@@ -20,20 +20,22 @@ import static com.android.providers.media.MediaProvider.TAG;
 
 import android.app.IntentService;
 import android.content.ContentProviderClient;
+import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaScanner;
 import android.net.Uri;
 import android.os.Environment;
 import android.os.PowerManager;
 import android.os.Trace;
-import android.os.UserManager;
 import android.provider.MediaStore;
 import android.util.Log;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 
 public class MediaService extends IntentService {
     public MediaService() {
@@ -54,8 +56,8 @@ public class MediaService extends IntentService {
     protected void onHandleIntent(Intent intent) {
         mWakeLock.acquire();
         Trace.traceBegin(Trace.TRACE_TAG_DATABASE, intent.getAction());
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "Begin " + intent);
+        if (Log.isLoggable(TAG, Log.INFO)) {
+            Log.i(TAG, "Begin " + intent);
         }
         try {
             switch (intent.getAction()) {
@@ -69,12 +71,13 @@ public class MediaService extends IntentService {
                     onPackageOrphaned(packageName);
                     break;
                 }
-                case Intent.ACTION_MEDIA_MOUNTED: {
-                    onScanVolume(intent.getData());
+                case Intent.ACTION_MEDIA_MOUNTED:
+                case Intent.ACTION_MEDIA_SCANNER_SCAN_VOLUME: {
+                    onScanVolume(this, intent.getData());
                     break;
                 }
                 case Intent.ACTION_MEDIA_SCANNER_SCAN_FILE: {
-                    onScanFile(intent.getData(), intent.getType());
+                    onScanFile(this, intent.getData(), intent.getType());
                     break;
                 }
                 default: {
@@ -83,10 +86,10 @@ public class MediaService extends IntentService {
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed operation " + intent);
+            Log.w(TAG, "Failed operation " + intent, e);
         } finally {
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "End " + intent);
+            if (Log.isLoggable(TAG, Log.INFO)) {
+                Log.i(TAG, "End " + intent);
             }
             Trace.traceEnd(Trace.TRACE_TAG_DATABASE);
             mWakeLock.release();
@@ -107,7 +110,9 @@ public class MediaService extends IntentService {
         }
     }
 
-    private void onScanVolume(Uri uri) throws IOException {
+    public static void onScanVolume(Context context, Uri uri) throws IOException {
+        final ContentResolver resolver = context.getContentResolver();
+
         final File file = new File(uri.getPath()).getCanonicalFile();
         final String volumeName = MediaStore.getVolumeName(file);
 
@@ -115,60 +120,50 @@ public class MediaService extends IntentService {
         // to ensure that we have ringtones ready to roll before a possibly very
         // long external storage scan
         if (MediaProvider.EXTERNAL_VOLUME.equals(volumeName)) {
-            onScanVolume(Uri.fromFile(Environment.getRootDirectory()));
+            onScanVolume(context, Uri.fromFile(Environment.getRootDirectory()));
         }
 
         try {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.MEDIA_SCANNER_VOLUME, volumeName);
-            Uri scanUri = getContentResolver().insert(MediaStore.getMediaScannerUri(), values);
-
-            if (!MediaProvider.INTERNAL_VOLUME.equals(volumeName)) {
-                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_STARTED, uri));
-            }
-
-            try (ContentProviderClient cpc = getContentResolver()
+            try (ContentProviderClient cpc = resolver
                     .acquireContentProviderClient(MediaStore.AUTHORITY)) {
                 ((MediaProvider) cpc.getLocalContentProvider()).attachVolume(volumeName);
             }
-            try (MediaScanner scanner = new MediaScanner(this, volumeName)) {
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MEDIA_SCANNER_VOLUME, volumeName);
+            Uri scanUri = resolver.insert(MediaStore.getMediaScannerUri(), values);
+
+            if (!MediaProvider.INTERNAL_VOLUME.equals(volumeName)) {
+                context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_STARTED, uri));
+            }
+
+            try (MediaScanner scanner = new MediaScanner(context, volumeName)) {
                 scanner.scanDirectories(resolveDirectories(volumeName));
             }
 
-            getContentResolver().delete(scanUri, null, null);
+            resolver.delete(scanUri, null, null);
 
         } finally {
             if (!MediaProvider.INTERNAL_VOLUME.equals(volumeName)) {
-                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_FINISHED, uri));
+                context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_FINISHED, uri));
             }
         }
     }
 
-    private Uri onScanFile(Uri uri, String mimeType) throws IOException {
+    public static Uri onScanFile(Context context, Uri uri, String mimeType) throws IOException {
         final File file = new File(uri.getPath()).getCanonicalFile();
         final String volumeName = MediaStore.getVolumeName(file);
 
-        try (MediaScanner scanner = new MediaScanner(this, volumeName)) {
+        try (MediaScanner scanner = new MediaScanner(context, volumeName)) {
             return scanner.scanSingleFile(file.getAbsolutePath(), mimeType);
         }
     }
 
-    private String[] resolveDirectories(String volumeName) throws FileNotFoundException {
-        if (MediaProvider.INTERNAL_VOLUME.equals(volumeName)) {
-            return new String[] {
-                    Environment.getRootDirectory() + "/media",
-                    Environment.getOemDirectory() + "/media",
-                    Environment.getProductDirectory() + "/media",
-            };
-        } else if (getSystemService(UserManager.class).isDemoUser()) {
-            return new String[] {
-                    MediaStore.getVolumePath(volumeName).getAbsolutePath(),
-                    Environment.getDataPreloadsMediaDirectory().getAbsolutePath(),
-            };
-        } else {
-            return new String[] {
-                    MediaStore.getVolumePath(volumeName).getAbsolutePath(),
-            };
+    private static String[] resolveDirectories(String volumeName) throws FileNotFoundException {
+        final ArrayList<String> res = new ArrayList<>();
+        for (File dir : MediaStore.getVolumeScanPaths(volumeName)) {
+            res.add(dir.getAbsolutePath());
         }
+        return res.toArray(new String[res.size()]);
     }
 }
