@@ -21,9 +21,8 @@ import android.app.ActivityManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.hardware.usb.IUsbManager;
 import android.hardware.usb.UsbManager;
-import android.Manifest;
 import android.mtp.MtpDatabase;
 import android.mtp.MtpServer;
 import android.os.Build;
@@ -40,7 +39,6 @@ import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.Preconditions;
-import android.hardware.usb.IUsbManager;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -181,7 +179,7 @@ public class MtpService extends Service {
             Log.d(TAG, "starting MTP server in " + (mPtpMode ? "PTP mode" : "MTP mode") +
                     " with storage " + primary.getPath() + (mUnlocked ? " unlocked" : "") + " as user " + UserHandle.myUserId());
 
-            final MtpDatabase database = new MtpDatabase(this, MediaProvider.EXTERNAL_VOLUME, subdirs);
+            final MtpDatabase database = new MtpDatabase(this, subdirs);
             IUsbManager usbMgr = IUsbManager.Stub.asInterface(ServiceManager.getService(
                     Context.USB_SERVICE));
             ParcelFileDescriptor controlFd = null;

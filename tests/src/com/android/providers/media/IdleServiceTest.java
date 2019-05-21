@@ -62,12 +62,12 @@ public class IdleServiceTest {
                 new File(dir, System.nanoTime() + ".jpg"));
         values.put(MediaColumns.DATA, file.getAbsolutePath());
         final Uri uri = isolatedResolver.insert(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
         final long id = ContentUris.parseId(uri);
 
         // Touch some thumbnail files
-        final File a = buildPath(dir, Environment.DIRECTORY_PICTURES, ".thumbnails", "21.jpg");
-        final File b = buildPath(dir, Environment.DIRECTORY_MOVIES, ".thumbnails", "12.jpg");
+        final File a = buildPath(dir, Environment.DIRECTORY_PICTURES, ".thumbnails", "1234567.jpg");
+        final File b = buildPath(dir, Environment.DIRECTORY_MOVIES, ".thumbnails", "7654321.jpg");
         final File c = buildPath(dir, Environment.DIRECTORY_PICTURES, ".thumbnails", id + ".jpg");
         final File d = buildPath(dir, Environment.DIRECTORY_PICTURES, ".thumbnails", "random.bin");
 

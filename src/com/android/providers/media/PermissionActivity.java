@@ -19,21 +19,27 @@ package com.android.providers.media;
 import static com.android.providers.media.MediaProvider.TAG;
 
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.provider.MediaStore.MediaColumns;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Size;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ImageView.ScaleType;
+import android.widget.TextView;
 
 import com.android.internal.app.AlertActivity;
 
@@ -56,18 +62,15 @@ public class PermissionActivity extends AlertActivity implements DialogInterface
         }
 
         final Resources res = getResources();
-        final ImageView thumbnailView = new ImageView(this);
-        thumbnailView.setScaleType(ScaleType.CENTER_INSIDE);
-        thumbnailView.setPadding(
-                0, res.getDimensionPixelSize(com.android.internal.R.dimen.default_gap), 0, 0);
-        new AsyncTask<Void, Void, Bitmap>() {
+        final FrameLayout view = new FrameLayout(this);
+        final int padding = res.getDimensionPixelSize(com.android.internal.R.dimen.default_gap);
+        view.setPadding(padding, padding, padding, padding);
+        new AsyncTask<Void, Void, Description>() {
             @Override
-            protected Bitmap doInBackground(Void... params) {
-                final Size size = new Size(res.getDisplayMetrics().widthPixels,
-                        res.getDisplayMetrics().widthPixels);
+            protected Description doInBackground(Void... params) {
                 try {
-                    return getContentResolver().loadThumbnail(getIntent().getData(), size, null);
-                } catch (IOException e) {
+                    return new Description(PermissionActivity.this, getIntent().getData());
+                } catch (Exception e) {
                     Log.w(TAG, e);
                     finish();
                     return null;
@@ -75,9 +78,25 @@ public class PermissionActivity extends AlertActivity implements DialogInterface
             }
 
             @Override
-            protected void onPostExecute(Bitmap result) {
-                Log.d(TAG, "Found thumbnail " + result.getWidth() + "x" + result.getHeight());
-                thumbnailView.setImageBitmap(result);
+            protected void onPostExecute(Description result) {
+                if (result == null) return;
+
+                if (result.thumbnail != null) {
+                    Log.d(TAG, "Found thumbnail " + result.thumbnail.getWidth() + "x"
+                            + result.thumbnail.getHeight());
+
+                    final ImageView child = new ImageView(PermissionActivity.this);
+                    child.setScaleType(ScaleType.CENTER_INSIDE);
+                    child.setImageBitmap(result.thumbnail);
+                    child.setContentDescription(result.contentDescription);
+                    view.addView(child);
+                } else {
+                    Log.d(TAG, "Found description " + result.contentDescription);
+
+                    final TextView child = new TextView(PermissionActivity.this);
+                    child.setText(result.contentDescription);
+                    view.addView(child);
+                }
             }
         }.execute();
 
@@ -87,7 +106,7 @@ public class PermissionActivity extends AlertActivity implements DialogInterface
         mAlertParams.mNegativeButtonText = getString(R.string.grant_dialog_button_deny);
         mAlertParams.mNegativeButtonListener = this;
         mAlertParams.mCancelable = false;
-        mAlertParams.mView = thumbnailView;
+        mAlertParams.mView = view;
         setupAlert();
 
         getWindow().setCloseOnTouchOutside(false);
@@ -140,5 +159,33 @@ public class PermissionActivity extends AlertActivity implements DialogInterface
             case "images": return R.string.permission_images;
         }
         throw new NameNotFoundException("Unknown media type " + uri);
+    }
+
+    private static class Description {
+        public Bitmap thumbnail;
+        public CharSequence contentDescription;
+
+        public Description(Context context, Uri uri) {
+            final Resources res = context.getResources();
+            final ContentResolver resolver = context.getContentResolver();
+
+            final Size size = new Size(res.getDisplayMetrics().widthPixels,
+                    res.getDisplayMetrics().widthPixels);
+            try {
+                thumbnail = resolver.loadThumbnail(uri, size, null);
+            } catch (IOException e) {
+                Log.w(TAG, e);
+            }
+            try (Cursor c = resolver.query(uri,
+                    new String[] { MediaColumns.DISPLAY_NAME }, null, null)) {
+                if (c.moveToFirst()) {
+                    contentDescription = c.getString(0);
+                }
+            }
+
+            if (TextUtils.isEmpty(contentDescription)) {
+                throw new IllegalStateException();
+            }
+        }
     }
 }
