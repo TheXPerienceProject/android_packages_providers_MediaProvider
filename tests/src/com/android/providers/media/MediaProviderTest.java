@@ -210,12 +210,10 @@ public class MediaProviderTest {
     @Test
     public void testBuildData_InvalidNames() throws Exception {
         final Uri uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-        assertThrows(IllegalArgumentException.class, () -> {
-            buildFile(uri, null, null, "foo/bar", "image/png");
-        });
-        assertThrows(IllegalArgumentException.class, () -> {
-            buildFile(uri, null, null, ".hidden", "image/png");
-        });
+        assertEndsWith("/Pictures/foo_bar.png",
+            buildFile(uri, null, null, "foo/bar", "image/png"));
+        assertEndsWith("/Pictures/_.hidden.png",
+            buildFile(uri, null, null, ".hidden", "image/png"));
     }
 
     @Test
@@ -598,7 +596,7 @@ public class MediaProviderTest {
             assertVolume(values, "0000-0000");
             assertBucket(values, "/storage/0000-0000/DCIM/Camera", "Camera");
             assertGroup(values, "IMG1024");
-            assertDirectories(values, "DCIM/Camera", "DCIM", "Camera");
+            assertDirectories(values, "DCIM/Camera/", "DCIM", "Camera");
         }
     }
 
@@ -610,13 +608,13 @@ public class MediaProviderTest {
         assertVolume(values, "0000-0000");
         assertBucket(values, "/storage/0000-0000/DCIM/Camera", "Camera");
         assertGroup(values, null);
-        assertDirectories(values, "DCIM/Camera", "DCIM", "Camera");
+        assertDirectories(values, "DCIM/Camera/", "DCIM", "Camera");
 
         values = computeDataValues("/storage/0000-0000/DCIM/Camera/.foo");
         assertVolume(values, "0000-0000");
         assertBucket(values, "/storage/0000-0000/DCIM/Camera", "Camera");
         assertGroup(values, null);
-        assertDirectories(values, "DCIM/Camera", "DCIM", "Camera");
+        assertDirectories(values, "DCIM/Camera/", "DCIM", "Camera");
     }
 
     @Test
@@ -643,25 +641,25 @@ public class MediaProviderTest {
             assertVolume(values, MediaStore.VOLUME_EXTERNAL_PRIMARY);
             assertBucket(values, top, null);
             assertGroup(values, "IMG1024");
-            assertDirectories(values, "", null, null);
+            assertDirectories(values, "/", null, null);
 
             values = computeDataValues(top + "/One/IMG1024.JPG");
             assertVolume(values, MediaStore.VOLUME_EXTERNAL_PRIMARY);
             assertBucket(values, top + "/One", "One");
             assertGroup(values, "IMG1024");
-            assertDirectories(values, "One", "One", null);
+            assertDirectories(values, "One/", "One", null);
 
             values = computeDataValues(top + "/One/Two/IMG1024.JPG");
             assertVolume(values, MediaStore.VOLUME_EXTERNAL_PRIMARY);
             assertBucket(values, top + "/One/Two", "Two");
             assertGroup(values, "IMG1024");
-            assertDirectories(values, "One/Two", "One", "Two");
+            assertDirectories(values, "One/Two/", "One", "Two");
 
             values = computeDataValues(top + "/One/Two/Three/IMG1024.JPG");
             assertVolume(values, MediaStore.VOLUME_EXTERNAL_PRIMARY);
             assertBucket(values, top + "/One/Two/Three", "Three");
             assertGroup(values, "IMG1024");
-            assertDirectories(values, "One/Two/Three", "One", "Two");
+            assertDirectories(values, "One/Two/Three/", "One", "Two");
         }
     }
 
