@@ -137,20 +137,15 @@ public class IsoInterface {
             return null;
         }
 
-        final int len = readInt(fd);
-        final int type = readInt(fd);
-
-        if (len == 0) {
-            throw new IOException("Invalid box length");
-        }
-
-        if (pos + len > end) {
-            Log.w(TAG, "Invalid box " + typeToString(type) + " of length " + len
+        final long len = Integer.toUnsignedLong(readInt(fd));
+        if (len <= 0 || pos + len > end) {
+            Log.w(TAG, "Invalid box at " + pos + " of length " + len
                     + " reached beyond end of parent " + end);
             return null;
         }
 
         // Skip past legacy data on 'meta' box
+        final int type = readInt(fd);
         if (type == BOX_META) {
             readInt(fd);
         }
@@ -168,13 +163,13 @@ public class IsoInterface {
                 Log.v(TAG, prefix + "  UUID " + box.uuid);
             }
 
-            box.data = new byte[len - 8 - 16];
+            box.data = new byte[(int) (len - 8 - 16)];
             IoBridge.read(fd, box.data, 0, box.data.length);
         }
 
         // Parse XMP box
         if (type == BOX_XMP) {
-            box.data = new byte[len - 8];
+            box.data = new byte[(int) (len - 8)];
             IoBridge.read(fd, box.data, 0, box.data.length);
         }
 
