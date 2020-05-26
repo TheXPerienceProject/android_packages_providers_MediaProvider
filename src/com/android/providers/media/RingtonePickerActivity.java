@@ -363,8 +363,21 @@ public final class RingtonePickerActivity extends AlertActivity implements
         }
 
         if (getCheckedItem() == POS_UNKNOWN) {
-            setCheckedItem(getListPosition(mRingtoneManager.getRingtonePosition(mExistingUri)));
-        }
+             int position = POS_UNKNOWN;
+             try {
+                 position = mRingtoneManager.getRingtonePosition(mExistingUri);
+             } catch (NumberFormatException e) {
+                 Log.e(TAG, "onPrepareListView Exception", e);
+             }
+
+             if (position != POS_UNKNOWN) {
+                 setCheckedItem(getListPosition(position));
+             }else{
+                 if (mHasDefaultItem) {
+                     setCheckedItem(mDefaultRingtonePos);
+                 }
+             }
+         }
 
         // In the buttonless (watch-only) version, preemptively set our result since we won't
         // have another chance to do so before the activity closes.
