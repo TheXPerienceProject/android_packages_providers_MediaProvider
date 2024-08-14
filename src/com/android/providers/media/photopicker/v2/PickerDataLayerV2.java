@@ -43,11 +43,14 @@ import androidx.annotation.Nullable;
 import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.sync.SyncCompletionWaiter;
 import com.android.providers.media.photopicker.sync.SyncTrackerRegistry;
+import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
+import com.android.providers.media.photopicker.util.exceptions.UnableToAcquireLockException;
 import com.android.providers.media.photopicker.v2.model.AlbumMediaQuery;
 import com.android.providers.media.photopicker.v2.model.AlbumsCursorWrapper;
 import com.android.providers.media.photopicker.v2.model.FavoritesMediaQuery;
 import com.android.providers.media.photopicker.v2.model.MediaQuery;
 import com.android.providers.media.photopicker.v2.model.MediaSource;
+import com.android.providers.media.photopicker.v2.model.ProviderCollectionInfo;
 import com.android.providers.media.photopicker.v2.model.VideoMediaQuery;
 
 import java.util.ArrayList;
@@ -56,7 +59,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * This class handles Photo Picker content queries.
+ * This class handles Photo Picker content queries.\
  */
 public class PickerDataLayerV2 {
     private static final String TAG = "PickerDataLayerV2";
@@ -65,6 +68,18 @@ public class PickerDataLayerV2 {
             AlbumColumns.ALBUM_ID_FAVORITES,
             AlbumColumns.ALBUM_ID_VIDEOS
     );
+
+    /**
+     * Refresh the cloud provider in-memory cache in PickerSyncController.
+     */
+    public static void ensureProviders() {
+        try {
+            final PickerSyncController syncController = PickerSyncController.getInstanceOrThrow();
+            syncController.maybeEnableCloudMediaQueries();
+        } catch (UnableToAcquireLockException | RequestObsoleteException exception) {
+            Log.e(TAG, "Could not ensure that the providers are set.");
+        }
+    }
 
     /**
      * Returns a cursor with the Photo Picker media in response.
@@ -833,6 +848,7 @@ public class PickerDataLayerV2 {
     @NonNull
     public static Cursor queryAvailableProviders(@NonNull Context context) {
         try {
+            final PackageManager packageManager = context.getPackageManager();
             final PickerSyncController syncController = PickerSyncController.getInstanceOrThrow();
             final String[] columnNames = Arrays
                     .stream(PickerSQLConstants.AvailableProviderResponse.values())
@@ -840,26 +856,36 @@ public class PickerDataLayerV2 {
                     .toArray(String[]::new);
             final MatrixCursor matrixCursor = new MatrixCursor(columnNames, /*initialCapacity */ 2);
             final String localAuthority = syncController.getLocalProvider();
-            addAvailableProvidersToCursor(matrixCursor,
+            final ProviderInfo localProviderInfo = packageManager.resolveContentProvider(
+                    localAuthority, /* flags */ 0);
+            final String localProviderLabel =
+                    String.valueOf(localProviderInfo.loadLabel(packageManager));
+            addAvailableProvidersToCursor(
+                    matrixCursor,
                     localAuthority,
                     MediaSource.LOCAL,
-                    Process.myUid());
+                    Process.myUid(),
+                    localProviderLabel
+            );
 
             final String cloudAuthority =
                     syncController.getCloudProviderOrDefault(/* defaultValue */ null);
             if (syncController.shouldQueryCloudMedia(cloudAuthority)) {
-                final PackageManager packageManager = context.getPackageManager();
-                final ProviderInfo providerInfo = requireNonNull(
+                final ProviderInfo cloudProviderInfo = requireNonNull(
                         packageManager.resolveContentProvider(cloudAuthority, /* flags */ 0));
                 final int uid = packageManager.getPackageUid(
-                        providerInfo.packageName,
+                        cloudProviderInfo.packageName,
                         /* flags */ 0
                 );
+                final String cloudProviderLabel =
+                        String.valueOf(cloudProviderInfo.loadLabel(packageManager));
                 addAvailableProvidersToCursor(
                         matrixCursor,
                         cloudAuthority,
                         MediaSource.REMOTE,
-                        uid);
+                        uid,
+                        cloudProviderLabel
+                );
             }
 
             return matrixCursor;
@@ -868,17 +894,74 @@ public class PickerDataLayerV2 {
         }
     }
 
+    /**
+     * @return a cursor with the Collection Info for all the available providers.
+     */
+    public static Cursor queryCollectionInfo() {
+        try {
+            final PickerSyncController syncController = PickerSyncController.getInstanceOrThrow();
+            final String[] columnNames = Arrays
+                    .stream(PickerSQLConstants.CollectionInfoResponse.values())
+                    .map(PickerSQLConstants.CollectionInfoResponse::getColumnName)
+                    .toArray(String[]::new);
+            final MatrixCursor matrixCursor = new MatrixCursor(columnNames, /*initialCapacity */ 2);
+            Bundle extras = new Bundle();
+            matrixCursor.setExtras(extras);
+            final ProviderCollectionInfo localCollectionInfo =
+                    syncController.getLocalProviderLatestCollectionInfo();
+            addCollectionInfoToCursor(
+                    matrixCursor,
+                    localCollectionInfo
+            );
+
+            final ProviderCollectionInfo cloudCollectionInfo =
+                    syncController.getCloudProviderLatestCollectionInfo();
+            if (cloudCollectionInfo != null
+                    && syncController.shouldQueryCloudMedia(cloudCollectionInfo.getAuthority())) {
+                addCollectionInfoToCursor(
+                        matrixCursor,
+                        cloudCollectionInfo
+                );
+            }
+
+            return matrixCursor;
+        } catch (IllegalStateException e) {
+            throw new RuntimeException("Unexpected internal error occurred", e);
+        }
+    }
+
     private static void addAvailableProvidersToCursor(
             @NonNull MatrixCursor cursor,
             @NonNull String authority,
             @NonNull MediaSource source,
-            @UserIdInt int uid) {
+            @UserIdInt int uid,
+            @Nullable String displayName) {
         cursor.newRow()
                 .add(PickerSQLConstants.AvailableProviderResponse.AUTHORITY.getColumnName(),
                         authority)
                 .add(PickerSQLConstants.AvailableProviderResponse.MEDIA_SOURCE.getColumnName(),
                         source.name())
-                .add(PickerSQLConstants.AvailableProviderResponse.UID.getColumnName(), uid);
+                .add(PickerSQLConstants.AvailableProviderResponse.UID.getColumnName(), uid)
+                .add(PickerSQLConstants.AvailableProviderResponse.DISPLAY_NAME.getColumnName(),
+                        displayName);
+    }
+
+    private static void addCollectionInfoToCursor(
+            @NonNull MatrixCursor cursor,
+            @NonNull ProviderCollectionInfo providerCollectionInfo) {
+        if (providerCollectionInfo != null) {
+            cursor.newRow()
+                    .add(PickerSQLConstants.CollectionInfoResponse.AUTHORITY.getColumnName(),
+                            providerCollectionInfo.getAuthority())
+                    .add(PickerSQLConstants.CollectionInfoResponse.COLLECTION_ID.getColumnName(),
+                            providerCollectionInfo.getCollectionId())
+                    .add(PickerSQLConstants.CollectionInfoResponse.ACCOUNT_NAME.getColumnName(),
+                            providerCollectionInfo.getAccountName());
+
+            Bundle extras = cursor.getExtras();
+            extras.putParcelable(providerCollectionInfo.getAuthority(),
+                    providerCollectionInfo.getAccountConfigurationIntent());
+        }
     }
 
     /**

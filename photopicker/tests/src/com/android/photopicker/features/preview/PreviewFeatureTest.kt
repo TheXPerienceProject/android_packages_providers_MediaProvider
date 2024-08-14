@@ -21,6 +21,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.UserManager
 import android.provider.CloudMediaProvider.CloudMediaSurfaceStateChangedCallback.PLAYBACK_STATE_ERROR_PERMANENT_FAILURE
@@ -51,6 +52,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.core.os.bundleOf
+import androidx.test.filters.SdkSuppress
 import com.android.photopicker.R
 import com.android.photopicker.core.ActivityModule
 import com.android.photopicker.core.ApplicationModule
@@ -60,6 +62,8 @@ import com.android.photopicker.core.ConcurrencyModule
 import com.android.photopicker.core.EmbeddedServiceModule
 import com.android.photopicker.core.Main
 import com.android.photopicker.core.ViewModelModule
+import com.android.photopicker.core.banners.BannerManager
+import com.android.photopicker.core.configuration.ConfigurationManager
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.Events
 import com.android.photopicker.core.features.FeatureManager
@@ -78,6 +82,7 @@ import com.android.photopicker.tests.utils.mockito.capture
 import com.android.photopicker.tests.utils.mockito.nonNullableEq
 import com.android.photopicker.tests.utils.mockito.whenever
 import com.google.common.truth.Truth.assertWithMessage
+import dagger.Lazy
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.android.testing.BindValue
@@ -120,6 +125,8 @@ import org.mockito.MockitoAnnotations
 )
 @HiltAndroidTest
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTestApi::class)
+// TODO(b/340770526) Fix tests that can't access [ICloudMediaSurfaceController] on R & S.
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
 class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
 
     /* Hilt's rule needs to come first to ensure the DI container is setup for the test. */
@@ -164,6 +171,8 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     @Inject lateinit var selection: Selection<Media>
     @Inject lateinit var featureManager: FeatureManager
     @Inject lateinit var events: Events
+    @Inject lateinit var bannerManager: Lazy<BannerManager>
+    @Inject override lateinit var configurationManager: ConfigurationManager
 
     val TEST_MEDIA_IMAGE =
         Media.Image(
@@ -324,6 +333,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
+                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -351,6 +361,49 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                 .isEqualTo(TEST_MEDIA_IMAGE)
         }
 
+    /** Ensures that the PreviewMedia route navigate back button. */
+    @Test
+    fun testNavigateBack() =
+        mainScope.runTest {
+            val resources = getTestableContext().getResources()
+
+            composeTestRule.setContent {
+                // Set an explicit size to prevent errors in glide being unable to measure
+                Column(modifier = Modifier.defaultMinSize(minHeight = 100.dp, minWidth = 100.dp)) {
+                    callPhotopickerMain(
+                        featureManager = featureManager,
+                        selection = selection,
+                        events = events,
+                        bannerManager = bannerManager.get(),
+                    )
+                }
+            }
+
+            val initialRoute = navController.currentBackStackEntry?.destination?.route
+            assertWithMessage("Unable to find initial route").that(initialRoute).isNotNull()
+
+            // Navigate on the UI thread (similar to a click handler)
+            composeTestRule.runOnUiThread({
+                navController.navigateToPreviewMedia(TEST_MEDIA_IMAGE)
+            })
+
+            assertWithMessage("Expected route to be preview/media")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.PREVIEW_MEDIA.route)
+
+            composeTestRule
+                .onNode(
+                    hasContentDescription(resources.getString(R.string.photopicker_back_option))
+                )
+                .assert(hasClickAction())
+                .performClick()
+            composeTestRule.waitForIdle()
+
+            assertWithMessage("Expected route to be initial route")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(initialRoute)
+        }
+
     @Test
     fun testNavigateToPreviewVideo() =
         mainScope.runTest {
@@ -359,6 +412,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -401,6 +455,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
+                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -455,6 +510,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
+                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -489,6 +545,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
+                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -555,6 +612,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
+                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -602,6 +660,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -649,6 +708,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -694,6 +754,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -745,6 +806,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -825,6 +887,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -899,6 +962,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -975,6 +1039,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -1049,6 +1114,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
+                    bannerManager = bannerManager.get(),
                 )
             }
 

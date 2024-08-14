@@ -25,6 +25,7 @@ import com.android.photopicker.core.configuration.PhotopickerConfiguration
 import com.android.photopicker.core.features.FeatureManager
 import com.android.photopicker.core.user.UserStatus
 import com.android.photopicker.data.model.CloudMediaProviderDetails
+import com.android.photopicker.data.model.CollectionInfo
 import com.android.photopicker.data.model.Group.Album
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.data.model.MediaPageKey
@@ -37,6 +38,8 @@ import com.android.photopicker.features.cloudmedia.CloudMediaFeature
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.Channel.Factory.CONFLATED
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -142,11 +145,13 @@ class DataServiceImpl(
      * providers. The [availableProviderCallbackFlow] can change if the active user in a session has
      * changed.
      *
-     * The initial value of this flow is an empty list to avoid an IPC to fetch the actual value
-     * from Media Provider from the main thread.
+     * This flow is directly initialized with the available providers fetched from the data source
+     * because if we initialize with a default empty list here, all PagingSource objects will get
+     * created with an empty provider list and result in a transient error state.
      */
-    private val _availableProviders: MutableStateFlow<List<Provider>> =
-        MutableStateFlow(emptyList())
+    private val _availableProviders: MutableStateFlow<List<Provider>> by lazy {
+        MutableStateFlow(fetchAvailableProviders())
+    }
 
     /**
      * Create an immutable state flow from the callback flow [_availableProviders]. The state flow
@@ -164,6 +169,12 @@ class DataServiceImpl(
             SharingStarted.WhileSubscribed(FLOW_TIMEOUT_MILLI_SECONDS),
             _availableProviders.value
         )
+
+    // Contains collection info cache
+    private val collectionInfoState =
+        CollectionInfoState(mediaProviderClient, _activeContentResolver, availableProviders)
+
+    override val disruptiveDataUpdateChannel = Channel<Unit>(CONFLATED)
 
     companion object {
         const val FLOW_TIMEOUT_MILLI_SECONDS: Long = 5000
@@ -214,25 +225,7 @@ class DataServiceImpl(
                                 "Available providers update notification received $providers"
                             )
 
-                            var updatedProviders: List<Provider> = providers
-                            if (!featureManager.isFeatureEnabled(CloudMediaFeature::class.java)) {
-                                updatedProviders =
-                                    providers.filter { it.mediaSource != MediaSource.REMOTE }
-                                Log.i(
-                                    DataService.TAG,
-                                    "Cloud media feature is not enabled, available providers are " +
-                                        "updated to  $updatedProviders"
-                                )
-                            }
-
-                            // Send refresh media request to Photo Picker.
-                            // TODO(b/340246010): This is required even when  there is no change in
-                            // the [availableProviders] state flow because PhotoPicker relies on the
-                            // UI to trigger a sync when the cloud provider changes. Further, a
-                            // successful sync enables cloud queries, which then updates the UI.
-                            refreshMedia(updatedProviders)
-
-                            _availableProviders.update { updatedProviders }
+                            updateAvailableProviders(providers)
                         }
                     }
 
@@ -316,7 +309,7 @@ class DataServiceImpl(
             }
             .map {
                 // Fetch the available providers again when a change is detected.
-                mediaProviderClient.fetchAvailableProviders(resolver)
+                fetchAvailableProviders()
             }
 
     /**
@@ -395,7 +388,7 @@ class DataServiceImpl(
                             availableProviders,
                             mediaProviderClient,
                             dispatcher,
-                            config.value.intent,
+                            config.value,
                         )
 
                     Log.v(
@@ -421,7 +414,7 @@ class DataServiceImpl(
                     availableProviders,
                     mediaProviderClient,
                     dispatcher,
-                    config.value.intent,
+                    config.value,
                 )
 
             Log.v(
@@ -449,7 +442,7 @@ class DataServiceImpl(
                     availableProviders,
                     mediaProviderClient,
                     dispatcher,
-                    config.value.intent,
+                    config.value,
                 )
 
             Log.v(DataService.TAG, "Created a media paging source that queries $availableProviders")
@@ -497,7 +490,7 @@ class DataServiceImpl(
                 album.authority,
                 providers,
                 _activeContentResolver.value,
-                config.value.intent
+                config.value
             )
         } else {
             Log.e(
@@ -509,15 +502,83 @@ class DataServiceImpl(
         }
     }
 
+    override suspend fun getCollectionInfo(provider: Provider): CollectionInfo {
+        return collectionInfoState.getCollectionInfo(provider)
+    }
+
+    override suspend fun ensureProviders() {
+        mediaProviderClient.ensureProviders(_activeContentResolver.value)
+        updateAvailableProviders(fetchAvailableProviders())
+    }
+
+    /**
+     * Sends an update to the [_availableProviders] State flow. Collection info cache gets cleared
+     * because it is potentially stale. If the new set of available providers does not contain all
+     * of the previously available providers, then the UI should ideally clear itself immediately to
+     * avoid displaying any media items from a clud provider that is not currently available. To
+     * communicate this with the UI, [disruptiveDataUpdateChannel] might emit a Unit object.
+     *
+     * @param providers The list of new available providers.
+     */
+    private suspend fun updateAvailableProviders(providers: List<Provider>) {
+        // Send refresh media request to Photo Picker.
+        // TODO(b/340246010): This is required even when there is no change in
+        // the [availableProviders] state flow because PhotoPicker relies on the
+        // UI to trigger a sync when the cloud provider changes. Further, a
+        // successful sync enables cloud queries, which then updates the UI.
+        refreshMedia(providers)
+
+        val previouslyAvailableProviders = _availableProviders.value
+
+        _availableProviders.update { providers }
+
+        // If the available providers are not a superset of previously available
+        // providers, this is a disruptive data update that should ideally
+        // reset the UI.
+        if (!providers.containsAll(previouslyAvailableProviders)) {
+            Log.d(DataService.TAG, "Sending a disruptive data update notification.")
+            disruptiveDataUpdateChannel.send(Unit)
+        }
+
+        // Clear collection info cache immediately and update the cache from
+        // data source in a child coroutine.
+        collectionInfoState.clear()
+    }
+
+    /**
+     * Sends a refresh media notification to the data source. This signal tells the data source to
+     * refresh its cache.
+     *
+     * @param providers The list of currently available providers.
+     */
     private fun refreshMedia(availableProviders: List<Provider>) {
         if (availableProviders.isNotEmpty()) {
             mediaProviderClient.refreshMedia(
                 availableProviders,
                 _activeContentResolver.value,
-                config.value.intent,
+                config.value,
             )
         } else {
             Log.w(DataService.TAG, "Cannot refresh media when there are no providers available")
         }
+    }
+
+    /**
+     * Fetch available providers from the data source and return it. If the [CloudMediaFeature] is
+     * turned off, the available list of providers received from the data source will filter out all
+     * providers that serve [MediaSource.Remote] items.
+     */
+    private fun fetchAvailableProviders(): List<Provider> {
+        var availableProviders =
+            mediaProviderClient.fetchAvailableProviders(_activeContentResolver.value)
+        if (!featureManager.isFeatureEnabled(CloudMediaFeature::class.java)) {
+            availableProviders = availableProviders.filter { it.mediaSource != MediaSource.REMOTE }
+            Log.i(
+                DataService.TAG,
+                "Cloud media feature is not enabled, available providers are " +
+                    "updated to  $availableProviders"
+            )
+        }
+        return availableProviders
     }
 }
