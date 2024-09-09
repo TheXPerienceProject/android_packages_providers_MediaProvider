@@ -47,13 +47,17 @@ import com.android.photopicker.core.Main
 import com.android.photopicker.core.configuration.ConfigurationManager
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
 import com.android.photopicker.core.configuration.PhotopickerConfiguration
+import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
 import com.android.photopicker.core.configuration.provideTestConfigurationFlow
 import com.android.photopicker.core.configuration.testPhotopickerConfiguration
+import com.android.photopicker.core.configuration.testUserSelectImagesForAppConfiguration
 import com.android.photopicker.core.events.Events
 import com.android.photopicker.core.events.LocalEvents
+import com.android.photopicker.core.events.generatePickerSessionId
 import com.android.photopicker.core.features.FeatureManager
 import com.android.photopicker.core.features.LocalFeatureManager
 import com.android.photopicker.core.features.LocationParams
+import com.android.photopicker.core.glide.GlideTestRule
 import com.android.photopicker.core.navigation.LocalNavController
 import com.android.photopicker.core.selection.LocalSelection
 import com.android.photopicker.core.selection.Selection
@@ -103,15 +107,18 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
     @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule(activityClass = HiltTestActivity::class.java)
+    @get:Rule(order = 2) val glideRule = GlideTestRule()
 
     /* Setup dependencies for the UninstallModules for the test class. */
     @Module @InstallIn(SingletonComponent::class) class TestModule : PhotopickerTestModule()
 
     val testDispatcher = StandardTestDispatcher()
+    val sessionId = generatePickerSessionId()
 
     /* Overrides for ActivityModule */
-    @BindValue @Main val mainScope: TestScope = TestScope(testDispatcher)
-    @BindValue @Background var testBackgroundScope: CoroutineScope = mainScope.backgroundScope
+    val testScope: TestScope = TestScope(testDispatcher)
+    @BindValue @Main val mainScope: CoroutineScope = testScope
+    @BindValue @Background var testBackgroundScope: CoroutineScope = testScope.backgroundScope
 
     /* Overrides for the ConcurrencyModule */
     @BindValue @Main val mainDispatcher: CoroutineDispatcher = testDispatcher
@@ -124,7 +131,7 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
     @Inject lateinit var mockContext: Context
     @Inject lateinit var selection: Lazy<Selection<Media>>
     @Inject lateinit var featureManager: Lazy<FeatureManager>
-    @Inject override lateinit var configurationManager: ConfigurationManager
+    @Inject override lateinit var configurationManager: Lazy<ConfigurationManager>
     @Inject lateinit var events: Lazy<Events>
 
     val TEST_TAG_SELECTION_BAR = "selection_bar"
@@ -167,7 +174,7 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
             Intent(MediaStore.ACTION_PICK_IMAGES).apply {
                 putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, 5)
             }
-        configurationManager.setIntent(testIntent)
+        configurationManager.get().setIntent(testIntent)
 
         // Stub for MockContentResolver constructor
         whenever(mockContext.getApplicationInfo()) { getTestableContext().getApplicationInfo() }
@@ -182,46 +189,86 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
     }
 
     @Test
-    fun testSelectionBarIsEnabledWithSelectionLimit() {
-        val configOne = PhotopickerConfiguration(action = "TEST_ACTION", selectionLimit = 5)
+    fun testSelectionBarIsEnabledWithSelectionLimitInActivityMode() {
+        val configOne =
+            PhotopickerConfiguration(
+                action = "TEST_ACTION",
+                selectionLimit = 5,
+                sessionId = sessionId
+            )
         assertWithMessage("SelectionBarFeature is not always enabled for TEST_ACTION")
             .that(SelectionBarFeature.Registration.isEnabled(configOne))
             .isEqualTo(true)
 
         val configTwo =
-            PhotopickerConfiguration(action = MediaStore.ACTION_PICK_IMAGES, selectionLimit = 5)
+            PhotopickerConfiguration(
+                action = MediaStore.ACTION_PICK_IMAGES,
+                selectionLimit = 5,
+                sessionId = sessionId
+            )
         assertWithMessage("SelectionBarFeature is not always enabled")
             .that(SelectionBarFeature.Registration.isEnabled(configTwo))
             .isEqualTo(true)
 
         val configThree =
-            PhotopickerConfiguration(action = Intent.ACTION_GET_CONTENT, selectionLimit = 5)
+            PhotopickerConfiguration(
+                action = Intent.ACTION_GET_CONTENT,
+                selectionLimit = 5,
+                sessionId = sessionId
+            )
         assertWithMessage("SelectionBarFeature is not always enabled")
             .that(SelectionBarFeature.Registration.isEnabled(configThree))
             .isEqualTo(true)
     }
 
     @Test
-    fun testSelectionBarNotEnabledForSingleSelect() {
-        val configOne = PhotopickerConfiguration(action = "TEST_ACTION")
+    fun testSelectionBarNotEnabledForSingleSelectInActivityMode() {
+        val configOne = PhotopickerConfiguration(action = "TEST_ACTION", sessionId = sessionId)
         assertWithMessage("SelectionBarFeature is not always enabled for TEST_ACTION")
             .that(SelectionBarFeature.Registration.isEnabled(configOne))
             .isEqualTo(false)
 
-        val configTwo = PhotopickerConfiguration(action = MediaStore.ACTION_PICK_IMAGES)
+        val configTwo =
+            PhotopickerConfiguration(action = MediaStore.ACTION_PICK_IMAGES, sessionId = sessionId)
         assertWithMessage("SelectionBarFeature is not always enabled")
             .that(SelectionBarFeature.Registration.isEnabled(configTwo))
             .isEqualTo(false)
 
-        val configThree = PhotopickerConfiguration(action = Intent.ACTION_GET_CONTENT)
+        val configThree =
+            PhotopickerConfiguration(action = Intent.ACTION_GET_CONTENT, sessionId = sessionId)
         assertWithMessage("SelectionBarFeature is not always enabled")
             .that(SelectionBarFeature.Registration.isEnabled(configThree))
             .isEqualTo(false)
     }
 
     @Test
+    fun testSelectionBarIsAlwaysEnabledInEmbeddedMode() {
+        val configOne =
+            PhotopickerConfiguration(
+                action = "",
+                runtimeEnv = PhotopickerRuntimeEnv.EMBEDDED,
+                selectionLimit = 1,
+                sessionId = sessionId
+            )
+        assertWithMessage("SelectionBarFeature not always enabled for EMBEDDED mode")
+            .that(SelectionBarFeature.Registration.isEnabled(configOne))
+            .isEqualTo(true)
+
+        val configTwo =
+            PhotopickerConfiguration(
+                action = "",
+                runtimeEnv = PhotopickerRuntimeEnv.EMBEDDED,
+                selectionLimit = 20,
+                sessionId = sessionId
+            )
+        assertWithMessage("SelectionBarFeature not always enabled for EMBEDDED mode")
+            .that(SelectionBarFeature.Registration.isEnabled(configTwo))
+            .isEqualTo(true)
+    }
+
+    @Test
     fun testSelectionBarIsShown() {
-        mainScope.runTest {
+        testScope.runTest {
             val photopickerConfiguration: PhotopickerConfiguration = testPhotopickerConfiguration
             composeTestRule.setContent {
                 CompositionLocalProvider(
@@ -252,6 +299,37 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
     }
 
     @Test
+    fun testSelectionBarIsAlwaysShownForGrantsAwareSelection() {
+        testScope.runTest {
+            val photopickerConfiguration: PhotopickerConfiguration =
+                testUserSelectImagesForAppConfiguration
+            composeTestRule.setContent {
+                CompositionLocalProvider(
+                    LocalFeatureManager provides featureManager.get(),
+                    LocalSelection provides selection.get(),
+                    LocalEvents provides events.get(),
+                    LocalNavController provides createNavController(),
+                    LocalPhotopickerConfiguration provides photopickerConfiguration,
+                ) {
+                    PhotopickerTheme(isDarkTheme = false, config = photopickerConfiguration) {
+                        SelectionBar(
+                            modifier = Modifier.testTag(TEST_TAG_SELECTION_BAR),
+                            params = LocationParams.None
+                        )
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            // verify that the selection bar is displayed
+            composeTestRule
+                .onNode(hasTestTag(TEST_TAG_SELECTION_BAR))
+                .assertExists()
+                .assertIsDisplayed()
+        }
+    }
+
+    @Test
     fun testSelectionBarShowsSecondaryAction() {
         val testFeatureRegistrations =
             setOf(
@@ -259,7 +337,7 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
                 SimpleUiFeature.Registration,
             )
 
-        mainScope.runTest {
+        testScope.runTest {
             val testFeatureManager =
                 FeatureManager(
                     provideTestConfigurationFlow(scope = this.backgroundScope),
@@ -298,7 +376,7 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
     @Test
     fun testSelectionBarPrimaryAction() {
 
-        mainScope.runTest {
+        testScope.runTest {
             val clicked = CompletableDeferred<Boolean>()
             val photopickerConfiguration: PhotopickerConfiguration = testPhotopickerConfiguration
             composeTestRule.setContent {
@@ -343,7 +421,7 @@ class SelectionBarFeatureTest : PhotopickerFeatureBaseTest() {
     @Test
     fun testSelectionBarClearSelection() {
 
-        mainScope.runTest {
+        testScope.runTest {
             val photopickerConfiguration: PhotopickerConfiguration = testPhotopickerConfiguration
 
             composeTestRule.setContent {

@@ -40,6 +40,7 @@ import android.test.mock.MockContentResolver
 import android.view.Surface
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
@@ -61,13 +62,23 @@ import com.android.photopicker.core.Background
 import com.android.photopicker.core.ConcurrencyModule
 import com.android.photopicker.core.EmbeddedServiceModule
 import com.android.photopicker.core.Main
+import com.android.photopicker.core.PhotopickerMain
 import com.android.photopicker.core.ViewModelModule
-import com.android.photopicker.core.banners.BannerManager
 import com.android.photopicker.core.configuration.ConfigurationManager
+import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
+import com.android.photopicker.core.configuration.testUserSelectImagesForAppConfiguration
 import com.android.photopicker.core.events.Events
+import com.android.photopicker.core.events.LocalEvents
 import com.android.photopicker.core.features.FeatureManager
+import com.android.photopicker.core.features.LocalFeatureManager
+import com.android.photopicker.core.glide.GlideTestRule
+import com.android.photopicker.core.navigation.LocalNavController
 import com.android.photopicker.core.navigation.PhotopickerDestinations
+import com.android.photopicker.core.selection.GrantsAwareSelectionImpl
+import com.android.photopicker.core.selection.LocalSelection
 import com.android.photopicker.core.selection.Selection
+import com.android.photopicker.core.theme.PhotopickerTheme
+import com.android.photopicker.data.TestDataServiceImpl
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.data.model.MediaSource
 import com.android.photopicker.extensions.navigateToPreviewMedia
@@ -94,6 +105,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -129,6 +142,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
     @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule(activityClass = HiltTestActivity::class.java)
+    @get:Rule(order = 2) val glideRule = GlideTestRule()
 
     /* Setup dependencies for the UninstallModules for the test class. */
     @Module @InstallIn(SingletonComponent::class) class TestModule : PhotopickerTestModule()
@@ -136,11 +150,12 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     val testDispatcher = StandardTestDispatcher()
 
     /* Overrides for ActivityModule */
-    @BindValue @Main val mainScope: TestScope = TestScope(testDispatcher)
-    @BindValue @Background var testBackgroundScope: CoroutineScope = mainScope.backgroundScope
+    val testScope: TestScope = TestScope(testDispatcher)
+    @BindValue @Main val mainScope: CoroutineScope = testScope
+    @BindValue @Background var testBackgroundScope: CoroutineScope = testScope.backgroundScope
 
     /* Overrides for ViewModelModule */
-    @BindValue val viewModelScopeOverride: CoroutineScope? = mainScope.backgroundScope
+    @BindValue val viewModelScopeOverride: CoroutineScope? = testScope.backgroundScope
 
     /* Overrides for the ConcurrencyModule */
     @BindValue @Main val mainDispatcher: CoroutineDispatcher = testDispatcher
@@ -167,8 +182,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     @Inject lateinit var selection: Selection<Media>
     @Inject lateinit var featureManager: FeatureManager
     @Inject lateinit var events: Events
-    @Inject lateinit var bannerManager: Lazy<BannerManager>
-    @Inject override lateinit var configurationManager: ConfigurationManager
+    @Inject override lateinit var configurationManager: Lazy<ConfigurationManager>
 
     val TEST_MEDIA_IMAGE =
         Media.Image(
@@ -321,7 +335,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures that the PreviewMedia route can be navigated to with an Image payload. */
     @Test
     fun testNavigateToPreviewImage() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 // Set an explicit size to prevent errors in glide being unable to measure
                 Column(modifier = Modifier.defaultMinSize(minHeight = 100.dp, minWidth = 100.dp)) {
@@ -329,7 +343,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
-                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -360,7 +373,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures that the PreviewMedia route navigate back button. */
     @Test
     fun testNavigateBack() =
-        mainScope.runTest {
+        testScope.runTest {
             val resources = getTestableContext().getResources()
 
             composeTestRule.setContent {
@@ -370,7 +383,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
-                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -402,13 +414,12 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
 
     @Test
     fun testNavigateToPreviewVideo() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 callPhotopickerMain(
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -438,7 +449,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the PreviewSelection route can be navigated to. */
     @Test
     fun testNavigateToPreviewSelection() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 // Set an explicit size to prevent errors in glide being unable to measure
                 Column(modifier = Modifier.defaultMinSize(minHeight = 100.dp, minWidth = 100.dp)) {
@@ -446,7 +457,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
-                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -456,6 +466,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
 
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToPreviewSelection() })
+            composeTestRule.waitForIdle()
 
             assertWithMessage("Expected route to be preview/selection")
                 .that(navController.currentBackStackEntry?.destination?.route)
@@ -468,7 +479,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
      */
     @Test
     fun testPreviewSelectionActions() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 // Set an explicit size to prevent errors in glide being unable to measure
                 Column(modifier = Modifier.defaultMinSize(minHeight = 100.dp, minWidth = 100.dp)) {
@@ -476,7 +487,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
-                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -538,9 +548,90 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                 .contains(TEST_MEDIA_IMAGE)
         }
 
+    /**
+     * Ensures the PreviewSelection select and deselect actions are not displayed when the selection
+     * is grants aware.
+     */
+    @Test
+    fun testPreviewSelectionActionsWithGrantsAwareSelection() =
+        testScope.runTest {
+            composeTestRule.setContent {
+                val testPhotoPickerConfiguration = testUserSelectImagesForAppConfiguration
+                val selection =
+                    GrantsAwareSelectionImpl<Media>(
+                        backgroundScope,
+                        null,
+                        MutableStateFlow(testPhotoPickerConfiguration),
+                        TestDataServiceImpl().preGrantedMediaCount
+                    )
+                val navController = createNavController()
+                val disruptiveFlow = flow { emit(0) }
+                // Set an explicit size to prevent errors in glide being unable to measure
+                Column(modifier = Modifier.defaultMinSize(minHeight = 100.dp, minWidth = 100.dp)) {
+                    CompositionLocalProvider(
+                        LocalFeatureManager provides featureManager,
+                        LocalSelection provides selection,
+                        LocalPhotopickerConfiguration provides testPhotoPickerConfiguration,
+                        LocalNavController provides navController,
+                        LocalEvents provides events
+                    ) {
+                        PhotopickerTheme(config = testPhotoPickerConfiguration) {
+                            PhotopickerMain(disruptiveDataNotification = disruptiveFlow)
+                        }
+                    }
+                }
+            }
+
+            selection.clear()
+            // Add an item to make the preview option visible
+            selection.add(TEST_MEDIA_IMAGE)
+            advanceTimeBy(100)
+
+            // Verify that the select all and de-select all option is not available for
+            // grantsAwareSelection.
+            val resources = getTestableContext().getResources()
+            val selectButtonLabel =
+                resources.getString(
+                    R.string.photopicker_select_button_label,
+                    selection.snapshot().size
+                )
+            val deselectButtonLabel =
+                resources.getString(
+                    R.string.photopicker_deselect_button_label,
+                    selection.snapshot().size
+                )
+
+            // Navigate on the UI thread (similar to a click handler)
+            composeTestRule.runOnUiThread({ navController.navigateToPreviewSelection() })
+
+            // Wait for the flows to resolve and the UI to update.
+            composeTestRule.waitForIdle()
+            advanceTimeBy(100)
+
+            assertWithMessage("Expected route to be preview/media")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.PREVIEW_SELECTION.route)
+
+            advanceTimeBy(100)
+            composeTestRule.waitForIdle()
+
+            // Allow the PreviewViewModel to collect flows
+            advanceTimeBy(100)
+
+            composeTestRule.onNode(hasText(deselectButtonLabel)).assertIsNotDisplayed()
+
+            composeTestRule.onNode(hasText(selectButtonLabel)).assertIsNotDisplayed()
+
+            // Allow selection to update
+            advanceTimeBy(100)
+            assertWithMessage("Selection did not contain an expected item")
+                .that(selection.snapshot())
+                .contains(TEST_MEDIA_IMAGE)
+        }
+
     @Test
     fun testPreviewDoneNavigatesBack() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 // Set an explicit size to prevent errors in glide being unable to measure
                 Column(modifier = Modifier.defaultMinSize(minHeight = 100.dp, minWidth = 100.dp)) {
@@ -548,7 +639,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                         featureManager = featureManager,
                         selection = selection,
                         events = events,
-                        bannerManager = bannerManager.get(),
                     )
                 }
             }
@@ -591,13 +681,12 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi creates a RemoteSurfaceController */
     @Test
     fun testVideoUiCreatesRemoteSurfaceController() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 callPhotopickerMain(
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -639,13 +728,12 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi notifies of surfaceCreation */
     @Test
     fun testVideoUiNotifySurfaceCreated() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 callPhotopickerMain(
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -685,13 +773,12 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi attempts to play videos when the controller indicates it is ready. */
     @Test
     fun testVideoUiRequestsPlayWhenMediaReady() =
-        mainScope.runTest {
+        testScope.runTest {
             composeTestRule.setContent {
                 callPhotopickerMain(
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -723,7 +810,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi auto shows & hides the player controls. */
     @Test
     fun testVideoUiShowsAndHidesPlayerControls() =
-        mainScope.runTest {
+        testScope.runTest {
             val resources = getTestableContext().getResources()
 
             val playButtonDescription =
@@ -743,7 +830,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -810,7 +896,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi Play/Pause buttons work correctly. */
     @Test
     fun testVideoUiPlayPauseButtonOnClick() =
-        mainScope.runTest {
+        testScope.runTest {
             val resources = getTestableContext().getResources()
 
             val playButtonDescription =
@@ -824,7 +910,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -886,7 +971,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi Mute/UnMute buttons work correctly. */
     @Test
     fun testVideoUiMuteButtonOnClick() =
-        mainScope.runTest {
+        testScope.runTest {
             val resources = getTestableContext().getResources()
             val muteButtonDescription =
                 resources.getString(R.string.photopicker_video_mute_button_description)
@@ -899,7 +984,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -962,7 +1046,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi shows an error dialog for temporary failures. */
     @Test
     fun testVideoUiRetriablePlaybackError() =
-        mainScope.runTest {
+        testScope.runTest {
             val resources = getTestableContext().getResources()
 
             val retryButtonLabel =
@@ -976,7 +1060,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
@@ -1040,7 +1123,7 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
     /** Ensures the VideoUi shows a snackbar for permanent failures. */
     @Test
     fun testVideoUiPermanentPlaybackError() =
-        mainScope.runTest {
+        testScope.runTest {
             val resources = getTestableContext().getResources()
 
             val errorMessage =
@@ -1051,7 +1134,6 @@ class PreviewFeatureTest : PhotopickerFeatureBaseTest() {
                     featureManager = featureManager,
                     selection = selection,
                     events = events,
-                    bannerManager = bannerManager.get(),
                 )
             }
 
