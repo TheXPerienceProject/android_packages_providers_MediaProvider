@@ -131,7 +131,7 @@ open class Session(
     companion object {
         val TAG: String = "PhotopickerEmbeddedSession"
         // Time interval to notify client about selected/deselected Uris
-        const val URI_DEBOUNCE_TIME: Long = 400 // In milliseconds
+        private const val URI_DEBOUNCE_TIME: Long = 400 // In milliseconds
     }
 
     /**
@@ -186,6 +186,12 @@ open class Session(
             prev + 1
         }
     }
+
+    /** List of all effectively selected Uris in current time interval */
+    private var _selectedUris: MutableList<Uri> = mutableListOf()
+
+    /** List of all effectively deselected Uris in current time interval */
+    private var _deselectedUris: MutableList<Uri> = mutableListOf()
 
     private val _host: SurfaceControlViewHost
     private val _view: ComposeView
@@ -407,7 +413,13 @@ open class Session(
                     newlySelectedMedia.iterator().forEach { item ->
                         val result = grantUriPermission(clientPackageName, item.mediaUri)
                         if (result == EmbeddedService.GrantResult.SUCCESS) {
-                            selectedUris.add(item.mediaUri)
+                            // no need to notify the client if some media item was
+                            // already selected -> deselected -> selected again
+                            if (_deselectedUris.contains(item.mediaUri)) {
+                                _deselectedUris.remove(item.mediaUri)
+                            } else {
+                                _selectedUris.add(item.mediaUri)
+                            }
                         } else {
                             Log.w(
                                 TAG,
@@ -421,7 +433,13 @@ open class Session(
                     unselectedMedia.iterator().forEach { item ->
                         val result = revokeUriPermission(clientPackageName, item.mediaUri)
                         if (result == EmbeddedService.GrantResult.SUCCESS) {
-                            deselectedUris.add(item.mediaUri)
+                            // no need to notify the client if some media item was
+                            // already deselected -> selected -> deselected again
+                            if (_selectedUris.contains(item.mediaUri)) {
+                                _selectedUris.remove(item.mediaUri)
+                            } else {
+                                _deselectedUris.add(item.mediaUri)
+                            }
                         } else {
                             Log.w(
                                 TAG,
@@ -430,20 +448,29 @@ open class Session(
                             )
                         }
                     }
-
-                    // notify client about final selection
-                    if (selectedUris.isNotEmpty()) {
-                        clientCallback.onUriPermissionGranted(selectedUris)
-                    }
-                    if (deselectedUris.isNotEmpty()) {
-                        clientCallback.onUriPermissionRevoked(deselectedUris)
-                    }
-
                     // Update previous selection to current flow
                     _newSelection
                 }
-                .collect()
+                .debounce(URI_DEBOUNCE_TIME)
+                .collect {
+                    // When the user interaction remains stable for [URI_DEBOUNCE_TIME] time,
+                    // the code below will start executing, and the client callback will be
+                    // informed about the user media selection
+                    if (_selectedUris.isNotEmpty()) {
+                        clientCallback.onUriPermissionGranted(_selectedUris.toList())
+                    }
+                    if (_deselectedUris.isNotEmpty()) {
+                        clientCallback.onUriPermissionRevoked(_deselectedUris.toList())
+                    }
+                    _deselectedUris.clear()
+                    _selectedUris.clear()
+                }
         }
+    }
+
+    /** returns URI Debounce Time. This method is added specifically for tests */
+    fun getURIDebounceTime(): Long {
+        return URI_DEBOUNCE_TIME
     }
 
     override fun notifyVisibilityChanged(isVisible: Boolean) {
