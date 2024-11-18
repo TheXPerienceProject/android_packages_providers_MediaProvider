@@ -945,14 +945,16 @@ public final class CloudMediaProviderContract {
      * Constant used to execute {@link CloudMediaProvider#onGetCapabilities()} via
      * {@link android.content.ContentProvider#call}.
      *
+     * {@hide}
      */
-    static final String METHOD_GET_CAPABILITIES = "android:getCapabilities";
+    public static final String METHOD_GET_CAPABILITIES = "android:getCapabilities";
 
     /**
      * Constant used to get/set {@link Capabilities} in {@link Bundle}.
      *
+     * {@hide}
      */
-    static final String EXTRA_PROVIDER_CAPABILITIES =
+    public static final String EXTRA_PROVIDER_CAPABILITIES =
             "android.provider.extra.PROVIDER_CAPABILITIES";
 
 
@@ -1406,7 +1408,8 @@ public final class CloudMediaProviderContract {
     }
 
     /**
-     * Represents a generic text search suggestion.
+     * Represents a generic text search suggestion. This can be treated as a default when the type
+     * of search suggestions is unknown.
      * @see SearchSuggestionColumns#TYPE
      * Type: INTEGER
      */
