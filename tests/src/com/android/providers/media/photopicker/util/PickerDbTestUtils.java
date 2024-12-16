@@ -16,6 +16,8 @@
 
 package com.android.providers.media.photopicker.util;
 
+import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_ALBUM;
+
 import static com.android.providers.media.util.MimeUtils.getExtensionFromMimeType;
 
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -29,7 +31,6 @@ import android.provider.MediaStore;
 import com.android.providers.media.MediaGrants;
 import com.android.providers.media.PickerUriResolver;
 import com.android.providers.media.photopicker.data.PickerDbFacade;
-import com.android.providers.media.photopicker.v2.model.SearchSuggestionType;
 
 public class PickerDbTestUtils {
     public static final long SIZE_BYTES = 7000;
@@ -324,7 +325,7 @@ public class PickerDbTestUtils {
         String[] projectionValue = new String[]{
                 mediaSetId,
                 "display_text",
-                SearchSuggestionType.ALBUM.name(),
+                SEARCH_SUGGESTION_ALBUM,
                 CLOUD_ID_1,
         };
 
@@ -333,6 +334,32 @@ public class PickerDbTestUtils {
         return c;
     }
 
+    public static Cursor getMediaCategoriesCursor(String categoryId) {
+        String[] projectionKey = new String[]{
+                CloudMediaProviderContract.MediaCategoryColumns.ID,
+                CloudMediaProviderContract.MediaCategoryColumns.DISPLAY_NAME,
+                CloudMediaProviderContract.MediaCategoryColumns.MEDIA_CATEGORY_TYPE,
+                CloudMediaProviderContract.MediaCategoryColumns.MEDIA_COVER_ID1,
+                CloudMediaProviderContract.MediaCategoryColumns.MEDIA_COVER_ID2,
+                CloudMediaProviderContract.MediaCategoryColumns.MEDIA_COVER_ID3,
+                CloudMediaProviderContract.MediaCategoryColumns.MEDIA_COVER_ID4,
+        };
+
+        String[] projectionValue = new String[]{
+                categoryId,
+                "display_text",
+                CloudMediaProviderContract.MEDIA_CATEGORY_TYPE_PEOPLE_AND_PETS,
+                CLOUD_ID_1,
+                CLOUD_ID_2,
+                /* MEDIA_COVER_ID3 */ null,
+                /* MEDIA_COVER_ID4 */ null
+        };
+
+        MatrixCursor c = new MatrixCursor(
+                CloudMediaProviderContract.MediaCategoryColumns.ALL_PROJECTION);
+        c.addRow(projectionValue);
+        return c;
+    }
     public static String toMediaStoreUri(String localId) {
         if (localId == null) {
             return null;
