@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 
+#include "page_object.h"
+
 // Goes first due to conflicts.
 #include "document.h"
 #include "rect.h"
@@ -33,11 +35,14 @@
 namespace {
 
 using ::pdfClient::Document;
+using ::pdfClient::ImageObject;
 using ::pdfClient::Page;
+using ::pdfClient::PageObject;
 using ::pdfClient::Rectangle_i;
 
 static const std::string kTestdata = "testdata";
 static const std::string kSekretNoPassword = "sekret_no_password.pdf";
+static const std::string kImageObject = "image_object.pdf";
 
 std::string GetTestDataDir() {
     return android::base::GetExecutableDirectory();
@@ -197,6 +202,100 @@ TEST(Test, InvalidPageNumberTest) {
     // The following should not crash, we do not expect anything in return.
     page->InitializeFormFilling();
     page->TerminateFormFilling();
+}
+
+TEST(Test, GetPageObjectsTest) {
+    Document doc(LoadTestDocument(kImageObject), false);
+
+    std::shared_ptr<Page> page = doc.GetPage(0);
+    std::vector<PageObject*> pageObjects = page->GetPageObjects();
+
+    // Check for PageObjects size.
+    ASSERT_EQ(1, pageObjects.size());
+    // Check for the PageObject to be ImageObject.
+    ASSERT_EQ(PageObject::Type::Image, pageObjects[0]->GetType());
+}
+
+TEST(Test, AddPageObjectTest) {
+    Document doc(LoadTestDocument(kImageObject), false);
+    std::shared_ptr<Page> page = doc.GetPage(0);
+
+    std::vector<PageObject*> initialPageObjects = page->GetPageObjects();
+
+    // Create Image Object.
+    auto imageObject = std::make_unique<ImageObject>();
+
+    // Create FPDF Bitmap.
+    FPDF_BITMAP bitmap = FPDFBitmap_Create(6000, 4000, 1);
+    FPDFBitmap_FillRect(bitmap, 0, 0, 3000, 4000, 0xFF000000);
+    imageObject->bitmap = bitmap;
+
+    // Set Matrix.
+    imageObject->matrix = {1.0f, 0, 0, 1.0f, 0, 0};
+
+    // Add the page object.
+    ASSERT_EQ(page->AddPageObject(std::move(imageObject)), initialPageObjects.size());
+
+    // Get Updated PageObjects
+    std::vector<PageObject*> updatedPageObjects = page->GetPageObjects(true);
+
+    // Assert that the size has increased by one.
+    ASSERT_EQ(initialPageObjects.size() + 1, updatedPageObjects.size());
+}
+
+TEST(Test, RemovePageObjectTest) {
+    Document doc(LoadTestDocument(kImageObject), false);
+
+    std::shared_ptr<Page> page = doc.GetPage(0);
+
+    std::vector<PageObject*> initialPageObjects = page->GetPageObjects();
+
+    // Remove a pageObject
+    EXPECT_TRUE(page->RemovePageObject(0));
+    // Get Updated PageObjects after removal
+    std::vector<PageObject*> updatedPageObjects = page->GetPageObjects(true);
+
+    ASSERT_EQ(initialPageObjects.size() - 1, updatedPageObjects.size());
+}
+
+TEST(Test, UpdatePageObjectTest) {
+    Document doc(LoadTestDocument(kImageObject), false);
+    std::shared_ptr<Page> page = doc.GetPage(0);
+
+    // Get initial page objects.
+    std::vector<PageObject*> initialPageObjects = page->GetPageObjects();
+
+    // Create Image Object.
+    auto imageObject = std::make_unique<ImageObject>();
+
+    // Create FPDF Bitmap.
+    FPDF_BITMAP bitmap = FPDFBitmap_Create(6000, 4000, 1);
+    FPDFBitmap_FillRect(bitmap, 0, 0, 6000, 4000, 0xFF0000FF);
+    imageObject->bitmap = bitmap;
+
+    // Set Matrix.
+    imageObject->matrix = {2.0f, 0, 0, 2.0f, 0, 0};
+
+    // Update the page object.
+    EXPECT_TRUE(page->UpdatePageObject(0, std::move(imageObject)));
+
+    // Get the updated page objects.
+    std::vector<PageObject*> updatedPageObjects = page->GetPageObjects(true);
+
+    // Check for size equality.
+    ASSERT_EQ(initialPageObjects.size(), updatedPageObjects.size());
+
+    // Check for updated bitmap.
+    ASSERT_EQ(FPDFBitmap_GetWidth(updatedPageObjects[0]->AsImage()->bitmap), 6000);
+    ASSERT_EQ(FPDFBitmap_GetHeight(updatedPageObjects[0]->AsImage()->bitmap), 4000);
+
+    // Check for updated matrix.
+    ASSERT_EQ(updatedPageObjects[0]->matrix.a, 2.0f);
+    ASSERT_EQ(updatedPageObjects[0]->matrix.b, 0.0f);
+    ASSERT_EQ(updatedPageObjects[0]->matrix.c, 0.0f);
+    ASSERT_EQ(updatedPageObjects[0]->matrix.d, 2.0f);
+    ASSERT_EQ(updatedPageObjects[0]->matrix.e, 0.0f);
+    ASSERT_EQ(updatedPageObjects[0]->matrix.f, 0.0f);
 }
 
 }  // namespace
