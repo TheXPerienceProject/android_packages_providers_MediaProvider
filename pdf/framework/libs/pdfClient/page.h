@@ -30,6 +30,7 @@
 #include "form_filler.h"
 #include "form_widget_info.h"
 #include "fpdfview.h"
+#include "page_object.h"
 #include "rect.h"
 
 namespace pdfClient {
@@ -221,6 +222,19 @@ class Page {
     // requesting the FPDF_PAGE directly through this method.
     void* page();
 
+    // Get all PageObjects on this Page. Ownership of PageObjects is with Page.
+    std::vector<PageObject*> GetPageObjects(bool refetch = false);
+
+    // Add PageObject to Page.
+    int AddPageObject(std::unique_ptr<PageObject> page_object);
+
+    // Remove PageObject on Page.
+    bool RemovePageObject(int index);
+
+    // Update the attributes of the PageObject on the Page. Ownership stays with
+    // the Page, we only modify the PageObject's attributes.
+    bool UpdatePageObject(int index, std::unique_ptr<PageObject> page_object);
+
   private:
     // Convenience methods to access the variables dependent on an initialized
     // ScopedFPDFTextPage. We lazy init text_page_ for efficiency because many
@@ -326,6 +340,12 @@ class Page {
 
     // Page number that is opened.
     int page_num_;
+
+    // Page Objects
+    std::vector<std::unique_ptr<PageObject>> page_objects_;
+
+    // Populates page_objects_ with PageObjects on Page.
+    void PopulatePageObjects(bool refetch);
 };
 
 }  // namespace pdfClient

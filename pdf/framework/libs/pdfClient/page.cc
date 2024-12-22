@@ -432,6 +432,116 @@ void* Page::page() {
     return page_.get();
 }
 
+std::vector<PageObject*> Page::GetPageObjects(bool refetch) {
+    PopulatePageObjects(refetch);
+
+    std::vector<PageObject*> page_objects;
+    for (const auto& page_object : page_objects_) {
+        page_objects.push_back(page_object.get());
+    }
+
+    return page_objects;
+}
+
+int Page::AddPageObject(std::unique_ptr<PageObject> pageObject) {
+    // Create a scoped PDFium page object.
+    ScopedFPDFPageObject scoped_page_object;
+
+    // Handle different page object types.
+    switch (pageObject->GetType()) {
+        case PageObject::Type::Image: {
+            ImageObject* imgObject = pageObject->AsImage();
+
+            // Create a PDFium image object.
+            scoped_page_object = ScopedFPDFPageObject(FPDFPageObj_NewImageObj(document_));
+            if (!scoped_page_object) {
+                return -1;
+            }
+            // Set the bitmap for the image object.
+            if (!FPDFImageObj_SetBitmap(nullptr, 0, scoped_page_object.get(), imgObject->bitmap)) {
+                return -1;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    // Check if a FPDF page object was created.
+    if (!scoped_page_object) {
+        return -1;
+    }
+
+    // Set the matrix for the page object.
+    if (!FPDFPageObj_SetMatrix(scoped_page_object.get(), &pageObject->matrix)) {
+        return -1;
+    }
+
+    // Insert the FPDF page object into the FPDF page.
+    FPDFPage_InsertObject(page_.get(), scoped_page_object.release());
+    FPDFPage_GenerateContent(page_.get());
+
+    // Add pageObject in stored list if populated.
+    if (!page_objects_.empty()) {
+        page_objects_.push_back(std::move(pageObject));
+    }
+
+    return FPDFPage_CountObjects(page_.get()) - 1;
+}
+
+bool Page::RemovePageObject(int index) {
+    FPDF_PAGEOBJECT page_object = FPDFPage_GetObject(page_.get(), index);
+    // Remove FPDF PageObject
+    if (!FPDFPage_RemoveObject(page_.get(), page_object)) {
+        return false;
+    }
+
+    FPDFPageObj_Destroy(page_object);
+    FPDFPage_GenerateContent(page_.get());
+
+    // Remove pageObject from stored list if populated.
+    if (!page_objects_.empty()) {
+        page_objects_.erase(page_objects_.begin() + index);
+    }
+
+    return true;
+}
+
+bool Page::UpdatePageObject(int index, std::unique_ptr<PageObject> pageObject) {
+    if (index < 0 || index >= FPDFPage_CountObjects(page_.get())) {
+        return false;
+    }
+
+    FPDF_PAGEOBJECT page_object = FPDFPage_GetObject(page_.get(), index);
+
+    switch (pageObject->GetType()) {
+        case PageObject::Type::Image: {
+            ImageObject* imageObject = pageObject->AsImage();
+
+            // Check for Type Correctness.
+            if (FPDFPageObj_GetType(page_object) != FPDF_PAGEOBJ_IMAGE) {
+                return false;
+            }
+            // Set the new bitmap.
+            if (!FPDFImageObj_SetBitmap(nullptr, 0, page_object, imageObject->bitmap)) {
+                return false;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    // Set the updated matrix.
+    if (!FPDFPageObj_SetMatrix(page_object, &pageObject->matrix)) {
+        return false;
+    }
+
+    FPDFPage_GenerateContent(page_.get());
+
+    return true;
+}
+
 FPDF_TEXTPAGE Page::text_page() {
     EnsureTextPageInitialized();
     return text_page_.get();
@@ -694,6 +804,56 @@ bool Page::IsGotoLink(FPDF_LINK link) const {
 bool Page::IsUrlLink(FPDF_LINK link) const {
     FPDF_ACTION action = FPDFLink_GetAction(link);
     return action != nullptr && FPDFAction_GetType(action) == PDFACTION_URI;
+}
+
+void Page::PopulatePageObjects(bool refetch) {
+    if (!refetch && !page_objects_.empty()) {
+        return;
+    }
+
+    int object_count = FPDFPage_CountObjects(page_.get());
+    // Resize PageObjects
+    page_objects_.resize(object_count);
+
+    for (int index = 0; index < object_count; ++index) {
+        FPDF_PAGEOBJECT page_object = FPDFPage_GetObject(page_.get(), index);
+        int type = FPDFPageObj_GetType(page_object);
+
+        // Pointer to PageObject
+        std::unique_ptr<PageObject> page_object_ = nullptr;
+
+        switch (type) {
+            case FPDF_PAGEOBJ_IMAGE: {
+                auto image_object_ = std::make_unique<ImageObject>();
+                // Get Bitmap from Image
+                FPDF_BITMAP bitmap = FPDFImageObj_GetBitmap(page_object);
+                if (bitmap) {
+                    image_object_->bitmap = bitmap;
+                    page_object_ = std::move(image_object_);
+                }
+                break;
+            }
+            default:
+                break;
+        }
+
+        if (page_object_) {
+            // Get Matrix Data
+            FPDFPageObj_GetMatrix(page_object, &page_object_->matrix);
+            // Get Fill Color Data
+            FPDFPageObj_GetFillColor(page_object, &page_object_->fill_color.r,
+                                     &page_object_->fill_color.g, &page_object_->fill_color.b,
+                                     &page_object_->fill_color.a);
+            // Get Stroke Color Data
+            FPDFPageObj_GetStrokeColor(page_object, &page_object_->stroke_color.r,
+                                       &page_object_->stroke_color.g, &page_object_->stroke_color.b,
+                                       &page_object_->stroke_color.a);
+            // Get Stroke Width Data
+            FPDFPageObj_GetStrokeWidth(page_object, &page_object_->stroke_width);
+
+            page_objects_[index] = std::move(page_object_);
+        }
+    }
 }
 
 }  // namespace pdfClient
