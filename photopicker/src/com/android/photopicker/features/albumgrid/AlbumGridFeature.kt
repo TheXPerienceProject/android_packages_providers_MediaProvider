@@ -57,7 +57,7 @@ class AlbumGridFeature : PhotopickerUiFeature {
         override fun isEnabled(
             config: PhotopickerConfiguration,
             deferredPrefetchResultsMap: Map<PrefetchResultKey, Deferred<Any?>>,
-        ) = true
+        ) = !config.flags.PICKER_SEARCH_ENABLED
 
         override fun build(featureManager: FeatureManager) = AlbumGridFeature()
 
