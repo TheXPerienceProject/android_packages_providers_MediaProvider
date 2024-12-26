@@ -32,16 +32,11 @@ public abstract class PdfPageObject {
     // Possible Values are {@link PdfPageObjectType}
     private final int mType;
 
-    // Id of page object
-    private int mObjectId;
-
     // Bound of page object
     private RectF mBounds;
 
     // Transformation matrix of page object
     private Matrix mTransform;
-
-    private boolean mIsAddedInAnnotation;
 
     /**
      * Constructor for the PageObject.
@@ -51,8 +46,6 @@ public abstract class PdfPageObject {
     PdfPageObject(int type) {
         this.mType = type;
         this.mTransform = new Matrix(); // Initialize with identity matrix
-        this.mObjectId = -1; // Initialize with -1
-        this.mIsAddedInAnnotation = false;
     }
 
     /**
@@ -62,25 +55,6 @@ public abstract class PdfPageObject {
      */
     public int getPdfObjectType() {
         return mType;
-    }
-
-    /**
-     * Returns the ID of the object.
-     *
-     * @return The ID of the object.
-     */
-    public int getObjectId() {
-        return mObjectId;
-    }
-
-    /**
-     * Sets the objectIndex of the object.
-     *
-     * @param objectId The objectIndex of the object.
-     * @hide
-     */
-    protected void setObjectId(int objectId) {
-        this.mObjectId = objectId;
     }
 
     /**
@@ -141,20 +115,5 @@ public abstract class PdfPageObject {
      */
     public void setMatrix(@NonNull Matrix matrix) {
         this.mTransform = matrix;
-    }
-
-    /*
-     * Returns {@code true} if the page object is added to an annotation, else false
-     */
-    public boolean isAddedInAnnotation() {
-        return mIsAddedInAnnotation;
-    }
-
-    /*
-    * Sets that this page object is added to an annotation
-    * @hide
-    */
-    void setAddedInAnnotation() {
-        mIsAddedInAnnotation = true;
     }
 }
