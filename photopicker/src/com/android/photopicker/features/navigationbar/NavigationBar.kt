@@ -195,9 +195,17 @@ fun NavigationBarButton(
  */
 @Composable
 private fun NavigationBarButtons(modifier: Modifier) {
+    val featureManager = LocalFeatureManager.current
+    val categoryGridFeatureEnabled =
+        featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
     Row(
         // Consume the incoming modifier to get the correct positioning.
-        modifier = modifier,
+        modifier =
+            if (categoryGridFeatureEnabled) {
+                modifier.padding(start = 8.dp, end = 8.dp)
+            } else {
+                modifier
+            },
         horizontalArrangement = Arrangement.Center,
     ) {
         Row(
@@ -208,15 +216,13 @@ private fun NavigationBarButtons(modifier: Modifier) {
                     alignment = Alignment.CenterHorizontally,
                 )
         ) {
-            val featureManager = LocalFeatureManager.current
-            val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
             // Buttons are provided by registered features, so request for the features to fill
             // this content.
             LocalFeatureManager.current.composeLocation(
                 Location.NAVIGATION_BAR_NAV_BUTTON,
                 maxSlots = 2,
                 modifier =
-                    if (searchFeatureEnabled) {
+                    if (categoryGridFeatureEnabled) {
                         Modifier.weight(1f)
                     } else {
                         Modifier // No modifier needed when search not enabled
@@ -400,7 +406,7 @@ private fun NavigationBarWithSearch(modifier: Modifier, params: LocationParams) 
                 }
             }
         }
-        NavigationBarButtons(Modifier.padding(start = 8.dp, end = 8.dp))
+        NavigationBarButtons(Modifier)
     }
 }
 
