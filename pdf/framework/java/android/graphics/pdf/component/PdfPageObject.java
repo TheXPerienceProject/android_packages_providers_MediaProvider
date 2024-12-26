@@ -38,8 +38,6 @@ public abstract class PdfPageObject {
     // Transformation matrix of page object
     private Matrix mTransform;
 
-    private boolean mIsAddedInAnnotation;
-
     /**
      * Constructor for the PageObject.
      *
@@ -48,7 +46,6 @@ public abstract class PdfPageObject {
     PdfPageObject(int type) {
         this.mType = type;
         this.mTransform = new Matrix(); // Initialize with identity matrix
-        this.mIsAddedInAnnotation = false;
     }
 
     /**
@@ -118,20 +115,5 @@ public abstract class PdfPageObject {
      */
     public void setMatrix(@NonNull Matrix matrix) {
         this.mTransform = matrix;
-    }
-
-    /*
-     * Returns {@code true} if the page object is added to an annotation, else false
-     */
-    public boolean isAddedInAnnotation() {
-        return mIsAddedInAnnotation;
-    }
-
-    /*
-    * Sets that this page object is added to an annotation
-    * @hide
-    */
-    void setAddedInAnnotation() {
-        mIsAddedInAnnotation = true;
     }
 }

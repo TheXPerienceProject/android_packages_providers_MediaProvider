@@ -260,12 +260,12 @@ public class PdfDocumentProxy {
             int pageNum, int annotIndex, int[] selectedIndices);
 
     /**
-     * Gets the list of annotations of supported types (freetext, image, stamp) present
-     * on the page
+     * Gets the list of pair of annotations of supported types (freetext, image, stamp) and their
+     * ids present on the page
      *
      * @param pageNum - page number of the page whose annotations list is to be returned
      */
-    public native @NonNull List<PdfAnnotation> getPageAnnotations(
+    public native @NonNull List<Pair<Integer, PdfAnnotation>> getPageAnnotations(
             @IntRange(from = 0) int pageNum);
 
     /**
@@ -291,10 +291,11 @@ public class PdfDocumentProxy {
      * Updates an annotation on the given page
      *
      * @param pageNum    page number of the page on which annotation is to be updated
+     * @param annotationId id corresponding to which the annotation is to be updated
      * @param annotation annotation to be updated
      */
     public native boolean updatePageAnnotation(@IntRange(from = 0) int pageNum,
-            PdfAnnotation annotation);
+            int annotationId, PdfAnnotation annotation);
 
 
     /**

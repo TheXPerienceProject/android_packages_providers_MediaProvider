@@ -29,7 +29,7 @@ package android.graphics.pdf {
   }
 
   public final class PdfRendererPreV.Page implements java.lang.AutoCloseable {
-    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public int addPageAnnotation(@NonNull android.graphics.pdf.component.PdfAnnotation);
+    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") @IntRange(from=0xffffffff) public int addPageAnnotation(@NonNull android.graphics.pdf.component.PdfAnnotation);
     method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") public int addPageObject(@NonNull android.graphics.pdf.component.PdfPageObject);
     method @FlaggedApi("android.graphics.pdf.flags.enable_form_filling") @NonNull public java.util.List<android.graphics.Rect> applyEdit(@NonNull android.graphics.pdf.models.FormEditRecord);
     method public void close();
@@ -42,16 +42,16 @@ package android.graphics.pdf {
     method @NonNull public java.util.List<android.graphics.pdf.content.PdfPageImageContent> getImageContents();
     method @IntRange(from=0) public int getIndex();
     method @NonNull public java.util.List<android.graphics.pdf.content.PdfPageLinkContent> getLinkContents();
-    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") @NonNull public java.util.List<android.graphics.pdf.component.PdfAnnotation> getPageAnnotations();
+    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") @NonNull public java.util.List<android.util.Pair<java.lang.Integer,android.graphics.pdf.component.PdfAnnotation>> getPageAnnotations();
     method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") @NonNull public java.util.List<android.util.Pair<java.lang.Integer,android.graphics.pdf.component.PdfPageObject>> getPageObjects();
     method @NonNull public java.util.List<android.graphics.pdf.content.PdfPageTextContent> getTextContents();
     method @IntRange(from=0) public int getWidth();
-    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") @NonNull public android.graphics.pdf.component.PdfAnnotation removePageAnnotation(int);
+    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") @NonNull public android.graphics.pdf.component.PdfAnnotation removePageAnnotation(@IntRange(from=0) int);
     method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") @NonNull public android.graphics.pdf.component.PdfPageObject removePageObject(@IntRange(from=0) int);
     method public void render(@NonNull android.graphics.Bitmap, @Nullable android.graphics.Rect, @Nullable android.graphics.Matrix, @NonNull android.graphics.pdf.RenderParams);
     method @NonNull public java.util.List<android.graphics.pdf.models.PageMatchBounds> searchText(@NonNull String);
     method @Nullable public android.graphics.pdf.models.selection.PageSelection selectContent(@NonNull android.graphics.pdf.models.selection.SelectionBoundary, @NonNull android.graphics.pdf.models.selection.SelectionBoundary);
-    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public boolean updatePageAnnotation(@NonNull android.graphics.pdf.component.PdfAnnotation);
+    method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public boolean updatePageAnnotation(@IntRange(from=0) int, @NonNull android.graphics.pdf.component.PdfAnnotation);
     method @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") public boolean updatePageObject(@IntRange(from=0) int, @NonNull android.graphics.pdf.component.PdfPageObject);
   }
 
@@ -93,7 +93,6 @@ package android.graphics.pdf.component {
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public abstract class PdfAnnotation {
     method @NonNull public android.graphics.RectF getBounds();
-    method public int getId();
     method public int getPdfAnnotationType();
     method public void setBounds(@NonNull android.graphics.RectF);
   }
@@ -115,7 +114,6 @@ package android.graphics.pdf.component {
     method @NonNull public android.graphics.RectF getBounds();
     method @NonNull public float[] getMatrix();
     method public int getPdfObjectType();
-    method public boolean isAddedInAnnotation();
     method public void setBounds(@NonNull android.graphics.RectF);
     method public void setMatrix(@NonNull android.graphics.Matrix);
     method public void transform(float, float, float, float, float, float);
@@ -163,7 +161,7 @@ package android.graphics.pdf.component {
     ctor public StampAnnotation(@NonNull android.graphics.RectF);
     method public void addObject(@NonNull android.graphics.pdf.component.PdfPageObject);
     method @NonNull public java.util.List<android.graphics.pdf.component.PdfPageObject> getObjects();
-    method public void removeObject(int);
+    method public void removeObject(@IntRange(from=0) int);
   }
 
 }

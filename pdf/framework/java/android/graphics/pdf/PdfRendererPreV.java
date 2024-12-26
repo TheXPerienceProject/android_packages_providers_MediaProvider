@@ -614,52 +614,53 @@ public final class PdfRendererPreV implements AutoCloseable {
         }
 
         /**
-         * Return list of supported {@link PdfAnnotation} present on the
-         * page. See {@link PdfAnnotationType} for the supported types
+         * Returns a list of pairs, where each pair consists of a supported {@link PdfAnnotation}
+         * and its corresponding ID on the specified page. ID of the annotation will be required for
+         * {@link #updatePageAnnotation(int, PdfAnnotation)} and {@link #removePageAnnotation(int)}
+         * and will remain same without mutate operations.
+         *
          * <p>
-         * The list will be empty if there are no supported
-         * annotations present on the page, even if the page
-         * contains other annotation types.
+         * The returned list will be empty if no supported annotations are present on the page,
+         * even if the page contains other annotation types. Refer to {@link PdfAnnotationType} for
+         * the supported annotation types.
          *
-         * @return list of supported annotations present on the page
-         * @throws IllegalStateException if {@link PdfRendererPreV} or
-         *                               {@link PdfRendererPreV.Page} is closed before invocation.
-         */
-        @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
-        @NonNull
-        public List<PdfAnnotation> getPageAnnotations() {
-            throwIfDocumentOrPageClosed();
-            return mPdfProcessor.getPageAnnotations(mIndex);
-        }
-
-        /**
-         * Adds the given annotation to the page. The annotation should be of
-         * supported type. See {@link PdfAnnotationType} for the supported types
-         *
-         * @param annotation the {@link PdfAnnotation} object to
-         *                   add
-         * @return id of the added annotation,
-         * or -1 if the annotation cannot be added. The
-         * id is guaranteed to be non-negative if
-         * the annotation is added successfully.
-         * @throws IllegalArgumentException if the provided
-         *                                  {@code annotation} is null or of unsupported type i.e.-
-         *                                  {@link PdfAnnotationType#UNKNOWN} or if the annotation
-         *                                  is already
-         *                                  added in this page or some other page of the document.
+         * @return A list of pairs representing the supported annotations and their ids on the page.
          * @throws IllegalStateException    if {@link PdfRendererPreV} or
          *                                  {@link PdfRendererPreV.Page} is closed before
          *                                  invocation.
          */
         @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
+        @NonNull
+        public List<Pair<Integer, PdfAnnotation>> getPageAnnotations() {
+            throwIfDocumentOrPageClosed();
+            return mPdfProcessor.getPageAnnotations(mIndex);
+        }
+
+        /**
+         * Adds the given annotation to the page. The annotation should be of supported type.
+         * See {@link PdfAnnotationType} for the supported types
+         *
+         * <p>
+         * {@link PdfRendererPreV#write} needs to be called to get the updated PDF stream
+         * after calling this method. {@link PdfRendererPreV.Page} instance can be closed before
+         * calling {@link PdfRendererPreV#write}.
+         *
+         * @param annotation the {@link PdfAnnotation} object to add
+         * @return id of the added annotation, or -1 if the annotation cannot be added. The id is
+         *         guaranteed to be non-negative if the annotation is added successfully.
+         * @throws IllegalArgumentException if the provided annotation is null or of unsupported
+         *                                  type i.e. {@link PdfAnnotationType#UNKNOWN}
+         * @throws IllegalStateException    if {@link PdfRendererPreV} or
+         *                                  {@link PdfRendererPreV.Page} is closed before invocation
+         */
+        @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
+        @IntRange(from = -1)
         public int addPageAnnotation(@NonNull PdfAnnotation annotation) {
             throwIfDocumentOrPageClosed();
             Preconditions.checkNotNull(annotation, "Annotation should not be null");
             Preconditions.checkArgument(
                     annotation.getPdfAnnotationType() != PdfAnnotationType.UNKNOWN,
                     "Annotation should be of valid type");
-            Preconditions.checkArgument(annotation.getId() != -1,
-                    "Annotation already added");
             return mPdfProcessor.addPageAnnotation(mIndex, annotation);
 
         }
@@ -667,17 +668,21 @@ public final class PdfRendererPreV implements AutoCloseable {
         /**
          * Removes the annotation with the specified id.
          *
+         * <p>
+         * {@link PdfRendererPreV#write} needs to be called to get the updated PDF stream after
+         * calling this method. {@link PdfRendererPreV.Page} instance can be closed before calling
+         * {@link PdfRendererPreV#write}.
+         *
          * @param annotationId id of the annotation to remove from the page
          * @return the removed annotation
          * @throws IllegalArgumentException if annotationId ie negative
          * @throws IllegalStateException    if {@link PdfRendererPreV} or
          *                                  {@link PdfRendererPreV.Page} is closed before invocation
-         *                                  or if
-         *                                  annotation is failed to get removed from the page.
+         *                                  or if annotation is failed to get removed from the page.
          */
         @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
         @NonNull
-        public PdfAnnotation removePageAnnotation(int annotationId) {
+        public PdfAnnotation removePageAnnotation(@IntRange(from = 0) int annotationId) {
             throwIfDocumentOrPageClosed();
             Preconditions.checkArgument(annotationId >= 0,
                     "Annotation id should be non-negative");
@@ -694,25 +699,32 @@ public final class PdfRendererPreV implements AutoCloseable {
         /**
          * Update the given {@link PdfAnnotation} to the page.
          *
+         * <p>
+         * {@link PdfRendererPreV#write} needs to be called to get the updated PDF stream after
+         * calling this method. {@link PdfRendererPreV.Page} instance can be closed before calling
+         * {@link PdfRendererPreV#write}.
+         *
+         * @param annotationId id corresponding to which the annotation is to be updated
          * @param annotation the annotation to update
          * @return true if annotation is updated, false otherwise
          * @throws IllegalArgumentException if the provided annotation is null or of
          *                                  unsupported type i.e. {@link PdfAnnotationType#UNKNOWN}
+         *                                  or if the provided annotationId is negative
          * @throws IllegalStateException    if {@link PdfRendererPreV} or
          *                                  {@link PdfRendererPreV.Page}  is closed before
          *                                  invocation
          */
         @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
-        public boolean updatePageAnnotation(@NonNull PdfAnnotation annotation) {
+        public boolean updatePageAnnotation(@IntRange(from = 0) int annotationId,
+                @NonNull PdfAnnotation annotation) {
             throwIfDocumentOrPageClosed();
             Preconditions.checkNotNull(annotation, "PdfAnnotation should not be null");
             Preconditions.checkArgument(
                     annotation.getPdfAnnotationType() != PdfAnnotationType.UNKNOWN,
                     "Annotation should be of valid type");
-
-            Preconditions.checkArgument(annotation.getId() >= 0,
-                    "Annotation id should be greater than equal to 0");
-            return mPdfProcessor.updatePageAnnotation(mIndex, annotation);
+            Preconditions.checkArgument(annotationId >= 0,
+                    "Annotation Id should be non-negative");
+            return mPdfProcessor.updatePageAnnotation(mIndex, annotationId, annotation);
         }
 
         /**

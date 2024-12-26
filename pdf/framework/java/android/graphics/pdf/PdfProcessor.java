@@ -568,18 +568,19 @@ public class PdfProcessor {
     }
 
     /**
-     * Return list of supported {@link PdfAnnotation} present on the
-     * page. See {@link PdfAnnotationType} for the supported types
+     * Returns a list of pairs, where each pair consists of a supported
+     * {@link PdfAnnotation} and its corresponding ID on the specified page.
+     * Refer to {@link PdfAnnotationType} for the supported annotation types.
+     *
      * <p>
-     * The list will be empty if there are no supported
-     * annotations present on the page, even if the page
-     * contains other annotation types.
+     * The returned list will be empty if no supported annotations are present
+     * on the page, even if the page contains other annotation types.
      *
      * @param pageNum page number whose annotations' list to be retrieved
-     * @return list of supported annotations present on the page
+     * @return A list of pairs representing the supported annotations and their ids on the page.
      */
     @NonNull
-    public List<PdfAnnotation> getPageAnnotations(@IntRange(from = 0) int pageNum) {
+    public List<Pair<Integer, PdfAnnotation>> getPageAnnotations(@IntRange(from = 0) int pageNum) {
         synchronized (sPdfiumLock) {
             assertPdfDocumentNotNull();
             return mPdfDocument.getPageAnnotations(pageNum);
@@ -625,17 +626,19 @@ public class PdfProcessor {
     /**
      * Update the given {@link PdfAnnotation} to the page.
      *
+     * @param annotationId id corresponding to which the annotation is to be updated
      * @param annotation the annotation to update
      * @return true if annotation is updated, false otherwise
      * @throws IllegalArgumentException f the provided annotation is null or of
      *                                  unsupported type i.e. {@link PdfAnnotationType#UNKNOWN}
+     *                                  or if the provided annotation id is negative
      **/
     @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_PAGE_OBJECTS)
-    public boolean updatePageAnnotation(int pageNum,
+    public boolean updatePageAnnotation(int pageNum, int annotationId,
             @NonNull PdfAnnotation annotation) {
         synchronized (sPdfiumLock) {
             assertPdfDocumentNotNull();
-            return mPdfDocument.updatePageAnnotation(pageNum, annotation);
+            return mPdfDocument.updatePageAnnotation(pageNum, annotationId, annotation);
         }
     }
 

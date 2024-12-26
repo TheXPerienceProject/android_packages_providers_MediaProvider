@@ -30,7 +30,6 @@ import android.graphics.pdf.utils.Preconditions;
  */
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
 public abstract class PdfAnnotation {
-    private int mId;
     private int mType;
     @NonNull  private RectF mBounds;
 
@@ -46,38 +45,8 @@ public abstract class PdfAnnotation {
                 || type == PdfAnnotationType.FREETEXT
                 || type == PdfAnnotationType.HIGHLIGHT
                 || type == PdfAnnotationType.STAMP, "Invalid Annotation Type");
-
-        this.mId = -1;
         this.mType = type;
         this.mBounds = bounds;
-    }
-
-    /**
-     * Returns the id of the annotation.
-     * <p>
-     * Id of an annotation will be unique in a page.
-     *
-     * @return The annotation ID.
-     */
-    public int getId() {
-        return mId;
-    }
-
-    /**
-     * Sets the id of the annotation.
-     * <p>
-     * When the annotation is created, it's assigned default id as -1, when it will
-     * added to a page using
-     * {@link  android.graphics.pdf.PdfRenderer.Page#addPageAnnotation(PdfAnnotation)}
-     * or {@link android.graphics.pdf.PdfRendererPreV.Page#addPageAnnotation(PdfAnnotation)},
-     * it will get assigned a unique id in the page.
-     * </p>
-     *
-     * @param id to be assigned to the annotation
-     * @hide
-     */
-    protected void setId(int id) {
-        mId = id;
     }
 
     /**
