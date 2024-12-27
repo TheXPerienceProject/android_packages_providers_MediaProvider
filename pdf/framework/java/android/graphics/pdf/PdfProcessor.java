@@ -49,6 +49,7 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
 import android.util.Log;
+import android.util.Pair;
 
 import java.io.IOException;
 import java.security.SecureRandom;
@@ -567,34 +568,36 @@ public class PdfProcessor {
     }
 
     /**
-     * Return list of supported {@link PdfAnnotation} present on the
-     * page. See {@link PdfAnnotationType} for the supported types
+     * Returns a list of pairs, where each pair consists of a supported
+     * {@link PdfAnnotation} and its corresponding ID on the specified page.
+     * Refer to {@link PdfAnnotationType} for the supported annotation types.
+     *
      * <p>
-     * The list will be empty if there are no supported
-     * annotations present on the page, even if the page
-     * contains other annotation types.
+     * The returned list will be empty if no supported annotations are present
+     * on the page, even if the page contains other annotation types.
      *
      * @param pageNum page number whose annotations' list to be retrieved
-     * @return list of supported annotations present on the page
+     * @return A list of pairs representing the supported annotations and their ids on the page.
      */
     @NonNull
-    public List<PdfAnnotation> getPageAnnotations(@IntRange(from = 0) int pageNum) {
+    public List<Pair<Integer, PdfAnnotation>> getPageAnnotations(@IntRange(from = 0) int pageNum) {
         synchronized (sPdfiumLock) {
             assertPdfDocumentNotNull();
             return mPdfDocument.getPageAnnotations(pageNum);
         }
     }
+
     /**
      * Adds the given annotation to the page. The annotation should be of
      * supported type. See {@link PdfAnnotationType} for the supported types
      *
      * @param annotation the {@link PdfAnnotation} object to
-     *        add
-     * @param pageNum the page number where the annotation to be added
+     *                   add
+     * @param pageNum    the page number where the annotation to be added
      * @return the index of the added annotation,
-     *         or -1 if the annotation cannot be added. The
-     *         index is guaranteed to be non-negative if
-     *         the annotation is added successfully.
+     * or -1 if the annotation cannot be added. The
+     * index is guaranteed to be non-negative if
+     * the annotation is added successfully.
      */
     public int addPageAnnotation(@IntRange(from = 0) int pageNum,
             PdfAnnotation annotation) {
@@ -608,10 +611,9 @@ public class PdfProcessor {
      * Removes the annotation with the specified index.
      *
      * @param annotationIndex the index of the annotation to remove
-     * from the page
-     * @param pageNum page number from which annotation is to be removed
+     *                        from the page
+     * @param pageNum         page number from which annotation is to be removed
      * @return the removed annotation
-     *
      */
     public PdfAnnotation removePageAnnotation(@IntRange(from = 0) int pageNum,
             int annotationIndex) {
@@ -624,20 +626,19 @@ public class PdfProcessor {
     /**
      * Update the given {@link PdfAnnotation} to the page.
      *
+     * @param annotationId id corresponding to which the annotation is to be updated
      * @param annotation the annotation to update
-     *
      * @return true if annotation is updated, false otherwise
-     *
      * @throws IllegalArgumentException f the provided annotation is null or of
-     *         unsupported type i.e. {@link PdfAnnotationType#UNKNOWN}
-     *
+     *                                  unsupported type i.e. {@link PdfAnnotationType#UNKNOWN}
+     *                                  or if the provided annotation id is negative
      **/
     @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_PAGE_OBJECTS)
-    public boolean updatePageAnnotation(int pageNum,
+    public boolean updatePageAnnotation(int pageNum, int annotationId,
             @NonNull PdfAnnotation annotation) {
         synchronized (sPdfiumLock) {
             assertPdfDocumentNotNull();
-            return mPdfDocument.updatePageAnnotation(pageNum, annotation);
+            return mPdfDocument.updatePageAnnotation(pageNum, annotationId, annotation);
         }
     }
 
@@ -648,12 +649,14 @@ public class PdfProcessor {
      * objects present on the page, even if the page contains
      * other page object types.
      *
-     * @return list of page objects present on the page
+     * @return A {@link List} of {@link Pair} objects, where each pair contains:
+     * - An {@link Integer} representing the object ID.
+     * - A {@link PdfPageObject} representing the page object.
      * @throws IllegalStateException if the {@link PdfRenderer.Page} is
      *                               closed before invocation
      */
     @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_PAGE_OBJECTS)
-    public List<PdfPageObject> getPageObjects(int pageNum) {
+    public List<Pair<Integer, PdfPageObject>> getPageObjects(int pageNum) {
         synchronized (sPdfiumLock) {
             assertPdfDocumentNotNull();
             return mPdfDocument.getPageObjects(pageNum);
@@ -680,18 +683,18 @@ public class PdfProcessor {
     /**
      * Update the given {@link PdfPageObject} to the page.
      *
-     * @param pageObject the {@link PdfPageObject} object to
-     *                   add
-     * @return true if page object is updated, false otherwise
+     * @param objectId   The unique identifier of the page object to update.
+     * @param pageObject the {@link PdfPageObject} object to add.
+     * @return true if page object is updated, false otherwise.
      * @throws IllegalArgumentException if the provided {@link PdfPageObject} is unknown or null.
      * @throws IllegalStateException    if the {@link PdfRenderer.Page} is closed before invocation.
      */
     @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_PAGE_OBJECTS)
-    public boolean updatePageObject(int pageNum,
+    public boolean updatePageObject(int pageNum, int objectId,
             @NonNull PdfPageObject pageObject) {
         synchronized (sPdfiumLock) {
             assertPdfDocumentNotNull();
-            return mPdfDocument.updatePageObject(pageNum, pageObject);
+            return mPdfDocument.updatePageObject(pageNum, objectId, pageObject);
         }
     }
 
