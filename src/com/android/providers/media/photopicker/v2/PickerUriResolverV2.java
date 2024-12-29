@@ -143,7 +143,7 @@ public class PickerUriResolverV2 {
             case PICKER_INTERNAL_COLLECTION_INFO:
                 return PickerDataLayerV2.queryCollectionInfo();
             case PICKER_INTERNAL_MEDIA_GRANTS_COUNT:
-                return PickerDataLayerV2.fetchMediaGrantsCount(appContext,
+                return PickerDataLayerV2.fetchCountForPreGrantedItems(appContext,
                         requireNonNull(queryArgs));
             case PICKER_INTERNAL_MEDIA_PREVIEW:
                 return PickerDataLayerV2.queryPreviewMedia(appContext, queryArgs);

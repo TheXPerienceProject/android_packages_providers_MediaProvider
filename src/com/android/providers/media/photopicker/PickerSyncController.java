@@ -1331,7 +1331,7 @@ public class PickerSyncController {
     /**
      * Commit the latest media collection info when a sync operation is completed.
      */
-    private boolean cacheMediaCollectionInfo(@Nullable String authority, boolean isLocal,
+    public boolean cacheMediaCollectionInfo(@Nullable String authority, boolean isLocal,
             @Nullable Bundle bundle) throws UnableToAcquireLockException {
         if (authority == null) {
             Log.d(TAG, "Ignoring cache media info for null authority with bundle: " + bundle);
@@ -1558,7 +1558,16 @@ public class PickerSyncController {
         }
     }
 
-    private String getPrefsKey(boolean isLocal, String key) {
+    /**
+     * Generates a key for shared preferences by appending the specified key
+     * to the prefix corresponding to the local or cloud provider.
+     *
+     * @param isLocal {@code true} to use the local provider prefix,
+     * {@code false} to use the cloud provider prefix.
+     * @param key the specific key to append to the provider's prefix.
+     * @return a complete key to used to query shared preferences.
+     */
+    public static String getPrefsKey(boolean isLocal, String key) {
         return (isLocal ? PREFS_KEY_LOCAL_PREFIX : PREFS_KEY_CLOUD_PREFIX) + key;
     }
 

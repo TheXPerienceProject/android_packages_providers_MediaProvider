@@ -16,6 +16,8 @@
 
 package com.android.providers.media.photopicker.v2.sqlite;
 
+import static com.android.providers.media.MediaProvider.isOwnedPhotosEnabled;
+import static com.android.providers.media.photopicker.PickerSyncController.getPackageNameFromUid;
 import static com.android.providers.media.photopicker.v2.PickerDataLayerV2.getDefaultEmptyAlbum;
 import static com.android.providers.media.photopicker.v2.sqlite.MediaProjection.prependTableName;
 
@@ -521,11 +523,21 @@ public class PickerMediaDatabaseUtil {
             @NonNull PickerSQLConstants.Table table,
             @Nullable String localAuthority,
             @Nullable String cloudAuthority) {
+        int callingPackageUid = query.getCallingPackageUid();
+        String[] packageNames = null;
+
+        if (callingPackageUid != -1 && isOwnedPhotosEnabled(callingPackageUid) && appContext != null
+                && appContext.getPackageManager() != null) {
+            packageNames = getPackageNameFromUid(appContext, callingPackageUid);
+        }
+
         final MediaProjection projectionUtil = new MediaProjection(
                 localAuthority,
                 cloudAuthority,
                 query.getIntentAction(),
-                table
+                table,
+                callingPackageUid,
+                packageNames
         );
 
         SelectSQLiteQueryBuilder queryBuilder = new SelectSQLiteQueryBuilder(database)

@@ -18,12 +18,15 @@ package com.android.providers.media.photopicker.v2;
 
 import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_ALBUM;
 
+import static com.android.providers.media.MediaGrants.FILE_ID_COLUMN;
 import static com.android.providers.media.MediaGrants.MEDIA_GRANTS_TABLE;
 import static com.android.providers.media.MediaGrants.OWNER_PACKAGE_NAME_COLUMN;
 import static com.android.providers.media.MediaGrants.PACKAGE_USER_ID_COLUMN;
+import static com.android.providers.media.MediaProvider.isOwnedPhotosEnabled;
 import static com.android.providers.media.PickerUriResolver.getAlbumUri;
 import static com.android.providers.media.photopicker.PickerSyncController.getPackageNameFromUid;
 import static com.android.providers.media.photopicker.PickerSyncController.uidToUserId;
+import static com.android.providers.media.photopicker.data.PickerDbFacade.KEY_LOCAL_ID;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.IMMEDIATE_GRANTS_SYNC_WORK_NAME;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.IMMEDIATE_LOCAL_SYNC_WORK_NAME;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_CLOUD_ONLY;
@@ -120,6 +123,12 @@ import java.util.concurrent.TimeoutException;
 public class PickerDataLayerV2 {
     private static final String TAG = "PickerDataLayerV2";
     private static final int CLOUD_SYNC_TIMEOUT_MILLIS = 500;
+    private static final String MEDIA_TABLE = "media";
+    private static final String MEDIA_LEFT_JOIN_MEDIA_GRANTS_TABLE =
+            MEDIA_TABLE + " LEFT JOIN " + MEDIA_GRANTS_TABLE
+                    + " ON " + MEDIA_TABLE + "." + KEY_LOCAL_ID
+                    + " = " + MEDIA_GRANTS_TABLE + "." + FILE_ID_COLUMN;
+
     // Local and merged albums have a predefined order that they should be displayed in. They always
     // need to be displayed above the cloud albums too.
     public static final List<String> PINNED_ALBUMS_ORDER = List.of(
@@ -235,7 +244,8 @@ public class PickerDataLayerV2 {
      */
     @NonNull
     static Cursor queryPreviewMedia(@NonNull Context appContext, @NonNull Bundle queryArgs) {
-        final PreviewMediaQuery query = new PreviewMediaQuery(queryArgs);
+        final PreviewMediaQuery query = new PreviewMediaQuery(queryArgs, appContext);
+
         final PickerSyncController syncController = PickerSyncController.getInstanceOrThrow();
         final String effectiveLocalAuthority =
                 query.getProviders().contains(syncController.getLocalProvider())
@@ -718,13 +728,13 @@ public class PickerDataLayerV2 {
     }
 
     /**
-     * Queries the picker database and fetches the count of pre-granted media for the current
-     * package and userId.
+     * Queries the picker database and fetches the count of pre-granted media. Returns count of
+     * media either owned by the app or user has granted access to.
      *
      * @return a [Cursor] containing only one column [COLUMN_GRANTS_COUNT] which have a single
      * row representing the count.
      */
-    static Cursor fetchMediaGrantsCount(
+    static Cursor fetchCountForPreGrantedItems(
             @NonNull Context appContext,
             @NonNull Bundle queryArgs) {
         String[] projectionIn = new String[]{PROJECTION_GRANTS_COUNT};
@@ -739,8 +749,34 @@ public class PickerDataLayerV2 {
                 packageUid);
 
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
-        qb.setTables(MEDIA_GRANTS_TABLE);
-        addWhereClausesForPackageAndUserIdSelection(userId, packageNames, MEDIA_GRANTS_TABLE, qb);
+        if (isOwnedPhotosEnabled(packageUid)) {
+            waitForOngoingSync(appContext, syncController.getLocalProvider(), null,
+                    MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP);
+
+            qb.setTables(MEDIA_LEFT_JOIN_MEDIA_GRANTS_TABLE);
+
+            String packageSelectionForMediaGrants = getPackageSelectionWhereClause(packageNames,
+                    MEDIA_GRANTS_TABLE).toString();
+            String packageSelectionForMedia = getPackageSelectionWhereClause(packageNames,
+                    MEDIA_TABLE).toString();
+
+            /*
+            (media.owner_package_name IN (com.android.example) AND media._user_id = 0) OR
+            (media_grants.owner_package_name IN (com.android.example) AND media_grants._user_id = 0)
+             */
+            String whereClause = String.format(Locale.ROOT,
+                    "(%s AND %s.%s = %d) OR (%s AND %s.%s = %d)",
+                    packageSelectionForMedia,
+                    MEDIA_TABLE, MediaStore.Files.FileColumns._USER_ID, userId,
+                    packageSelectionForMediaGrants,
+                    MEDIA_GRANTS_TABLE, PACKAGE_USER_ID_COLUMN, userId);
+
+            qb.appendWhereStandalone(whereClause);
+        } else {
+            qb.setTables(MEDIA_GRANTS_TABLE);
+            addWhereClausesForPackageAndUserIdSelection(userId, packageNames, MEDIA_GRANTS_TABLE,
+                    qb);
+        }
 
         Cursor result = qb.query(database, projectionIn, null,
                 null, null, null, null);
