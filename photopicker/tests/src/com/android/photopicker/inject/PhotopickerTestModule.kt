@@ -39,6 +39,7 @@ import com.android.photopicker.core.selection.SelectionStrategy
 import com.android.photopicker.core.selection.SelectionStrategy.Companion.determineSelectionStrategy
 import com.android.photopicker.core.user.UserMonitor
 import com.android.photopicker.data.DataService
+import com.android.photopicker.data.MediaProviderClient
 import com.android.photopicker.data.PrefetchDataService
 import com.android.photopicker.data.TestDataServiceImpl
 import com.android.photopicker.data.TestPrefetchDataService
@@ -229,6 +230,12 @@ abstract class PhotopickerTestModule(val options: TestOptions = TestOptions.Buil
             registeredFeatures = options.registeredFeatures,
             dispatcher = Dispatchers.Main.immediate,
         )
+    }
+
+    @Singleton
+    @Provides
+    fun createMediaProviderClient(): MediaProviderClient {
+        return MediaProviderClient()
     }
 
     @Singleton

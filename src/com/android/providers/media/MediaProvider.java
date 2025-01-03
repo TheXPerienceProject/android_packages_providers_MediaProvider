@@ -7154,6 +7154,9 @@ public class MediaProvider extends ContentProvider {
                 initMediaSets(extras);
                 return new Bundle();
             }
+            case MediaStore.PICKER_GET_SEARCH_PROVIDERS_CALL: {
+                return getPickerSearchProviders();
+            }
             case MediaStore.PICKER_TRANSCODE_CALL: {
                 return getResultForPickerTranscode(extras);
             }
@@ -7702,6 +7705,18 @@ public class MediaProvider extends ContentProvider {
                     getSecurityExceptionMessage("Picker media in media set init"));
         }
         PickerDataLayerV2.triggerMediaSyncForMediaSet(extras, getContext());
+    }
+
+    @Nullable
+    private Bundle getPickerSearchProviders() {
+        Log.i(TAG, "Received picker internal call to get available search providers.");
+        if (!checkPermissionShell(Binder.getCallingUid())
+                && !checkPermissionSelf(Binder.getCallingUid())
+                && !isCallerPhotoPicker()) {
+            throw new SecurityException(
+                    getSecurityExceptionMessage("Picker get search providers"));
+        }
+        return PickerDataLayerV2.getSearchProviders(getContext());
     }
 
     /**

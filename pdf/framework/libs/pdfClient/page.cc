@@ -445,35 +445,10 @@ std::vector<PageObject*> Page::GetPageObjects(bool refetch) {
 
 int Page::AddPageObject(std::unique_ptr<PageObject> pageObject) {
     // Create a scoped PDFium page object.
-    ScopedFPDFPageObject scoped_page_object;
-
-    // Handle different page object types.
-    switch (pageObject->GetType()) {
-        case PageObject::Type::Image: {
-            ImageObject* imgObject = pageObject->AsImage();
-
-            // Create a PDFium image object.
-            scoped_page_object = ScopedFPDFPageObject(FPDFPageObj_NewImageObj(document_));
-            if (!scoped_page_object) {
-                return -1;
-            }
-            // Set the bitmap for the image object.
-            if (!FPDFImageObj_SetBitmap(nullptr, 0, scoped_page_object.get(), imgObject->bitmap)) {
-                return -1;
-            }
-            break;
-        }
-        default:
-            break;
-    }
+    ScopedFPDFPageObject scoped_page_object = pageObject->CreateFPDFInstance(document_);
 
     // Check if a FPDF page object was created.
     if (!scoped_page_object) {
-        return -1;
-    }
-
-    // Set the matrix for the page object.
-    if (!FPDFPageObj_SetMatrix(scoped_page_object.get(), &pageObject->matrix)) {
         return -1;
     }
 
@@ -508,32 +483,16 @@ bool Page::RemovePageObject(int index) {
 }
 
 bool Page::UpdatePageObject(int index, std::unique_ptr<PageObject> pageObject) {
+    // Check for valid index
     if (index < 0 || index >= FPDFPage_CountObjects(page_.get())) {
         return false;
     }
 
+    // Get PDFium PageObject.
     FPDF_PAGEOBJECT page_object = FPDFPage_GetObject(page_.get(), index);
 
-    switch (pageObject->GetType()) {
-        case PageObject::Type::Image: {
-            ImageObject* imageObject = pageObject->AsImage();
-
-            // Check for Type Correctness.
-            if (FPDFPageObj_GetType(page_object) != FPDF_PAGEOBJ_IMAGE) {
-                return false;
-            }
-            // Set the new bitmap.
-            if (!FPDFImageObj_SetBitmap(nullptr, 0, page_object, imageObject->bitmap)) {
-                return false;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-
-    // Set the updated matrix.
-    if (!FPDFPageObj_SetMatrix(page_object, &pageObject->matrix)) {
+    // Update PDFium PageObject
+    if (!pageObject->UpdateFPDFInstance(page_object)) {
         return false;
     }
 
@@ -829,34 +788,20 @@ void Page::PopulatePageObjects(bool refetch) {
         std::unique_ptr<PageObject> page_object_ = nullptr;
 
         switch (type) {
+            case FPDF_PAGEOBJ_PATH: {
+                page_object_ = std::make_unique<PathObject>();
+                break;
+            }
             case FPDF_PAGEOBJ_IMAGE: {
-                auto image_object_ = std::make_unique<ImageObject>();
-                // Get Bitmap from Image
-                FPDF_BITMAP bitmap = FPDFImageObj_GetBitmap(page_object);
-                if (bitmap) {
-                    image_object_->bitmap = bitmap;
-                    page_object_ = std::move(image_object_);
-                }
+                page_object_ = std::make_unique<ImageObject>();
                 break;
             }
             default:
                 break;
         }
 
-        if (page_object_) {
-            // Get Matrix Data
-            FPDFPageObj_GetMatrix(page_object, &page_object_->matrix);
-            // Get Fill Color Data
-            FPDFPageObj_GetFillColor(page_object, &page_object_->fill_color.r,
-                                     &page_object_->fill_color.g, &page_object_->fill_color.b,
-                                     &page_object_->fill_color.a);
-            // Get Stroke Color Data
-            FPDFPageObj_GetStrokeColor(page_object, &page_object_->stroke_color.r,
-                                       &page_object_->stroke_color.g, &page_object_->stroke_color.b,
-                                       &page_object_->stroke_color.a);
-            // Get Stroke Width Data
-            FPDFPageObj_GetStrokeWidth(page_object, &page_object_->stroke_width);
-
+        // Populate PageObject From Page
+        if (page_object_ && page_object_->PopulateFromFPDFInstance(page_object)) {
             page_objects_[index] = std::move(page_object_);
         }
     }

@@ -46,6 +46,7 @@ import androidx.work.WorkerParameters;
 
 import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
+import com.android.providers.media.photopicker.v2.PickerNotificationSender;
 import com.android.providers.media.photopicker.v2.model.SearchRequest;
 import com.android.providers.media.photopicker.v2.model.SearchSuggestionRequest;
 import com.android.providers.media.photopicker.v2.model.SearchTextRequest;
@@ -69,6 +70,7 @@ public class SearchResultsSyncWorker extends Worker {
     public static final String SYNC_COMPLETE_RESUME_KEY = "SYNCED";
     private final Context mContext;
     private final CancellationSignal mCancellationSignal;
+    private boolean mMarkedSyncWorkAsComplete = false;
 
     /**
      * Creates an instance of the {@link Worker}.
@@ -190,7 +192,13 @@ public class SearchResultsSyncWorker extends Worker {
 
                     // Mark sync as completed after getting the first page to start returning
                     // search results to the UI.
-                    markSearchResultsSyncAsComplete(syncSource, getId());
+                    if (mMarkedSyncWorkAsComplete) {
+                        PickerNotificationSender
+                                .notifySearchResultsChange(mContext, searchRequestId);
+                    } else {
+                        markSearchResultsSyncAsComplete(syncSource, getId());
+                        mMarkedSyncWorkAsComplete = true;
+                    }
                 }
             }
         } finally {

@@ -151,6 +151,16 @@ public final class CloudMediaProviderContract {
         }
 
         /**
+         * @hide
+         */
+        @Override
+        public String toString() {
+            return " isSearchEnabled=" + this.mSearchEnabled
+                    + " isMediaCategoriesEnabled=" + this.mMediaCategoriesEnabled
+                    + " isAlbumsAsCategoryEnabled=" + this.mAlbumsAsCategory;
+        }
+
+        /**
          * Implemented for {@link Parcelable}
          */
         @Override

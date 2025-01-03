@@ -207,15 +207,20 @@ public class MediaProviderForFuseTest {
     @Test
     public void testRenameDirectory_WhenParentDirectoryIsHidden() throws Exception {
         // Create parent dir with nomedia file
-        final File parent = new File(sTestDir, "hidden" + System.nanoTime());
-        parent.mkdirs();
-        createNomediaFile(parent);
+        // Choosing the base dir to be a public directory so the file can be created by the test
+        // app context without need of shell or root privilege.
+        File parentDir = new File(Environment.getExternalStorageDirectory(),
+                Environment.DIRECTORY_DOWNLOADS);
+        File dir = new File(parentDir, "hidden" + System.nanoTime());
+        dir.mkdirs();
+        createNomediaFile(dir);
+
         // Create dir in hidden parent dir
-        File file = createSubdirWithOneFile(parent);
+        File file = createSubdirWithOneFile(dir);
         File oldDir = file.getParentFile();
 
         // Rename dir within hidden parent.
-        final File renamedDir = new File(parent, "renamed" + System.nanoTime());
+        final File renamedDir = new File(dir, "renamed" + System.nanoTime());
         Truth.assertThat(sMediaProvider.renameForFuse(
                 oldDir.getPath(), renamedDir.getPath(), sTestUid)).isEqualTo(0);
 
@@ -256,7 +261,7 @@ public class MediaProviderForFuseTest {
 
     private @NonNull File createNomediaFile(@NonNull File dir) throws IOException {
         final File nomediaFile = new File(dir, ".nomedia");
-        executeShellCommand("touch " + nomediaFile.getAbsolutePath());
+        nomediaFile.createNewFile();
         Truth.assertWithMessage("cannot create nomedia file: " + nomediaFile.getAbsolutePath())
                 .that(nomediaFile.exists())
                 .isTrue();

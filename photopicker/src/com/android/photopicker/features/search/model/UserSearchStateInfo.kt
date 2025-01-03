@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
-package com.android.photopicker.data
+package com.android.photopicker.features.search.model
 
-import com.android.photopicker.features.search.model.GlobalSearchState
-
-/** Class responsible to fetch all the required data before feature initialization */
-interface PrefetchDataService {
-    companion object {
-        val TAG: String = "PrefetchDataService"
-    }
-
-    /**
-     * Get the global search state from the Data Source. The global search state refers to the
-     * search state of all providers in all user profiles.
-     */
-    suspend fun getGlobalSearchState(): GlobalSearchState
+/** Holds search state info for the current selected profile in a Picker session. */
+data class UserSearchStateInfo(val searchProviderAuthorities: List<String>?) {
+    val state: UserSearchState =
+        when {
+            searchProviderAuthorities == null -> UserSearchState.UNKNOWN
+            searchProviderAuthorities.isEmpty() -> UserSearchState.DISABLED
+            else -> UserSearchState.ENABLED
+        }
 }

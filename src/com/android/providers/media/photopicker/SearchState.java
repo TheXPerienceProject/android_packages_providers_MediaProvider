@@ -111,7 +111,7 @@ public class SearchState {
         }
 
         if (!Flags.enablePhotopickerSearch()) {
-            Log.d(TAG, "Search feature is disabled.");
+            Log.d(TAG, "Search feature flag is disabled.");
             return false;
         }
 

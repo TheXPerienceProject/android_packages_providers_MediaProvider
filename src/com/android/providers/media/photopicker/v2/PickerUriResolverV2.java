@@ -41,11 +41,11 @@ public class PickerUriResolverV2 {
     public static final String COLLECTION_INFO_PATH_SEGMENT = "collection_info";
     public static final String MEDIA_PATH_SEGMENT = "media";
     public static final String ALBUM_PATH_SEGMENT = "album";
+    public static final String SEARCH_RESULT_MEDIA_PATH_SEGMENT = "search_media";
     public static final String UPDATE_PATH_SEGMENT = "update";
     private static final String MEDIA_GRANTS_COUNT_PATH_SEGMENT = "media_grants_count";
     private static final String PREVIEW_PATH_SEGMENT = "preview";
     private static final String PRE_SELECTION_PATH_SEGMENT = "pre_selection";
-    private static final String SEARCH_RESULT_MEDIA_PATH_SEGMENT = "search_media";
     private static final String SEARCH_SUGGESTIONS_PATH_SEGMENT = "search_suggestions";
 
 
