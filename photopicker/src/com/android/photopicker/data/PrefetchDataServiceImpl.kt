@@ -16,11 +16,76 @@
 
 package com.android.photopicker.data
 
-import com.android.photopicker.features.search.model.SearchEnabledState
+import android.content.Context
+import android.util.Log
+import com.android.photopicker.core.user.UserMonitor
+import com.android.photopicker.core.user.UserProfile
+import com.android.photopicker.features.search.model.GlobalSearchState
+import com.android.photopicker.features.search.model.GlobalSearchStateInfo
+import com.android.photopicker.util.mapOfDeferredWithTimeout
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Deferred
 
-class PrefetchDataServiceImpl() : PrefetchDataService {
+/** Implementation of [PrefetchDataService] that typically fetches data from MediaProvider. */
+class PrefetchDataServiceImpl(
+    val mediaProviderClient: MediaProviderClient,
+    val userMonitor: UserMonitor,
+    val context: Context,
+    val dispatcher: CoroutineDispatcher,
+) : PrefetchDataService {
 
-    override suspend fun getSearchState(): SearchEnabledState {
-        return SearchEnabledState.DISABLED
+    override suspend fun getGlobalSearchState(): GlobalSearchState {
+        // Create a map of user id to lambda that fetches search provider authorities for that
+        // user.
+        val inputMap: Map<Int, suspend (MediaProviderClient) -> Any?> =
+            userMonitor.userStatus.value.allProfiles
+                .map { profile: UserProfile ->
+                    val lambda: suspend (MediaProviderClient) -> Any? =
+                        { mediaProviderClient: MediaProviderClient ->
+                            mediaProviderClient.fetchSearchProviderAuthorities(
+                                context
+                                    .createPackageContextAsUser(
+                                        context.packageName, /* flags */
+                                        0,
+                                        profile.handle,
+                                    )
+                                    .contentResolver
+                            )
+                        }
+                    profile.identifier to lambda
+                }
+                .toMap()
+
+        // Get a map of user id to Deferred task that fetches search provider authorities for
+        // that user in parallel with a timeout.
+        val deferredMap: Map<Int, Deferred<Any?>> =
+            mapOfDeferredWithTimeout(
+                inputMap = inputMap,
+                input = mediaProviderClient,
+                timeoutMillis = 100L,
+            )
+
+        // Await all the deferred tasks and create a map of user id to the search provider
+        // authorities.
+        @Suppress("UNCHECKED_CAST")
+        val globalSearchProviders: Map<Int, List<String>?> =
+            deferredMap
+                .map {
+                    val searchProviders: Any? = it.value.await()
+                    it.key to if (searchProviders is List<*>?) searchProviders else null
+                }
+                .toMap() as Map<Int, List<String>?>
+
+        val globalSearchStateInfo =
+            GlobalSearchStateInfo(
+                globalSearchProviders,
+                userMonitor.userStatus.value.activeUserProfile.identifier,
+            )
+        Log.d(
+            PrefetchDataService.TAG,
+            "Global search providers available are $globalSearchProviders. " +
+                "Search state is $globalSearchStateInfo.state",
+        )
+        return globalSearchStateInfo.state
     }
 }

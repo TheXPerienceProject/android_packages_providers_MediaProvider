@@ -30,7 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -167,7 +167,7 @@ fun PreviewSelection(
                     // This is inside an edge-to-edge dialog, so apply padding to ensure the
                     // UI buttons stay above the navigation bar.
                     Modifier.windowInsetsPadding(
-                        WindowInsets.statusBars.only(WindowInsetsSides.Vertical)
+                        WindowInsets.systemBars.only(WindowInsetsSides.Vertical)
                     )
             ) {
                 Row(

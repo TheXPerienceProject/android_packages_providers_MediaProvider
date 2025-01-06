@@ -34,15 +34,17 @@
 
 namespace {
 
+using ::pdfClient::Color;
 using ::pdfClient::Document;
 using ::pdfClient::ImageObject;
 using ::pdfClient::Page;
 using ::pdfClient::PageObject;
+using ::pdfClient::PathObject;
 using ::pdfClient::Rectangle_i;
 
 static const std::string kTestdata = "testdata";
 static const std::string kSekretNoPassword = "sekret_no_password.pdf";
-static const std::string kImageObject = "image_object.pdf";
+static const std::string kPageObject = "page_object.pdf";
 
 std::string GetTestDataDir() {
     return android::base::GetExecutableDirectory();
@@ -205,19 +207,21 @@ TEST(Test, InvalidPageNumberTest) {
 }
 
 TEST(Test, GetPageObjectsTest) {
-    Document doc(LoadTestDocument(kImageObject), false);
+    Document doc(LoadTestDocument(kPageObject), false);
 
     std::shared_ptr<Page> page = doc.GetPage(0);
     std::vector<PageObject*> pageObjects = page->GetPageObjects();
 
     // Check for PageObjects size.
-    ASSERT_EQ(1, pageObjects.size());
-    // Check for the PageObject to be ImageObject.
+    ASSERT_EQ(2, pageObjects.size());
+    // Check for the first PageObject to be ImageObject.
     ASSERT_EQ(PageObject::Type::Image, pageObjects[0]->GetType());
+    // Check for the second PageObject to be PathObject.
+    ASSERT_EQ(PageObject::Type::Path, pageObjects[1]->GetType());
 }
 
-TEST(Test, AddPageObjectTest) {
-    Document doc(LoadTestDocument(kImageObject), false);
+TEST(Test, AddImagePageObjectTest) {
+    Document doc(LoadTestDocument(kPageObject), false);
     std::shared_ptr<Page> page = doc.GetPage(0);
 
     std::vector<PageObject*> initialPageObjects = page->GetPageObjects();
@@ -226,9 +230,8 @@ TEST(Test, AddPageObjectTest) {
     auto imageObject = std::make_unique<ImageObject>();
 
     // Create FPDF Bitmap.
-    FPDF_BITMAP bitmap = FPDFBitmap_Create(6000, 4000, 1);
-    FPDFBitmap_FillRect(bitmap, 0, 0, 3000, 4000, 0xFF000000);
-    imageObject->bitmap = bitmap;
+    imageObject->bitmap = ScopedFPDFBitmap(FPDFBitmap_Create(100, 100, 1));
+    FPDFBitmap_FillRect(imageObject->bitmap.get(), 0, 0, 100, 100, 0xFF000000);
 
     // Set Matrix.
     imageObject->matrix = {1.0f, 0, 0, 1.0f, 0, 0};
@@ -241,10 +244,53 @@ TEST(Test, AddPageObjectTest) {
 
     // Assert that the size has increased by one.
     ASSERT_EQ(initialPageObjects.size() + 1, updatedPageObjects.size());
+    // Check for the first PageObject to be ImageObject.
+    ASSERT_EQ(PageObject::Type::Image, updatedPageObjects[0]->GetType());
+    // Check for the second PageObject to be PathObject.
+    ASSERT_EQ(PageObject::Type::Path, updatedPageObjects[1]->GetType());
+    // Check for the first PageObject to be ImageObject.
+    ASSERT_EQ(PageObject::Type::Image, updatedPageObjects[2]->GetType());
+}
+
+TEST(Test, AddPathPageObject) {
+    Document doc(LoadTestDocument(kPageObject), false);
+    std::shared_ptr<Page> page = doc.GetPage(0);
+
+    std::vector<PageObject*> initialPageObjects = page->GetPageObjects();
+
+    // Create Path Object.
+    auto pathObject = std::make_unique<PathObject>();
+
+    // Command Simple Path
+    pathObject->segments.emplace_back(PathObject::Segment::Command::Move, 0.0f, 0.0f);
+    pathObject->segments.emplace_back(PathObject::Segment::Command::Line, 100.0f, 150.0f);
+    pathObject->segments.emplace_back(PathObject::Segment::Command::Line, 150.0f, 150.0f);
+
+    // Set Draw Mode
+    pathObject->is_fill_mode = false;
+    pathObject->is_stroke = true;
+
+    // Set PathObject Matrix.
+    pathObject->matrix = {1.0f, 0, 0, 1.0f, 0, 0};
+
+    // Add the page object.
+    ASSERT_EQ(page->AddPageObject(std::move(pathObject)), initialPageObjects.size());
+
+    // Get Updated PageObjects
+    std::vector<PageObject*> updatedPageObjects = page->GetPageObjects(true);
+
+    // Assert that the size has increased by one.
+    ASSERT_EQ(initialPageObjects.size() + 1, updatedPageObjects.size());
+    // Check for the first PageObject to be ImageObject.
+    ASSERT_EQ(PageObject::Type::Image, updatedPageObjects[0]->GetType());
+    // Check for the second PageObject to be PathObject.
+    ASSERT_EQ(PageObject::Type::Path, updatedPageObjects[1]->GetType());
+    // Check for the first PageObject to be PathObject.
+    ASSERT_EQ(PageObject::Type::Path, updatedPageObjects[2]->GetType());
 }
 
 TEST(Test, RemovePageObjectTest) {
-    Document doc(LoadTestDocument(kImageObject), false);
+    Document doc(LoadTestDocument(kPageObject), false);
 
     std::shared_ptr<Page> page = doc.GetPage(0);
 
@@ -258,8 +304,8 @@ TEST(Test, RemovePageObjectTest) {
     ASSERT_EQ(initialPageObjects.size() - 1, updatedPageObjects.size());
 }
 
-TEST(Test, UpdatePageObjectTest) {
-    Document doc(LoadTestDocument(kImageObject), false);
+TEST(Test, UpdateImagePageObjectTest) {
+    Document doc(LoadTestDocument(kPageObject), false);
     std::shared_ptr<Page> page = doc.GetPage(0);
 
     // Get initial page objects.
@@ -269,9 +315,8 @@ TEST(Test, UpdatePageObjectTest) {
     auto imageObject = std::make_unique<ImageObject>();
 
     // Create FPDF Bitmap.
-    FPDF_BITMAP bitmap = FPDFBitmap_Create(6000, 4000, 1);
-    FPDFBitmap_FillRect(bitmap, 0, 0, 6000, 4000, 0xFF0000FF);
-    imageObject->bitmap = bitmap;
+    imageObject->bitmap = ScopedFPDFBitmap(FPDFBitmap_Create(100, 110, 1));
+    FPDFBitmap_FillRect(imageObject->bitmap.get(), 0, 0, 100, 110, 0xFF0000FF);
 
     // Set Matrix.
     imageObject->matrix = {2.0f, 0, 0, 2.0f, 0, 0};
@@ -286,8 +331,10 @@ TEST(Test, UpdatePageObjectTest) {
     ASSERT_EQ(initialPageObjects.size(), updatedPageObjects.size());
 
     // Check for updated bitmap.
-    ASSERT_EQ(FPDFBitmap_GetWidth(updatedPageObjects[0]->AsImage()->bitmap), 6000);
-    ASSERT_EQ(FPDFBitmap_GetHeight(updatedPageObjects[0]->AsImage()->bitmap), 4000);
+    ASSERT_EQ(FPDFBitmap_GetWidth(static_cast<ImageObject*>(updatedPageObjects[0])->bitmap.get()),
+              100);
+    ASSERT_EQ(FPDFBitmap_GetHeight(static_cast<ImageObject*>(updatedPageObjects[0])->bitmap.get()),
+              110);
 
     // Check for updated matrix.
     ASSERT_EQ(updatedPageObjects[0]->matrix.a, 2.0f);
@@ -296,6 +343,51 @@ TEST(Test, UpdatePageObjectTest) {
     ASSERT_EQ(updatedPageObjects[0]->matrix.d, 2.0f);
     ASSERT_EQ(updatedPageObjects[0]->matrix.e, 0.0f);
     ASSERT_EQ(updatedPageObjects[0]->matrix.f, 0.0f);
+}
+
+TEST(Test, UpdatePathPageObjectTest) {
+    Document doc(LoadTestDocument(kPageObject), false);
+    std::shared_ptr<Page> page = doc.GetPage(0);
+
+    // Get initial page objects.
+    std::vector<PageObject*> initialPageObjects = page->GetPageObjects();
+
+    // Create Path Object.
+    auto pathObject = std::make_unique<PathObject>();
+
+    // Update fill Color.
+    pathObject->fill_color = Color(255, 0, 0, 255);
+
+    // Update Draw Mode.
+    pathObject->is_fill_mode = true;
+    pathObject->is_stroke = false;
+
+    // Set Matrix.
+    pathObject->matrix = {2.0f, 0, 0, 2.0f, 0, 0};
+
+    // Update the page object.
+    EXPECT_TRUE(page->UpdatePageObject(1, std::move(pathObject)));
+
+    // Get the updated page objects.
+    std::vector<PageObject*> updatedPageObjects = page->GetPageObjects(true);
+
+    // Check for updated fill Color.
+    ASSERT_EQ(updatedPageObjects[1]->fill_color.r, 255);
+    ASSERT_EQ(updatedPageObjects[1]->fill_color.b, 0);
+    ASSERT_EQ(updatedPageObjects[1]->fill_color.g, 0);
+    ASSERT_EQ(updatedPageObjects[1]->fill_color.a, 255);
+
+    // Check for updated Draw Mode.
+    ASSERT_EQ(static_cast<PathObject*>(updatedPageObjects[1])->is_fill_mode, true);
+    ASSERT_EQ(static_cast<PathObject*>(updatedPageObjects[1])->is_stroke, false);
+
+    // Check for updated matrix.
+    ASSERT_EQ(updatedPageObjects[1]->matrix.a, 2.0f);
+    ASSERT_EQ(updatedPageObjects[1]->matrix.b, 0.0f);
+    ASSERT_EQ(updatedPageObjects[1]->matrix.c, 0.0f);
+    ASSERT_EQ(updatedPageObjects[1]->matrix.d, 2.0f);
+    ASSERT_EQ(updatedPageObjects[1]->matrix.e, 0.0f);
+    ASSERT_EQ(updatedPageObjects[1]->matrix.f, 0.0f);
 }
 
 }  // namespace

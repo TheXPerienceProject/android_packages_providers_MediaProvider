@@ -84,9 +84,20 @@ public class PickerSearchProviderClient {
         queryArgs.putString(CloudMediaProviderContract.EXTRA_PAGE_TOKEN, resumePageToken);
         queryArgs.putInt(CloudMediaProviderContract.EXTRA_SORT_ORDER, sortOrder);
 
-        return mContext.getContentResolver().query(
+        Log.d(TAG, "Search results query sent to CMP: " + queryArgs);
+
+        final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_SEARCH_MEDIA),
                 null, queryArgs,  cancellationSignal);
+
+        if (cursor == null) {
+            Log.d(TAG, "Search results response from the CMP is null.");
+
+        } else {
+            Log.d(TAG, "Search results received from the CMP: " + cursor.getCount()
+                    + " extras: " + cursor.getExtras());
+        }
+        return cursor;
     }
 
     /**
@@ -99,9 +110,21 @@ public class PickerSearchProviderClient {
         final Bundle queryArgs = new Bundle();
         queryArgs.putString(CloudMediaProviderContract.KEY_PREFIX_TEXT, requireNonNull(prefixText));
         queryArgs.putInt(CloudMediaProviderContract.EXTRA_PAGE_SIZE, limit);
-        return mContext.getContentResolver().query(
+
+        Log.d(TAG, "Search suggestions query sent to CMP: " + queryArgs);
+
+        final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_SEARCH_SUGGESTION),
                 null, queryArgs,  cancellationSignal);
+
+        if (cursor == null) {
+            Log.d(TAG, "Search suggestions response from the CMP is null.");
+
+        } else {
+            Log.d(TAG, "Search suggestions received from the CMP: " + cursor.getCount()
+                    + " extras: " + cursor.getExtras());
+        }
+        return cursor;
     }
 
     /**
@@ -116,9 +139,21 @@ public class PickerSearchProviderClient {
             queryArgs = new Bundle();
         }
         queryArgs.putString(CloudMediaProviderContract.KEY_PARENT_CATEGORY_ID, parentCategoryId);
-        return mContext.getContentResolver().query(
+
+        Log.d(TAG, "Categories query sent to CMP: " + queryArgs);
+
+        final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_MEDIA_CATEGORY),
                 null, queryArgs, cancellationSignal);
+
+        if (cursor == null) {
+            Log.d(TAG, "Categories response from the CMP is null.");
+
+        } else {
+            Log.d(TAG, "Categories received from the CMP: " + cursor.getCount()
+                    + " extras: " + cursor.getExtras());
+        }
+        return cursor;
     }
 
     /**
@@ -134,9 +169,21 @@ public class PickerSearchProviderClient {
         queryArgs.putString(CloudMediaProviderContract.EXTRA_PAGE_TOKEN, nextPageToken);
         queryArgs.putInt(CloudMediaProviderContract.EXTRA_PAGE_SIZE, pageSize);
         queryArgs.putStringArray(Intent.EXTRA_MIME_TYPES, mimeTypes);
-        return mContext.getContentResolver().query(
+
+        Log.d(TAG, "Media sets query sent to CMP: " + queryArgs);
+
+        final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_MEDIA_SET),
                 null, queryArgs,  cancellationSignal);
+
+        if (cursor == null) {
+            Log.d(TAG, "Media sets response from the CMP is null.");
+
+        } else {
+            Log.d(TAG, "Media sets received from the CMP: " + cursor.getCount()
+                    + " extras: " + cursor.getExtras());
+        }
+        return cursor;
     }
 
     /**
@@ -158,9 +205,20 @@ public class PickerSearchProviderClient {
         queryArgs.putInt(CloudMediaProviderContract.EXTRA_SORT_ORDER, sortOrder);
         queryArgs.putStringArray(Intent.EXTRA_MIME_TYPES, mimeTypes);
 
-        return mContext.getContentResolver().query(
+        Log.d(TAG, "Media set content query sent to CMP: " + queryArgs);
+
+        final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_MEDIA_IN_MEDIA_SET),
                 null, queryArgs,  cancellationSignal);
+
+        if (cursor == null) {
+            Log.d(TAG, "Media set contents response from the CMP is null.");
+
+        } else {
+            Log.d(TAG, "Media set contents received from the CMP: " + cursor.getCount()
+                    + " extras: " + cursor.getExtras());
+        }
+        return cursor;
     }
 
     private Uri getCloudUriFromPath(String uriPath) {
@@ -185,6 +243,7 @@ public class PickerSearchProviderClient {
             final CloudMediaProviderContract.Capabilities capabilities =
                     response.getParcelable(EXTRA_PROVIDER_CAPABILITIES);
             requireNonNull(capabilities);
+            Log.d(TAG, "Capabilities received from CMP: " + capabilities);
 
             return capabilities;
         } catch (RuntimeException e) {

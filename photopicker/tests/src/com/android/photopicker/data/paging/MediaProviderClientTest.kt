@@ -27,6 +27,7 @@ import androidx.test.filters.SmallTest
 import com.android.photopicker.core.configuration.PhotopickerConfiguration
 import com.android.photopicker.core.configuration.TestPhotopickerConfiguration
 import com.android.photopicker.core.events.generatePickerSessionId
+import com.android.photopicker.data.DEFAULT_PROVIDERS
 import com.android.photopicker.data.DEFAULT_SEARCH_REQUEST_ID
 import com.android.photopicker.data.DEFAULT_SEARCH_SUGGESTIONS
 import com.android.photopicker.data.MediaProviderClient
@@ -486,5 +487,46 @@ class MediaProviderClientTest {
         for (index in 0..<DEFAULT_SEARCH_SUGGESTIONS.size) {
             assertThat(searchSuggestions[index]).isEqualTo(DEFAULT_SEARCH_SUGGESTIONS[index])
         }
+    }
+
+    @Test
+    fun testFetchSearchProvidersWithAvailableProvidersKnown() = runTest {
+        val mediaProviderClient = MediaProviderClient()
+        val localProvider =
+            Provider(
+                authority = "local_authority",
+                mediaSource = MediaSource.LOCAL,
+                uid = 0,
+                displayName = "",
+            )
+        val cloudProvider =
+            Provider(
+                authority = "cloud_authority",
+                mediaSource = MediaSource.REMOTE,
+                uid = 0,
+                displayName = "",
+            )
+        val testContentProvider: TestMediaProvider =
+            TestMediaProvider(searchProviders = listOf(localProvider, cloudProvider))
+        val testContentResolver: ContentResolver = ContentResolver.wrap(testContentProvider)
+
+        val searchProviderAuthorities =
+            mediaProviderClient.fetchSearchProviderAuthorities(
+                resolver = testContentResolver,
+                availableProviders = listOf(localProvider),
+            )
+
+        assertThat(searchProviderAuthorities).isEqualTo(listOf(localProvider.authority))
+    }
+
+    @Test
+    fun testFetchSearchProviders() = runTest {
+        val mediaProviderClient = MediaProviderClient()
+        val testContentResolver: ContentResolver = ContentResolver.wrap(testContentProvider)
+        val searchProviderAuthorities =
+            mediaProviderClient.fetchSearchProviderAuthorities(resolver = testContentResolver)
+
+        assertThat(searchProviderAuthorities)
+            .isEqualTo(DEFAULT_PROVIDERS.map { it.authority }.toList())
     }
 }

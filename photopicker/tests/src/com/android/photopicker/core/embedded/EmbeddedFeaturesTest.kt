@@ -25,6 +25,9 @@ import android.os.Build
 import android.os.Parcel
 import android.os.UserHandle
 import android.os.UserManager
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
+import android.platform.test.flag.junit.SetFlagsRule
 import android.test.mock.MockContentResolver
 import android.view.SurfaceControlViewHost
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -99,6 +102,7 @@ import com.android.photopicker.tests.HiltTestActivity
 import com.android.photopicker.util.test.MockContentProviderWrapper
 import com.android.photopicker.util.test.nonNullableEq
 import com.android.photopicker.util.test.whenever
+import com.android.providers.media.flags.Flags
 import com.google.common.truth.Truth.assertWithMessage
 import dagger.Lazy
 import dagger.Module
@@ -146,6 +150,7 @@ class EmbeddedFeaturesTest : EmbeddedPhotopickerFeatureBaseTest() {
     @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule(activityClass = HiltTestActivity::class.java)
     @get:Rule(order = 2) val glideRule = GlideTestRule()
+    @get:Rule(order = 3) var setFlagsRule = SetFlagsRule()
 
     /** Setup dependencies for the UninstallModules for the test class. */
     @Module
@@ -272,7 +277,8 @@ class EmbeddedFeaturesTest : EmbeddedPhotopickerFeatureBaseTest() {
     }
 
     @Test
-    fun testNavigationBarIsNotDisplayedInEmbeddedWhenCollapsed() =
+    @DisableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testNavigationBarIsNotDisplayedInEmbeddedWhenCollapsed_searchFlagOff() =
         testScope.runTest {
             val resources = getTestableContext().getResources()
             val photosGridNavButtonLabel =
@@ -301,7 +307,8 @@ class EmbeddedFeaturesTest : EmbeddedPhotopickerFeatureBaseTest() {
         }
 
     @Test
-    fun testNavigationBarIsDisplayedInEmbeddedWhenExpanded() =
+    @DisableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testNavigationBarIsDisplayedInEmbeddedWhenExpanded_searchFlagOff() =
         testScope.runTest {
             val resources = getTestableContext().getResources()
             val photosGridNavButtonLabel =
@@ -328,6 +335,39 @@ class EmbeddedFeaturesTest : EmbeddedPhotopickerFeatureBaseTest() {
                 .assert(hasClickAction())
             composeTestRule
                 .onNode(hasText(albumsGridNavButtonLabel))
+                .assertIsDisplayed()
+                .assert(hasClickAction())
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testNavigationBarIsDisplayedInEmbeddedWhenExpanded_searchFlagOn() =
+        testScope.runTest {
+            val resources = getTestableContext().getResources()
+            val photosGridNavButtonLabel =
+                resources.getString(R.string.photopicker_photos_nav_button_label)
+            val categoryGridNavButtonLabel =
+                resources.getString(R.string.photopicker_categories_nav_button_label)
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalEmbeddedState provides testEmbeddedStateExpanded) {
+                    callEmbeddedPhotopickerMain(
+                        embeddedLifecycle = embeddedLifecycle.get(),
+                        featureManager = featureManager.get(),
+                        selection = selection.get(),
+                        events = events.get(),
+                    )
+                }
+            }
+            // Wait for the PhotoGridViewModel to load data and for the UI to update.
+            advanceTimeBy(100)
+            composeTestRule.waitForIdle()
+            // Photos Grid Nav Button and Category Grid Nav Button
+            composeTestRule
+                .onNode(hasText(photosGridNavButtonLabel))
+                .assertIsDisplayed()
+                .assert(hasClickAction())
+            composeTestRule
+                .onNode(hasText(categoryGridNavButtonLabel))
                 .assertIsDisplayed()
                 .assert(hasClickAction())
         }
@@ -365,7 +405,8 @@ class EmbeddedFeaturesTest : EmbeddedPhotopickerFeatureBaseTest() {
         }
 
     @Test
-    fun testSwipeLeftToAlbumWorksInEmbeddedWhenExpanded() =
+    @DisableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testSwipeLeftToAlbumWorksInEmbeddedWhenExpanded_searchFlagOff() =
         testScope.runTest {
             composeTestRule.setContent {
                 CompositionLocalProvider(LocalEmbeddedState provides testEmbeddedStateExpanded) {
@@ -394,6 +435,39 @@ class EmbeddedFeaturesTest : EmbeddedPhotopickerFeatureBaseTest() {
             assertWithMessage("Expected swipe to navigate to AlbumGrid")
                 .that(route)
                 .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testSwipeLeftToCategoryWorksInEmbeddedWhenExpanded_searchFlagOn() =
+        testScope.runTest {
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalEmbeddedState provides testEmbeddedStateExpanded) {
+                    callEmbeddedPhotopickerMain(
+                        embeddedLifecycle = embeddedLifecycle.get(),
+                        featureManager = featureManager.get(),
+                        selection = selection.get(),
+                        events = events.get(),
+                    )
+                }
+            }
+            // Wait for the PhotoGridViewModel to load data and for the UI to update.
+            advanceTimeBy(100)
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onAllNodes(
+                    hasContentDescription(
+                        value = MEDIA_ITEM_CONTENT_DESCRIPTION_SUBSTRING,
+                        substring = true,
+                    )
+                )
+                .onFirst()
+                .performTouchInput { swipeLeft() }
+            composeTestRule.waitForIdle()
+            val route = navController.currentBackStackEntry?.destination?.route
+            assertWithMessage("Expected swipe to navigate to CategoryGrid")
+                .that(route)
+                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
         }
 
     @Test

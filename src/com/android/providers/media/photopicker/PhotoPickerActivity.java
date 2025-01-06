@@ -57,6 +57,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup.MarginLayoutParams;
 import android.view.ViewOutlineProvider;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -64,12 +65,16 @@ import android.view.accessibility.AccessibilityManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.activity.EdgeToEdge;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -169,8 +174,7 @@ public class PhotoPickerActivity extends AppCompatActivity {
         // in the base theme will be copied.
         getTheme().applyStyle(R.style.PickerMaterialTheme, /* force */ false);
 
-        // TODO(b/309578419): Make this activity handle insets properly and then remove this.
-        getTheme().applyStyle(R.style.OptOutEdgeToEdgeEnforcement, /* force */ false);
+        EdgeToEdge.enable(this);
 
         super.onCreate(savedInstanceState);
 
@@ -178,6 +182,17 @@ public class PhotoPickerActivity extends AppCompatActivity {
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+
+        View photo_picker_base = findViewById(R.id.photo_picker_base);
+        ViewCompat.setOnApplyWindowInsetsListener(photo_picker_base, (v, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            MarginLayoutParams mlp = (MarginLayoutParams) v.getLayoutParams();
+            mlp.topMargin = insets.top;
+            mlp.bottomMargin = insets.bottom;
+            v.setLayoutParams(mlp);
+
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         final int[] attrs = new int[]{R.attr.actionBarSize, R.attr.pickerTextColor};
         final TypedArray ta = obtainStyledAttributes(attrs);

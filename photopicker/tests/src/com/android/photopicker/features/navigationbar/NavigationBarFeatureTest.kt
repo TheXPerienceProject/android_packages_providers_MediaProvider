@@ -209,7 +209,9 @@ class NavigationBarFeatureTest : PhotopickerFeatureBaseTest() {
 
     /* Verify Navigation Bar contains tabs for both photos and albums grid.*/
     @Test
-    fun testNavigationBarIsVisibleWithFeatureTabs() {
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
+    @DisableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testNavigationBarIsVisibleWithFeatureTabs_searchFlagOff() {
         // Explicitly create a new feature manager that uses the same production feature
         // registrations to ensure this test will fail if the default production behavior changes.
         featureManager =
@@ -253,9 +255,57 @@ class NavigationBarFeatureTest : PhotopickerFeatureBaseTest() {
         }
     }
 
+    /* Verify Navigation Bar contains tabs for both photos and category grid.*/
+    @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
+    @EnableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testNavigationBarIsVisibleWithFeatureTabs_searchFlagOn() {
+        // Explicitly create a new feature manager that uses the same production feature
+        // registrations to ensure this test will fail if the default production behavior changes.
+        featureManager =
+            FeatureManager(
+                registeredFeatures = FeatureManager.KNOWN_FEATURE_REGISTRATIONS,
+                scope = testBackgroundScope,
+                prefetchDataService = TestPrefetchDataService(),
+                configuration = provideTestConfigurationFlow(scope = testBackgroundScope),
+            )
+
+        val photosGridNavButtonLabel =
+            getTestableContext()
+                .getResources()
+                .getString(R.string.photopicker_photos_nav_button_label)
+        val categoryGridNavButtonLabel =
+            getTestableContext()
+                .getResources()
+                .getString(R.string.photopicker_categories_nav_button_label)
+
+        testScope.runTest {
+            composeTestRule.setContent {
+                callPhotopickerMain(
+                    featureManager = featureManager,
+                    selection = selection,
+                    events = events,
+                )
+            }
+
+            composeTestRule.waitForIdle()
+
+            // Photos Grid Nav Button and Category Grid Nav Button
+            composeTestRule
+                .onNode(hasText(photosGridNavButtonLabel))
+                .assertIsDisplayed()
+                .assert(hasClickAction())
+
+            composeTestRule
+                .onNode(hasText(categoryGridNavButtonLabel))
+                .assertIsDisplayed()
+                .assert(hasClickAction())
+        }
+    }
+
     /* Verify Navigation Bar when search flag disabled contains tabs for both photos and albums grid.*/
     @Test
-    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
     @DisableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
     fun testNavigationBar_withSearchFlagDisabled_IsVisibleWithFeatureTabs() {
         val photosGridNavButtonLabel =

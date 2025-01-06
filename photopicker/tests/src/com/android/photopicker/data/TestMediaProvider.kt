@@ -138,6 +138,7 @@ class TestMediaProvider(
     var albumMedia: Map<String, List<Media>> = DEFAULT_ALBUM_MEDIA,
     var searchRequestId: Int = DEFAULT_SEARCH_REQUEST_ID,
     var searchSuggestions: List<SearchSuggestion> = DEFAULT_SEARCH_SUGGESTIONS,
+    var searchProviders: List<Provider>? = DEFAULT_PROVIDERS,
 ) : MockContentProvider() {
     var lastRefreshMediaRequest: Bundle? = null
     var TEST_GRANTS_COUNT = 2
@@ -173,13 +174,22 @@ class TestMediaProvider(
 
     override fun call(authority: String, method: String, arg: String?, extras: Bundle?): Bundle? {
         return when (method) {
-            "picker_media_init" -> {
+            MediaProviderClient.MEDIA_INIT_CALL_METHOD -> {
                 initMedia(extras)
                 null
             }
-            "picker_internal_search_media_init" -> {
+            MediaProviderClient.SEARCH_REQUEST_INIT_CALL_METHOD -> {
                 bundleOf(MediaProviderClient.SEARCH_REQUEST_ID to searchRequestId)
             }
+            MediaProviderClient.GET_SEARCH_PROVIDERS_CALL_METHOD ->
+                bundleOf(
+                    MediaProviderClient.SEARCH_PROVIDER_AUTHORITIES to
+                        if (searchProviders == null) null
+                        else
+                            arrayListOf<String>().apply {
+                                searchProviders?.map { it.authority }?.toCollection(this)
+                            }
+                )
             else -> throw UnsupportedOperationException("Could not recognize method $method")
         }
     }

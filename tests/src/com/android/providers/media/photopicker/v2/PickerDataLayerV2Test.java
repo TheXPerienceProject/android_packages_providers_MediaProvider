@@ -26,8 +26,10 @@ import static com.android.providers.media.photopicker.util.PickerDbTestUtils.CLO
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.CLOUD_ID_4;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.CLOUD_PROVIDER;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.DATE_TAKEN_MS;
+import static com.android.providers.media.photopicker.util.PickerDbTestUtils.DURATION_MS;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.GENERATION_MODIFIED;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.GIF_IMAGE_MIME_TYPE;
+import static com.android.providers.media.photopicker.util.PickerDbTestUtils.HEIGHT;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.JPEG_IMAGE_MIME_TYPE;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.LOCAL_ID;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.LOCAL_ID_1;
@@ -36,9 +38,12 @@ import static com.android.providers.media.photopicker.util.PickerDbTestUtils.LOC
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.LOCAL_ID_4;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.LOCAL_PROVIDER;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.MP4_VIDEO_MIME_TYPE;
+import static com.android.providers.media.photopicker.util.PickerDbTestUtils.ORIENTATION;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.PNG_IMAGE_MIME_TYPE;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.STANDARD_MIME_TYPE_EXTENSION;
+import static com.android.providers.media.photopicker.util.PickerDbTestUtils.TEST_DIFFERENT_PACKAGE_NAME;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.TEST_PACKAGE_NAME;
+import static com.android.providers.media.photopicker.util.PickerDbTestUtils.WIDTH;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.assertAddAlbumMediaOperation;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.assertAddMediaOperation;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.assertInsertGrantsOperation;
@@ -57,6 +62,7 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -65,6 +71,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.MockitoAnnotations.initMocks;
 
+import android.Manifest;
+import android.compat.testing.PlatformCompatChangeRule;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -75,23 +83,31 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.database.MergeCursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Process;
 import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.CloudMediaProviderContract;
 import android.provider.MediaStore;
 import android.test.mock.MockContentProvider;
 import android.test.mock.MockContentResolver;
 
 import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SdkSuppress;
+import androidx.test.runner.AndroidJUnit4;
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.Operation;
 import androidx.work.WorkManager;
 
+import com.android.providers.media.MediaProvider;
 import com.android.providers.media.PickerUriResolver;
 import com.android.providers.media.cloudproviders.SearchProvider;
+import com.android.providers.media.flags.Flags;
 import com.android.providers.media.photopicker.CategoriesState;
 import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.SearchState;
@@ -112,18 +128,27 @@ import com.android.providers.media.photopicker.v2.sqlite.SearchSuggestionsQuery;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import libcore.junit.util.compat.CoreCompatChangeRule;
+import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.runner.RunWith;
 import org.mockito.Mock;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 
+@RunWith(AndroidJUnit4.class)
 public class PickerDataLayerV2Test {
     @Mock
     private PickerSyncController mMockSyncController;
@@ -146,6 +171,12 @@ public class PickerDataLayerV2Test {
     private MockContentResolver mMockContentResolver;
     private TestContentProvider mLocalProvider;
     private TestContentProvider mCloudProvider;
+
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+
+    @Rule
+    public final TestRule mCompatChangeRule = new PlatformCompatChangeRule();
 
 
     private static class TestContentProvider extends MockContentProvider {
@@ -193,6 +224,13 @@ public class PickerDataLayerV2Test {
         doReturn(mCategoriesState).when(mMockSyncController).getCategoriesState();
         doReturn(new PickerSyncLockManager()).when(mMockSyncController).getPickerSyncLockManager();
         doReturn(mMockContentResolver).when(mMockContext).getContentResolver();
+
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .getUiAutomation()
+                .adoptShellPermissionIdentity(
+                        Manifest.permission.LOG_COMPAT_CHANGE,
+                        Manifest.permission.READ_COMPAT_CHANGE_CONFIG,
+                        Manifest.permission.READ_DEVICE_CONFIG);
     }
 
     @After
@@ -514,6 +552,188 @@ public class PickerDataLayerV2Test {
                     MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP,
                     /* isPreGranted */ true);
         }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_REVOKE_ACCESS_OWNED_PHOTOS)
+    @EnableCompatChanges({MediaProvider.ENABLE_OWNED_PHOTOS})
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA)
+    public void testPreGrantsForOwnedPhotos() {
+        assumeTrue(MediaProvider.isOwnedPhotosEnabled(Process.myUid()));
+
+        doReturn(mMockPackageManager)
+                .when(mMockContext).getPackageManager();
+        String[] packageNames = new String[]{TEST_PACKAGE_NAME};
+        doReturn(packageNames).when(mMockPackageManager).getPackagesForUid(Process.myUid());
+        Map<String, Integer> idVsExpectedPreGrantedValue = populateMediaAndMediaGrantsTable();
+        int totalCount = idVsExpectedPreGrantedValue.size();
+
+        try (Cursor cr = PickerDataLayerV2.queryMedia(
+                mMockContext, getMediaQueryExtras(Long.MAX_VALUE, Long.MAX_VALUE, /* pageSize */ 10,
+                        new ArrayList<>(List.of(LOCAL_PROVIDER)),
+                        new ArrayList<>(List.of("image/*")),
+                        MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP,
+                        /*callingUid*/ Process.myUid()))) {
+
+            assertWithMessage(
+                    "Unexpected number of rows in media query result")
+                    .that(cr.getCount()).isEqualTo(totalCount);
+
+            cr.moveToFirst();
+            for (int i = 0; i < totalCount; i++) {
+                int id = cr.getInt(cr.getColumnIndex("id"));
+                int isPreGranted = cr.getInt(cr.getColumnIndex("is_pre_granted"));
+                assertEquals(idVsExpectedPreGrantedValue.get(String.valueOf(id)).intValue(),
+                        isPreGranted);
+                cr.moveToNext();
+            }
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_REVOKE_ACCESS_OWNED_PHOTOS)
+    @EnableCompatChanges({MediaProvider.ENABLE_OWNED_PHOTOS})
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA)
+    public void testPreGrantedCountForOwnedPhotos() {
+        assumeTrue(MediaProvider.isOwnedPhotosEnabled(Process.myUid()));
+
+        doReturn(mMockPackageManager)
+                .when(mMockContext).getPackageManager();
+        String[] packageNames = new String[]{TEST_PACKAGE_NAME};
+        doReturn(packageNames).when(mMockPackageManager).getPackagesForUid(0);
+        Map<String, Integer> idVsPreGranted = populateMediaAndMediaGrantsTable();
+        int totalPreGranted = (int) idVsPreGranted.values().stream()
+                .filter(preGranted -> Integer.valueOf(1).equals(preGranted))
+                .count();
+
+        Bundle queryArgs = new Bundle();
+        queryArgs.putInt(Intent.EXTRA_UID, 0);
+        try (Cursor cr = PickerDataLayerV2.fetchCountForPreGrantedItems(mMockContext, queryArgs)) {
+            cr.moveToFirst();
+            assertEquals(totalPreGranted, cr.getInt(cr.getColumnIndex(COLUMN_GRANTS_COUNT)));
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_REVOKE_ACCESS_OWNED_PHOTOS)
+    @EnableCompatChanges({MediaProvider.ENABLE_OWNED_PHOTOS})
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA)
+    public void testPreviewForOwnedPhotos() {
+        assumeTrue(MediaProvider.isOwnedPhotosEnabled(Process.myUid()));
+
+        doReturn(mMockPackageManager)
+                .when(mMockContext).getPackageManager();
+        String[] packageNames = new String[]{TEST_PACKAGE_NAME};
+        doReturn(packageNames).when(mMockPackageManager).getPackagesForUid(0);
+
+        Map<String, Integer> idVsPreGranted = populateMediaAndMediaGrantsTable();
+        int totalPreGranted = (int) idVsPreGranted.values().stream()
+                .filter(preGranted -> Integer.valueOf(1).equals(preGranted))
+                .count();
+
+        Bundle queryArgs = getMediaQueryExtras(Long.MAX_VALUE, Long.MAX_VALUE, /* pageSize */ 10,
+                new ArrayList<>(List.of(LOCAL_PROVIDER)),
+                new ArrayList<>(List.of("image/*")),
+                MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP,
+                0);
+        queryArgs.putBoolean("is_preview_session", true);
+
+        try (Cursor cr = PickerDataLayerV2.queryPreviewMedia(mMockContext, queryArgs)) {
+            assertEquals(totalPreGranted, cr.getCount());
+            cr.moveToFirst();
+            for (int i = 0; i < totalPreGranted; i++) {
+                int id = cr.getInt(cr.getColumnIndex("id"));
+                int preGranted = cr.getInt(cr.getColumnIndex("is_pre_granted"));
+                assertEquals(1, (int) idVsPreGranted.get(String.valueOf(id)));
+                assertEquals(1, preGranted);
+                cr.moveToNext();
+            }
+        }
+    }
+
+    private Map<String, Integer> populateMediaAndMediaGrantsTable() {
+
+        Map<String, Integer> idVsExpectedPreGrantedValue = new HashMap<>();
+
+        // 1. ownerPackageName != TEST_PACKAGE_NAME and no media grants.
+        // preGranted should be false
+        Cursor cursorWithDifferentOwnerPackageName = getMediaCursorWithOwnerPackageNameAndUserId(
+                "101", TEST_DIFFERENT_PACKAGE_NAME);
+        assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursorWithDifferentOwnerPackageName,
+                /*writeCount*/ 1);
+        idVsExpectedPreGrantedValue.put("101", 0);
+
+        // 2. ownerPackageName == TEST_PACKAGE_NAME and no media grants.
+        // preGranted should be true
+        Cursor cursorWithCorrectOwnerPackageName = getMediaCursorWithOwnerPackageNameAndUserId(
+                "102", TEST_PACKAGE_NAME);
+        assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursorWithCorrectOwnerPackageName,
+                /*writeCount*/ 1);
+        idVsExpectedPreGrantedValue.put("102", 1);
+
+        // 3. ownerPackageName != TEST_PACKAGE_NAME
+        // and media_grants with packageName == TEST_PACKAGE_NAME.
+        // preGranted should be true
+        Cursor cursorWithCorrectMediaGrants = getMediaCursorWithOwnerPackageNameAndUserId(
+                "103", TEST_DIFFERENT_PACKAGE_NAME);
+        assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursorWithCorrectMediaGrants,
+                /*writeCount*/ 1);
+        assertInsertGrantsOperation(mFacade, getMediaGrantsCursor("103", TEST_PACKAGE_NAME,
+                0), /*writeCount*/ 1);
+        idVsExpectedPreGrantedValue.put("103", 1);
+
+        // 4. ownerPackageName != TEST_PACKAGE_NAME
+        // and media_grants with packageName != TEST_PACKAGE_NAME.
+        // preGranted should be false
+        Cursor cursorWithDifferentMediaGrants = getMediaCursorWithOwnerPackageNameAndUserId(
+                "104", TEST_DIFFERENT_PACKAGE_NAME);
+        assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursorWithDifferentMediaGrants,
+                /*writeCount*/ 1);
+        assertInsertGrantsOperation(mFacade, getMediaGrantsCursor("104",
+                TEST_DIFFERENT_PACKAGE_NAME, 0), /*writeCount*/ 1);
+        idVsExpectedPreGrantedValue.put("104", 0);
+
+        return idVsExpectedPreGrantedValue;
+    }
+
+    private Cursor getMediaCursorWithOwnerPackageNameAndUserId(String id, String ownerPackageName) {
+        String[] projectionKey = new String[]{
+                CloudMediaProviderContract.MediaColumns.ID,
+                CloudMediaProviderContract.MediaColumns.MEDIA_STORE_URI,
+                CloudMediaProviderContract.MediaColumns.DATE_TAKEN_MILLIS,
+                CloudMediaProviderContract.MediaColumns.SYNC_GENERATION,
+                CloudMediaProviderContract.MediaColumns.SIZE_BYTES,
+                CloudMediaProviderContract.MediaColumns.MIME_TYPE,
+                CloudMediaProviderContract.MediaColumns.STANDARD_MIME_TYPE_EXTENSION,
+                CloudMediaProviderContract.MediaColumns.DURATION_MILLIS,
+                CloudMediaProviderContract.MediaColumns.IS_FAVORITE,
+                CloudMediaProviderContract.MediaColumns.HEIGHT,
+                CloudMediaProviderContract.MediaColumns.WIDTH,
+                CloudMediaProviderContract.MediaColumns.ORIENTATION,
+                CloudMediaProviderContract.MediaColumns.OWNER_PACKAGE_NAME,
+                CloudMediaProviderContract.MediaColumns.USER_ID
+        };
+
+        String[] projectionValue = new String[]{
+                id,
+                null,
+                String.valueOf(DATE_TAKEN_MS),
+                String.valueOf(GENERATION_MODIFIED),
+                String.valueOf(1),
+                JPEG_IMAGE_MIME_TYPE,
+                String.valueOf(STANDARD_MIME_TYPE_EXTENSION),
+                String.valueOf(DURATION_MS),
+                String.valueOf(0),
+                String.valueOf(HEIGHT),
+                String.valueOf(WIDTH),
+                String.valueOf(ORIENTATION),
+                ownerPackageName,
+                String.valueOf(0)
+        };
+
+        MatrixCursor c = new MatrixCursor(projectionKey);
+        c.addRow(projectionValue);
+        return c;
     }
 
     @Test
@@ -866,6 +1086,9 @@ public class PickerDataLayerV2Test {
 
 
     @Test
+    @DisableFlags(Flags.FLAG_REVOKE_ACCESS_OWNED_PHOTOS)
+    @CoreCompatChangeRule.DisableCompatChanges({MediaProvider.ENABLE_OWNED_PHOTOS})
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
     public void testFetchMediaGrantsCount() {
         int testUid = 123;
         int userId = PickerSyncController.uidToUserId(testUid);
@@ -901,7 +1124,7 @@ public class PickerDataLayerV2Test {
         Bundle input = new Bundle();
         input.putInt(Intent.EXTRA_UID, testUid);
 
-        try (Cursor cr = PickerDataLayerV2.fetchMediaGrantsCount(
+        try (Cursor cr = PickerDataLayerV2.fetchCountForPreGrantedItems(
                 mMockContext, input)) {
 
             // cursor should only contain 1 row that represents the count.

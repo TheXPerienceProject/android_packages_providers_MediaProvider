@@ -254,6 +254,7 @@ class EmbeddedServiceModule {
         @ApplicationContext appContext: Context,
         events: Events,
         processOwnerHandle: UserHandle,
+        mediaProviderClient: MediaProviderClient,
     ): DataService {
 
         if (!::dataService.isInitialized) {
@@ -267,7 +268,7 @@ class EmbeddedServiceModule {
                     scope,
                     dispatcher,
                     notificationService,
-                    MediaProviderClient(),
+                    mediaProviderClient,
                     configurationManager.configuration,
                     featureManager,
                     appContext,
@@ -389,7 +390,12 @@ class EmbeddedServiceModule {
 
     @Provides
     @SessionScoped
-    fun providePrefetchDataService(): PrefetchDataService {
+    fun providePrefetchDataService(
+        userMonitor: UserMonitor,
+        @ApplicationContext context: Context,
+        @Background backgroundDispatcher: CoroutineDispatcher,
+        mediaProviderClient: MediaProviderClient,
+    ): PrefetchDataService {
 
         if (!::prefetchDataService.isInitialized) {
             Log.d(
@@ -397,7 +403,13 @@ class EmbeddedServiceModule {
                 "PrefetchDataService requested but not yet initialized. " +
                     "Initializing PrefetchDataService.",
             )
-            prefetchDataService = PrefetchDataServiceImpl()
+            prefetchDataService =
+                PrefetchDataServiceImpl(
+                    mediaProviderClient,
+                    userMonitor,
+                    context,
+                    backgroundDispatcher,
+                )
         }
         return prefetchDataService
     }

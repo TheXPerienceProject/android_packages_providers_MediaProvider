@@ -19,13 +19,14 @@
 
 #include <stdint.h>
 
+#include <vector>
+
+#include "cpp/fpdf_scopers.h"
 #include "fpdfview.h"
 
 typedef unsigned int uint;
 
 namespace pdfClient {
-
-struct ImageObject;
 
 struct Color {
     uint r;
@@ -40,39 +41,80 @@ struct Color {
     static constexpr uint INVALID_COLOR = 256;
 };
 
-struct PageObject {
+class PageObject {
+  public:
     enum class Type {
         Unknown = 0,
-        Image,
+        Path = 2,
+        Image = 3,
     };
 
-    PageObject(Type t = Type::Unknown) : type(t) {}
+    Type GetType();
+    // Returns a FPDF Instance for a PageObject.
+    virtual ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) = 0;
+    // Updates the FPDF Instance of PageObject present at given index on Page.
+    virtual bool UpdateFPDFInstance(FPDF_PAGEOBJECT page_object) = 0;
+    // Populates data from FPDFInstance of PageObject present on Page.
+    virtual bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT page_object) = 0;
 
-    // Returns a pointer to the ImageObject if the PageObject is of type Image.
-    // Returns nullptr otherwise.
-    virtual ImageObject* AsImage() { return nullptr; }
-
-    Type GetType() { return type; }
-
-    virtual ~PageObject() = default;
+    virtual ~PageObject();
 
     FS_MATRIX matrix;  // Matrix used to scale, rotate, shear and translate the page object.
     Color fill_color;
     Color stroke_color;
     float stroke_width = 1.0f;
 
+  protected:
+    PageObject(Type type = Type::Unknown);
+
   private:
     Type type;
 };
 
-struct ImageObject : public PageObject {
-    ImageObject() : PageObject(Type::Image) {}
+class PathObject : public PageObject {
+  public:
+    PathObject();
 
-    ImageObject* AsImage() override { return this; }
+    ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) override;
+    bool UpdateFPDFInstance(FPDF_PAGEOBJECT path_object) override;
+    bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT path_object) override;
 
-    ~ImageObject() { FPDFBitmap_Destroy(bitmap); }
+    ~PathObject();
 
-    FPDF_BITMAP bitmap;
+    class Segment {
+      public:
+        enum class Command {
+            Unknown = 0,
+            Move,
+            Line,
+        };
+
+        Command command;
+        float x;
+        float y;
+        bool is_closed;  // Checks if the path_segment is closed
+
+        Segment(Command command, float x, float y, bool is_closed = false)
+            : command(command), x(x), y(y), is_closed(is_closed) {}
+    };
+
+    bool is_fill_mode = true;
+    bool is_stroke = false;
+
+    std::vector<Segment> segments;
+};
+
+class ImageObject : public PageObject {
+  public:
+    ImageObject();
+
+    ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) override;
+    bool UpdateFPDFInstance(FPDF_PAGEOBJECT image_object) override;
+    bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT image_object) override;
+
+    ~ImageObject();
+
+    ScopedFPDFBitmap bitmap;
 };
 
 }  // namespace pdfClient
