@@ -16,6 +16,9 @@
 
 package com.android.providers.media.photopicker.sync;
 
+import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_ALBUM;
+import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_FACE;
+
 import static com.android.providers.media.photopicker.PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_LOCAL_ONLY;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_SYNC_SOURCE;
@@ -41,7 +44,6 @@ import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
-import android.platform.test.annotations.EnableFlags;
 import android.provider.CloudMediaProviderContract;
 
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -50,15 +52,12 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 
-import com.android.providers.media.TestConfigStore;
 import com.android.providers.media.cloudproviders.SearchProvider;
-import com.android.providers.media.flags.Flags;
 import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.SearchState;
 import com.android.providers.media.photopicker.data.PickerDatabaseHelper;
 import com.android.providers.media.photopicker.data.PickerDbFacade;
 import com.android.providers.media.photopicker.v2.model.SearchSuggestionRequest;
-import com.android.providers.media.photopicker.v2.model.SearchSuggestionType;
 import com.android.providers.media.photopicker.v2.model.SearchTextRequest;
 import com.android.providers.media.photopicker.v2.sqlite.PickerSQLConstants;
 import com.android.providers.media.photopicker.v2.sqlite.SearchRequestDatabaseUtil;
@@ -72,7 +71,6 @@ import java.io.File;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-@EnableFlags(Flags.FLAG_CLOUD_MEDIA_PROVIDER_SEARCH)
 public class SearchResultsSyncWorkerTest {
     @Mock
     private PickerSyncController mMockSyncController;
@@ -80,6 +78,8 @@ public class SearchResultsSyncWorkerTest {
     private SyncTracker mMockLocalSearchSyncTracker;
     @Mock
     private SyncTracker mMockCloudSearchSyncTracker;
+    @Mock
+    private SearchState mSearchState;
     private Context mContext;
     private SQLiteDatabase mDatabase;
     private PickerDbFacade mFacade;
@@ -103,16 +103,14 @@ public class SearchResultsSyncWorkerTest {
                 mContext, new PickerSyncLockManager(), LOCAL_PICKER_PROVIDER_AUTHORITY);
         mFacade.setCloudProvider(SearchProvider.AUTHORITY);
 
-        final TestConfigStore configStore = new TestConfigStore();
-        configStore.setIsSearchFeatureEnabled(true);
-        final SearchState searchState = new SearchState(configStore);
-
         doReturn(LOCAL_PICKER_PROVIDER_AUTHORITY).when(mMockSyncController).getLocalProvider();
         doReturn(SearchProvider.AUTHORITY).when(mMockSyncController).getCloudProvider();
         doReturn(SearchProvider.AUTHORITY).when(mMockSyncController)
                 .getCloudProviderOrDefault(any());
         doReturn(mFacade).when(mMockSyncController).getDbFacade();
-        doReturn(searchState).when(mMockSyncController).getSearchState();
+        doReturn(mSearchState).when(mMockSyncController).getSearchState();
+        doReturn(true).when(mSearchState).isCloudSearchEnabled(any());
+        doReturn(true).when(mSearchState).isCloudSearchEnabled(any(), any());
         doReturn(new PickerSyncLockManager()).when(mMockSyncController).getPickerSyncLockManager();
     }
 
@@ -211,7 +209,7 @@ public class SearchResultsSyncWorkerTest {
                 "search text",
                 "media-set-id",
                 SearchProvider.AUTHORITY,
-                SearchSuggestionType.ALBUM,
+                SEARCH_SUGGESTION_ALBUM,
                 null
         );
 
@@ -431,7 +429,7 @@ public class SearchResultsSyncWorkerTest {
                 "search text",
                 "media-set-id",
                 LOCAL_PICKER_PROVIDER_AUTHORITY,
-                SearchSuggestionType.FACE,
+                SEARCH_SUGGESTION_FACE,
                 null
         );
 
@@ -532,7 +530,7 @@ public class SearchResultsSyncWorkerTest {
                 "search text",
                 "media-set-id",
                 SearchProvider.AUTHORITY,
-                SearchSuggestionType.FACE,
+                SEARCH_SUGGESTION_FACE,
                 "Random-resume-key"
         );
 
@@ -622,7 +620,7 @@ public class SearchResultsSyncWorkerTest {
                 "search text",
                 "media-set-id",
                 LOCAL_PICKER_PROVIDER_AUTHORITY,
-                SearchSuggestionType.FACE,
+                SEARCH_SUGGESTION_FACE,
                 SYNC_COMPLETE_RESUME_KEY
         );
 

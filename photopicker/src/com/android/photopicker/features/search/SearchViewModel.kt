@@ -24,6 +24,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.android.photopicker.core.Background
 import com.android.photopicker.core.components.MediaGridItem
+import com.android.photopicker.core.configuration.ConfigurationManager
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.Events
 import com.android.photopicker.core.events.Telemetry
@@ -67,6 +68,7 @@ constructor(
     private val searchDataService: SearchDataService,
     private val selection: Selection<Media>,
     private val events: Events,
+    private val configurationManager: ConfigurationManager,
 ) : ViewModel() {
 
     companion object {
@@ -166,11 +168,29 @@ constructor(
             ) {
                 when (currentSearchState) {
                     is SearchState.Active.SuggestionSearch -> {
+                        scope.launch {
+                            events.dispatch(
+                                Event.ReportPhotopickerSearchInfo(
+                                    FeatureToken.SEARCH.token,
+                                    configurationManager.configuration.value.sessionId,
+                                    Telemetry.SearchMethod.SUGGESTED_SEARCHES,
+                                )
+                            )
+                        }
                         searchDataService.getSearchResults(
                             suggestion = currentSearchState.suggestion
                         )
                     }
                     is SearchState.Active.QuerySearch -> {
+                        scope.launch {
+                            events.dispatch(
+                                Event.ReportPhotopickerSearchInfo(
+                                    FeatureToken.SEARCH.token,
+                                    configurationManager.configuration.value.sessionId,
+                                    Telemetry.SearchMethod.SEARCH_QUERY,
+                                )
+                            )
+                        }
                         searchDataService.getSearchResults(searchText = currentSearchState.query)
                     }
                     is SearchState.Inactive -> {
@@ -218,12 +238,10 @@ constructor(
      * PhotoGrid composable.
      */
     fun handleGridItemSelection(item: Media, selectionLimitExceededMessage: String) {
-        // TODO Replace UNSET_MEDIA_LOCATION with the correct enum after it is added.
-        // Update the selectable values in the received media object.
         val updatedMediaItem =
             Media.withSelectable(
                 item,
-                /* selectionSource */ Telemetry.MediaLocation.UNSET_MEDIA_LOCATION,
+                /* selectionSource */ Telemetry.MediaLocation.SEARCH_GRID,
                 /* album */ null,
             )
         scope.launch {
