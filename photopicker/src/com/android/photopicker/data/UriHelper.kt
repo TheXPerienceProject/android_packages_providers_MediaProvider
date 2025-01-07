@@ -109,6 +109,16 @@ fun getAlbumMediaUri(albumId: String): Uri {
 val SEARCH_SUGGESTIONS_URI: Uri =
     pickerUri.buildUpon().apply { appendPath(SEARCH_SUGGESTIONS_PATH_SEGMENT) }.build()
 
+/** URI that receives [ContentProvider] change notifications for search result updates. */
+val SEARCH_RESULTS_UPDATE_URI: Uri =
+    pickerUri
+        .buildUpon()
+        .apply {
+            appendPath(SEARCH_MEDIA_PATH_SEGMENT)
+            appendPath(UPDATE_PATH_SEGMENT)
+        }
+        .build()
+
 fun getSearchResultsMediaUri(searchRequestId: Int): Uri {
     return pickerUri
         .buildUpon()

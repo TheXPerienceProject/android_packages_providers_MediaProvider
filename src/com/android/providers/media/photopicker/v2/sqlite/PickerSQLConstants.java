@@ -42,6 +42,8 @@ import java.util.Objects;
 public class PickerSQLConstants {
     public static final int DEFAULT_SEARCH_SUGGESTIONS_LIMIT = 50;
     public static final int DEFAULT_SEARCH_HISTORY_SUGGESTIONS_LIMIT = 3;
+    public static String EXTRA_SEARCH_REQUEST_ID = "search_request_id";
+    public static String EXTRA_SEARCH_PROVIDER_AUTHORITIES = "search_provider_authorities";
     static final String COUNT_COLUMN = "Count";
 
     /**

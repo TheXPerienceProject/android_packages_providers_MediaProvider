@@ -104,9 +104,9 @@ import com.android.photopicker.core.selection.LocalSelection
 import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.extensions.navigateToPreviewMedia
 import com.android.photopicker.features.preview.PreviewFeature
-import com.android.photopicker.features.search.model.SearchEnabledState
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
+import com.android.photopicker.features.search.model.UserSearchState
 import com.android.photopicker.util.rememberBitmapFromUri
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -118,7 +118,7 @@ private val MEASUREMENT_SEARCH_BAR_HEIGHT = 56.dp
 private val MEASUREMENT_SEARCH_BAR_PADDING =
     PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 16.dp)
 
-private val FETCH_SUGGESTION_DEBOUNCE_DELAY = 300L // in milliseconds
+private val FETCH_SUGGESTION_DEBOUNCE_DELAY = 50L // in milliseconds
 
 private val SUGGESTION_TITLE_PADDING =
     PaddingValues(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 12.dp)
@@ -161,9 +161,9 @@ fun Search(
     params: LocationParams,
     viewModel: SearchViewModel = obtainViewModel(),
 ) {
-    val searchEnabled by viewModel.searchEnabled.collectAsStateWithLifecycle()
+    val userSearchStateInfo by viewModel.userSearchStateInfo.collectAsStateWithLifecycle()
     when {
-        searchEnabled == SearchEnabledState.ENABLED -> {
+        userSearchStateInfo.state == UserSearchState.ENABLED -> {
             SearchBarEnabled(params, viewModel, modifier)
         }
         else -> {

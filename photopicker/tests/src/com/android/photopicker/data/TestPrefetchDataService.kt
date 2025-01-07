@@ -16,12 +16,12 @@
 
 package com.android.photopicker.data
 
-import com.android.photopicker.features.search.model.SearchEnabledState
+import com.android.photopicker.features.search.model.GlobalSearchState
 
 class TestPrefetchDataService() : PrefetchDataService {
-    var searchEnabledState = SearchEnabledState.ENABLED
+    var globalSearchState = GlobalSearchState.ENABLED
 
-    override suspend fun getSearchState(): SearchEnabledState {
-        return searchEnabledState
+    override suspend fun getGlobalSearchState(): GlobalSearchState {
+        return globalSearchState
     }
 }

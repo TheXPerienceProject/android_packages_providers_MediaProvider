@@ -61,15 +61,25 @@ class SearchResultsPagingSource(
 
                     checkNotNull(searchRequestId) { "Search request id is invalid" }
 
-                    mediaProviderClient.fetchSearchResults(
-                        searchRequestId,
-                        pageKey,
-                        pageSize,
-                        contentResolver,
-                        availableProviders,
-                        configuration,
-                        cancellationSignal,
-                    )
+                    val searchResults =
+                        mediaProviderClient.fetchSearchResults(
+                            searchRequestId,
+                            pageKey,
+                            pageSize,
+                            contentResolver,
+                            availableProviders,
+                            configuration,
+                            cancellationSignal,
+                        )
+
+                    if (searchResults is LoadResult.Page) {
+                        Log.d(
+                            TAG,
+                            "Received ${searchResults.data.count()} search results from MP for $searchRequestId",
+                        )
+                    }
+
+                    searchResults
                 } catch (e: Exception) {
                     Log.e(TAG, "Could not fetch search results page from Media provider", e)
                     LoadResult.Error(e)

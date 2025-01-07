@@ -133,6 +133,8 @@ public class PickerDbFacade {
     public static final String KEY_WIDTH = "width";
     @VisibleForTesting
     public static final String KEY_ORIENTATION = "orientation";
+    public static final String KEY_OWNER_PACKAGE_NAME = "owner_package_name";
+    public static final String KEY_USER_ID = "_user_id";
     public static final String EXTRA_OWNER_PACKAGE_NAMES = "owner_package_names";
     public static final String EXTRA_PACKAGE_USER_ID = "package_user_id";
 
@@ -1316,6 +1318,8 @@ public class PickerDbFacade {
             getProjectionSimple(KEY_MIME_TYPE, MediaColumns.MIME_TYPE),
             getProjectionSimple(KEY_STANDARD_MIME_TYPE_EXTENSION,
                     MediaColumns.STANDARD_MIME_TYPE_EXTENSION),
+            getProjectionSimple(KEY_OWNER_PACKAGE_NAME, MediaColumns.OWNER_PACKAGE_NAME),
+            getProjectionSimple(KEY_USER_ID, MediaColumns.USER_ID),
         };
     }
 
@@ -1484,6 +1488,12 @@ public class PickerDbFacade {
                     if (TextUtils.isEmpty(albumId)) {
                         values.put(KEY_IS_FAVORITE, cursor.getInt(index));
                     }
+                    break;
+                case MediaColumns.OWNER_PACKAGE_NAME:
+                    values.put(KEY_OWNER_PACKAGE_NAME, cursor.getString(index));
+                    break;
+                case MediaColumns.USER_ID:
+                    values.put(KEY_USER_ID, cursor.getInt(index));
                     break;
 
                     /* The below columns are only included if this is not the album_media table

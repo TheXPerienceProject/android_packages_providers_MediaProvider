@@ -76,8 +76,6 @@ import org.mockito.Mockito.verify
 @OptIn(ExperimentalCoroutinesApi::class)
 class DataServiceImplTest {
 
-    val testSessionId = generatePickerSessionId()
-
     companion object {
         private fun createUserHandle(userId: Int = 0): UserHandle {
             val parcel = Parcel.obtain()
@@ -191,7 +189,7 @@ class DataServiceImplTest {
                     defaultConfiguration =
                         PhotopickerConfiguration(
                             action = "TEST_ACTION",
-                            sessionId = testSessionId,
+                            sessionId = sessionId,
                             flags =
                                 PhotopickerFlags(
                                     CLOUD_MEDIA_ENABLED = true,
@@ -219,7 +217,7 @@ class DataServiceImplTest {
                         defaultConfiguration =
                             PhotopickerConfiguration(
                                 action = "TEST_ACTION",
-                                sessionId = testSessionId,
+                                sessionId = sessionId,
                                 flags =
                                     PhotopickerFlags(
                                         CLOUD_MEDIA_ENABLED = true,
@@ -358,7 +356,7 @@ class DataServiceImplTest {
                     defaultConfiguration =
                         PhotopickerConfiguration(
                             action = "TEST_ACTION",
-                            sessionId = testSessionId,
+                            sessionId = sessionId,
                             flags =
                                 PhotopickerFlags(
                                     CLOUD_MEDIA_ENABLED = true,
@@ -385,7 +383,7 @@ class DataServiceImplTest {
                         this.backgroundScope,
                         PhotopickerConfiguration(
                             action = "TEST_ACTION",
-                            sessionId = testSessionId,
+                            sessionId = sessionId,
                             flags =
                                 PhotopickerFlags(
                                     CLOUD_MEDIA_ENABLED = true,
@@ -1052,7 +1050,7 @@ class DataServiceImplTest {
                     defaultConfiguration =
                         PhotopickerConfiguration(
                             action = "TEST_ACTION",
-                            sessionId = testSessionId,
+                            sessionId = sessionId,
                             flags =
                                 PhotopickerFlags(
                                     CLOUD_MEDIA_ENABLED = true,
@@ -1080,7 +1078,7 @@ class DataServiceImplTest {
                         defaultConfiguration =
                             PhotopickerConfiguration(
                                 action = "TEST_ACTION",
-                                sessionId = testSessionId,
+                                sessionId = sessionId,
                                 flags =
                                     PhotopickerFlags(
                                         CLOUD_MEDIA_ENABLED = true,

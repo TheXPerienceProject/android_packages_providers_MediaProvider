@@ -68,6 +68,7 @@ import kotlinx.coroutines.launch
 /* The size of spacers between elements on the bar */
 private val MEASUREMENT_BUTTONS_SPACER_SIZE = 8.dp
 private val MEASUREMENT_DESELECT_SPACER_SIZE = 4.dp
+private val MEASUREMENT_DESELECT_DISABLED_SPACER_SIZE = 16.dp
 
 /* Corner radius of the selection bar */
 private val MEASUREMENT_SELECTION_BAR_CORNER_SIZE = 100
@@ -94,6 +95,10 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
             MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP.equals(
                 LocalPhotopickerConfiguration.current.action
             )
+    val disableClearAllButton =
+        MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP.equals(
+            LocalPhotopickerConfiguration.current.action
+        ) && LocalPhotopickerConfiguration.current.flags.OWNED_PHOTOS_ENABLED
     val configuration = LocalPhotopickerConfiguration.current
     val events = LocalEvents.current
     val scope = rememberCoroutineScope()
@@ -123,17 +128,22 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
 
                 // Deselect all button [Left side]
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { scope.launch { selection.clear() } }) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription =
-                                stringResource(
-                                    R.string.photopicker_clear_selection_button_description
-                                ),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
+                    if (disableClearAllButton) {
+                        Spacer(Modifier.size(MEASUREMENT_DESELECT_DISABLED_SPACER_SIZE))
+                    } else {
+                        IconButton(onClick = { scope.launch { selection.clear() } }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription =
+                                    stringResource(
+                                        R.string.photopicker_clear_selection_button_description
+                                    ),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                        Spacer(Modifier.size(MEASUREMENT_DESELECT_SPACER_SIZE))
                     }
-                    Spacer(Modifier.size(MEASUREMENT_DESELECT_SPACER_SIZE))
+
                     val selectionSizeDescription =
                         stringResource(
                             R.string.photopicker_selection_size_description,

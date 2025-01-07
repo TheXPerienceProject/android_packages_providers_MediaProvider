@@ -19,6 +19,7 @@ package com.android.photopicker.features.search
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.CancellationSignal
 import android.os.Parcel
 import android.os.UserHandle
@@ -65,6 +66,9 @@ import org.mockito.Mockito.mock
 class SearchDataServiceImplTest {
 
     companion object {
+        private val searchMediaUpdateUri =
+            Uri.parse("content://media/picker_internal/v2/search_media/update")
+
         private fun createUserHandle(userId: Int = 0): UserHandle {
             val parcel = Parcel.obtain()
             parcel.writeInt(userId)
@@ -200,6 +204,69 @@ class SearchDataServiceImplTest {
         // Check that the new PagingSource instance is valid.
         val secondSearchResultsPagingSource: PagingSource<MediaPageKey, Media> =
             searchDataService.getSearchResults(searchText)
+        assertThat(secondSearchResultsPagingSource.invalid).isFalse()
+    }
+
+    @Test
+    fun testOnUpdateSearchResultsNotification() = runTest {
+        val userStatusFlow: MutableStateFlow<UserStatus> = MutableStateFlow(userStatus)
+        events =
+            Events(
+                scope = this.backgroundScope,
+                provideTestConfigurationFlow(this.backgroundScope),
+                testFeatureManager,
+            )
+
+        val dataService: DataService =
+            DataServiceImpl(
+                userStatus = userStatusFlow,
+                scope = this.backgroundScope,
+                notificationService = notificationService,
+                mediaProviderClient = mediaProviderClient,
+                dispatcher = StandardTestDispatcher(this.testScheduler),
+                config = provideTestConfigurationFlow(this.backgroundScope),
+                featureManager = testFeatureManager,
+                appContext = mockContext,
+                events = events,
+                processOwnerHandle = userProfilePrimary.handle,
+            )
+
+        val searchDataService: SearchDataService =
+            SearchDataServiceImpl(
+                dataService = dataService,
+                userStatus = userStatusFlow,
+                photopickerConfiguration = provideTestConfigurationFlow(this.backgroundScope),
+                scope = this.backgroundScope,
+                notificationService = notificationService,
+                mediaProviderClient = mediaProviderClient,
+                dispatcher = StandardTestDispatcher(this.testScheduler),
+                events = events,
+            )
+
+        advanceTimeBy(100)
+
+        val searchText: String = "search_query"
+        val cancellationSignal = CancellationSignal()
+        val firstSearchResultsPagingSource: PagingSource<MediaPageKey, Media> =
+            searchDataService.getSearchResults(searchText = searchText, cancellationSignal)
+        assertThat(firstSearchResultsPagingSource.invalid).isFalse()
+
+        val searchResultsUpdateUri: Uri =
+            searchMediaUpdateUri
+                .buildUpon()
+                .apply { appendPath(testContentProvider.searchRequestId.toString()) }
+                .build()
+        // Send an update notification
+        notificationService.dispatchChangeToObservers(searchResultsUpdateUri)
+        advanceTimeBy(100)
+
+        // Check that the first media paging source was marked as invalid
+        assertThat(firstSearchResultsPagingSource.invalid).isTrue()
+
+        // Check that the a new PagingSource instance was created which is still valid
+        val secondSearchResultsPagingSource: PagingSource<MediaPageKey, Media> =
+            searchDataService.getSearchResults(searchText = searchText, cancellationSignal)
+        assertThat(secondSearchResultsPagingSource).isNotEqualTo(firstSearchResultsPagingSource)
         assertThat(secondSearchResultsPagingSource.invalid).isFalse()
     }
 }

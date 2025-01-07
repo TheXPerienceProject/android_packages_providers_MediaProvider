@@ -194,6 +194,7 @@ class ActivityModule {
         @Background scope: CoroutineScope,
         @Background dispatcher: CoroutineDispatcher,
         userMonitor: UserMonitor,
+        mediaProviderClient: MediaProviderClient,
         notificationService: NotificationService,
         configurationManager: ConfigurationManager,
         featureManager: FeatureManager,
@@ -212,7 +213,7 @@ class ActivityModule {
                     scope,
                     dispatcher,
                     notificationService,
-                    MediaProviderClient(),
+                    mediaProviderClient,
                     configurationManager.configuration,
                     featureManager,
                     appContext,
@@ -311,7 +312,12 @@ class ActivityModule {
 
     @Provides
     @ActivityRetainedScoped
-    fun providePrefetchDataService(): PrefetchDataService {
+    fun providePrefetchDataService(
+        userMonitor: UserMonitor,
+        @ApplicationContext context: Context,
+        @Background backgroundDispatcher: CoroutineDispatcher,
+        mediaProviderClient: MediaProviderClient,
+    ): PrefetchDataService {
 
         if (!::prefetchDataService.isInitialized) {
             Log.d(
@@ -319,7 +325,13 @@ class ActivityModule {
                 "PrefetchDataService requested but not yet initialized. " +
                     "Initializing PrefetchDataService.",
             )
-            prefetchDataService = PrefetchDataServiceImpl()
+            prefetchDataService =
+                PrefetchDataServiceImpl(
+                    mediaProviderClient,
+                    userMonitor,
+                    context,
+                    backgroundDispatcher,
+                )
         }
         return prefetchDataService
     }

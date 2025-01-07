@@ -46,8 +46,9 @@ import com.android.photopicker.features.search.model.SearchSuggestionType
 open class MediaProviderClient {
     companion object {
         private const val TAG = "MediaProviderClient"
-        private const val MEDIA_INIT_CALL_METHOD: String = "picker_media_init"
-        private const val SEARCH_REQUEST_INIT_CALL_METHOD = "picker_internal_search_media_init"
+        const val MEDIA_INIT_CALL_METHOD: String = "picker_media_init"
+        const val SEARCH_REQUEST_INIT_CALL_METHOD = "picker_internal_search_media_init"
+        const val GET_SEARCH_PROVIDERS_CALL_METHOD = "picker_internal_get_search_providers"
         private const val EXTRA_MIME_TYPES = "mime_types"
         private const val EXTRA_INTENT_ACTION = "intent_action"
         private const val EXTRA_PROVIDERS = "providers"
@@ -56,6 +57,7 @@ open class MediaProviderClient {
         private const val EXTRA_ALBUM_AUTHORITY = "album_authority"
         private const val COLUMN_GRANTS_COUNT = "grants_count"
         private const val PRE_SELECTION_URIS = "pre_selection_uris"
+        const val SEARCH_PROVIDER_AUTHORITIES = "search_provider_authorities"
         const val SEARCH_REQUEST_ID = "search_request_id"
     }
 
@@ -675,6 +677,43 @@ open class MediaProviderClient {
             )
         return checkNotNull(result?.getInt(SEARCH_REQUEST_ID)) {
             "Search request ID cannot be null"
+        }
+    }
+
+    /**
+     * Get available search providers from the Media Provider client using the available
+     * [ContentResolver].
+     *
+     * If the available providers are known at the time of the query, this method will filter the
+     * results of the call so that search providers are a subset of the available providers.
+     *
+     * @param resolver The [ContentResolver] that resolves to the desired instance of MediaProvider.
+     *   (This may resolve in a cross profile instance of MediaProvider).
+     * @param availableProviders
+     */
+    suspend fun fetchSearchProviderAuthorities(
+        resolver: ContentResolver,
+        availableProviders: List<Provider>? = null,
+    ): List<String>? {
+        try {
+            val availableProviderAuthorities: Set<String>? =
+                availableProviders?.map { it.authority }?.toSet()
+            val result: Bundle? =
+                resolver.call(
+                    MEDIA_PROVIDER_AUTHORITY,
+                    GET_SEARCH_PROVIDERS_CALL_METHOD,
+                    /* arg */ null,
+                    /* extras */ null,
+                )
+            return result?.getStringArrayList(SEARCH_PROVIDER_AUTHORITIES)?.filter {
+                availableProviderAuthorities?.contains(it) ?: true
+            }
+        } catch (e: RuntimeException) {
+            // If we can't fetch the available providers, basic functionality of photopicker does
+            // not work. In order to catch this earlier in testing, throw an error instead of
+            // silencing it.
+            Log.e(TAG, "Could not fetch providers with search enabled", e)
+            return null
         }
     }
 

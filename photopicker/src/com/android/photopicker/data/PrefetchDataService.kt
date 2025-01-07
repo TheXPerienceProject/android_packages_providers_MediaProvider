@@ -16,7 +16,7 @@
 
 package com.android.photopicker.data
 
-import com.android.photopicker.features.search.model.SearchEnabledState
+import com.android.photopicker.features.search.model.GlobalSearchState
 
 /** Class responsible to fetch all the required data before feature initialization */
 interface PrefetchDataService {
@@ -24,5 +24,9 @@ interface PrefetchDataService {
         val TAG: String = "PrefetchDataService"
     }
 
-    suspend fun getSearchState(): SearchEnabledState
+    /**
+     * Get the global search state from the Data Source. The global search state refers to the
+     * search state of all providers in all user profiles.
+     */
+    suspend fun getGlobalSearchState(): GlobalSearchState
 }

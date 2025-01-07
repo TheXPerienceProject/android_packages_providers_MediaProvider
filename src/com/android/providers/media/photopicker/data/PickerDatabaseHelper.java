@@ -16,6 +16,10 @@
 
 package com.android.providers.media.photopicker.data;
 
+import static android.provider.CloudMediaProviderContract.MediaCollectionInfo.MEDIA_COLLECTION_ID;
+
+import static com.android.providers.media.photopicker.PickerSyncController.PICKER_SYNC_PREFS_FILE_NAME;
+import static com.android.providers.media.photopicker.PickerSyncController.getPrefsKey;
 import static com.android.providers.media.util.MimeUtils.getExtensionFromMimeType;
 
 import android.content.Context;
@@ -50,7 +54,8 @@ public class PickerDatabaseHelper extends SQLiteOpenHelper {
     public static final int VERSION_INTRODUCING_CATEGORY_TABLES = 15;
     public static final int VERSION_INTRODUCING_SEARCH_SUGGESTION_TABLES = 16;
     public static final int VERSION_UPDATING_SEARCH_TABLES = 17;
-    public static final int VERSION_LATEST = VERSION_UPDATING_SEARCH_TABLES;
+    private static final int VERSION_INTRODUCING_OWNED_PHOTOS = 18;
+    public static final int VERSION_LATEST = VERSION_INTRODUCING_OWNED_PHOTOS;
 
     final Context mContext;
     final String mName;
@@ -113,6 +118,17 @@ public class PickerDatabaseHelper extends SQLiteOpenHelper {
             createSearchRequestTable(db);
             createSearchResultMediaTable(db);
         }
+        if (oldV < VERSION_INTRODUCING_OWNED_PHOTOS) {
+            db.execSQL("ALTER TABLE media ADD COLUMN owner_package_name TEXT DEFAULT NULL");
+            db.execSQL("ALTER TABLE media ADD COLUMN _user_id INTEGER");
+
+            db.execSQL(
+                    "ALTER TABLE album_media ADD COLUMN owner_package_name TEXT DEFAULT NULL");
+            db.execSQL("ALTER TABLE album_media ADD COLUMN _user_id INTEGER");
+
+            mContext.getSharedPreferences(PICKER_SYNC_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+                    .edit().remove(getPrefsKey(true, MEDIA_COLLECTION_ID)).apply();
+        }
     }
 
     @Override
@@ -173,6 +189,8 @@ public class PickerDatabaseHelper extends SQLiteOpenHelper {
                 + "mime_type TEXT NOT NULL,"
                 + "standard_mime_type_extension INTEGER,"
                 + "is_favorite INTEGER,"
+                + "_user_id INTEGER,"
+                + "owner_package_name TEXT DEFAULT NULL,"
                 + "CHECK(local_id IS NOT NULL OR cloud_id IS NOT NULL),"
                 + "UNIQUE(local_id, is_visible))");
 
@@ -186,6 +204,8 @@ public class PickerDatabaseHelper extends SQLiteOpenHelper {
                 + "duration_ms INTEGER CHECK(duration_ms >= 0),"
                 + "mime_type TEXT NOT NULL,"
                 + "standard_mime_type_extension INTEGER,"
+                + "_user_id INTEGER,"
+                + "owner_package_name TEXT DEFAULT NULL,"
                 + "CHECK((local_id IS NULL AND cloud_id IS NOT NULL) "
                 + "OR (local_id IS NOT NULL AND cloud_id IS NULL)),"
                 + "UNIQUE(local_id,  album_id),"

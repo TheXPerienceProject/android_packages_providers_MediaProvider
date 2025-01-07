@@ -151,6 +151,16 @@ public final class CloudMediaProviderContract {
         }
 
         /**
+         * @hide
+         */
+        @Override
+        public String toString() {
+            return " isSearchEnabled=" + this.mSearchEnabled
+                    + " isMediaCategoriesEnabled=" + this.mMediaCategoriesEnabled
+                    + " isAlbumsAsCategoryEnabled=" + this.mAlbumsAsCategory;
+        }
+
+        /**
          * Implemented for {@link Parcelable}
          */
         @Override
@@ -466,6 +476,24 @@ public final class CloudMediaProviderContract {
         public static final String DATA = "data";
 
         /**
+         * Owner package of the media item
+         * <p>
+         * Type: STRING
+         *
+         * @hide
+         */
+        public static final String OWNER_PACKAGE_NAME = "owner_package_name";
+
+        /**
+         * package user id of the media item
+         * <p>
+         * Type: STRING
+         *
+         * @hide
+         */
+        public static final String USER_ID = "_user_id";
+
+        /**
          * Array of all {@link MediaColumn} fields.
          *
          * @hide
@@ -485,6 +513,8 @@ public final class CloudMediaProviderContract {
             ORIENTATION,
             DATA,
             AUTHORITY,
+            OWNER_PACKAGE_NAME,
+            USER_ID,
         };
     }
 
