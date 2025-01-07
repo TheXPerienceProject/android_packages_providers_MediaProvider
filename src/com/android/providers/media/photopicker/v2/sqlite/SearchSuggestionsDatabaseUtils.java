@@ -47,8 +47,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class SearchSuggestionsDatabaseUtils {
     private static final String TAG = "SearchSuggestionsDBUtil";
-    private static final int TTL_HISTORY_SUGGESTIONS_IN_DAYS = 60;
-    private static final int TTL_CACHED_SUGGESTIONS_IN_DAYS = 30;
+    static final int TTL_HISTORY_SUGGESTIONS_IN_DAYS = 60;
+    static final int TTL_CACHED_SUGGESTIONS_IN_DAYS = 30;
 
     /**
      * Save Search Request as search history to serve as search suggestions later.
@@ -62,6 +62,7 @@ public class SearchSuggestionsDatabaseUtils {
             @NonNull SearchRequest searchRequest) {
         requireNonNull(database);
         requireNonNull(searchRequest);
+        Log.d(TAG, "Saving search history: " + searchRequest);
 
         try {
             // Note that CONFLICT_REPLACE create a new row in case of a conflict so the
@@ -104,7 +105,7 @@ public class SearchSuggestionsDatabaseUtils {
                         PickerSQLConstants.SearchHistoryTableColumns.MEDIA_SET_ID.getColumnName(),
                         PickerSQLConstants.SearchHistoryTableColumns.AUTHORITY.getColumnName(),
                         PickerSQLConstants.SearchHistoryTableColumns.COVER_MEDIA_ID.getColumnName()
-                )).setLimit(query.getHistoryLimit())
+                ))
                 .setSortOrder(String.format(
                         Locale.ROOT,
                         "%s DESC",
@@ -146,7 +147,8 @@ public class SearchSuggestionsDatabaseUtils {
                             historySuggestions.add(historySuggestion);
                         }
                     }
-                } while (cursor.moveToNext());
+                } while (cursor.moveToNext()
+                        && historySuggestions.size() < query.getHistoryLimit());
             }
 
             Log.d(TAG, "Number of history suggestions: " + historySuggestions.size());
@@ -187,7 +189,7 @@ public class SearchSuggestionsDatabaseUtils {
                                 .COVER_MEDIA_ID.getColumnName(),
                         PickerSQLConstants.SearchSuggestionsTableColumns
                                 .SUGGESTION_TYPE.getColumnName()
-                )).setLimit(query.getLimit())
+                ))
                 .setSortOrder(String.format(
                         Locale.ROOT,
                         "%s ASC",
@@ -221,7 +223,7 @@ public class SearchSuggestionsDatabaseUtils {
                             suggestions.add(suggestion);
                         }
                     }
-                } while (cursor.moveToNext());
+                } while (cursor.moveToNext() && suggestions.size() < query.getLimit());
             }
 
             Log.d(TAG, "Number of fetched cached suggestions: " + suggestions.size());
@@ -260,6 +262,7 @@ public class SearchSuggestionsDatabaseUtils {
             } while (cursor.moveToNext());
         }
 
+        Log.d(TAG, "Extracted suggestions from cursor: " + searchSuggestions);
         return searchSuggestions;
     }
 
@@ -340,6 +343,71 @@ public class SearchSuggestionsDatabaseUtils {
                 database.endTransaction();
             }
         }
+    }
+
+    /**
+     * Clear all expired cached search suggestions from the database.
+     *
+     * @param database SQLiteDatabase object that holds DB connections.
+     * @return the number of items deleted from the database.
+     */
+    public static int clearExpiredCachedSearchSuggestions(@NonNull SQLiteDatabase database) {
+        requireNonNull(database);
+
+        final Long creationThreshold = System.currentTimeMillis()
+                - TimeUnit.DAYS.toMillis(TTL_CACHED_SUGGESTIONS_IN_DAYS);
+
+        final String whereClause = String.format(
+                Locale.ROOT,
+                " %s < ? ",
+                PickerSQLConstants.SearchSuggestionsTableColumns.CREATION_TIME_MS);
+
+        final String[] whereArgs = List.of(creationThreshold.toString()).toArray(new String[0]);
+
+        int suggestionsDeletionCount =
+                database.delete(
+                        PickerSQLConstants.Table.SEARCH_SUGGESTION.name(),
+                        whereClause,
+                        whereArgs);
+
+        Log.d(TAG, String.format(
+                Locale.ROOT,
+                "Deleted %s rows in search suggestions table",
+                suggestionsDeletionCount));
+
+        return suggestionsDeletionCount;
+    }
+
+    /**
+     * Clear all expired history search suggestions from the database.
+     *
+     * @param database SQLiteDatabase object that holds DB connections.
+     * @return the number of items deleted from the database.
+     */
+    public static int clearExpiredHistorySearchSuggestions(@NonNull SQLiteDatabase database) {
+        requireNonNull(database);
+
+        final Long creationThreshold = System.currentTimeMillis()
+                - TimeUnit.DAYS.toMillis(TTL_HISTORY_SUGGESTIONS_IN_DAYS);
+
+        final String whereClause = String.format(
+                Locale.ROOT,
+                " %s < ? ",
+                PickerSQLConstants.SearchHistoryTableColumns.CREATION_TIME_MS);
+
+        final String[] whereArgs = List.of(creationThreshold.toString()).toArray(new String[0]);
+
+        int historyDeletionCount =
+                database.delete(
+                        PickerSQLConstants.Table.SEARCH_HISTORY.name(),
+                        whereClause,
+                        whereArgs);
+
+        Log.d(TAG, String.format(
+                Locale.ROOT,
+                "Deleted %s rows in search history table",
+                historyDeletionCount));
+        return historyDeletionCount;
     }
 
     /**

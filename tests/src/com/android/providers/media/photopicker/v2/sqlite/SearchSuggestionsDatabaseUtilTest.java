@@ -21,8 +21,12 @@ import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_HIST
 import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_FACE;
 import static android.provider.CloudMediaProviderContract.SEARCH_SUGGESTION_LOCATION;
 
+import static com.android.providers.media.photopicker.v2.sqlite.SearchSuggestionsDatabaseUtils.TTL_CACHED_SUGGESTIONS_IN_DAYS;
+import static com.android.providers.media.photopicker.v2.sqlite.SearchSuggestionsDatabaseUtils.TTL_HISTORY_SUGGESTIONS_IN_DAYS;
+
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.MatrixCursor;
@@ -35,6 +39,7 @@ import androidx.annotation.Nullable;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.providers.media.photopicker.data.PickerDatabaseHelper;
+import com.android.providers.media.photopicker.v2.model.SearchRequest;
 import com.android.providers.media.photopicker.v2.model.SearchSuggestion;
 import com.android.providers.media.photopicker.v2.model.SearchSuggestionRequest;
 import com.android.providers.media.photopicker.v2.model.SearchTextRequest;
@@ -46,6 +51,7 @@ import org.junit.Test;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class SearchSuggestionsDatabaseUtilTest {
     private SQLiteDatabase mDatabase;
@@ -115,8 +121,7 @@ public class SearchSuggestionsDatabaseUtilTest {
                 null,
                 mediaSetID,
                 authority,
-                SEARCH_SUGGESTION_LOCATION,
-                null
+                SEARCH_SUGGESTION_LOCATION
         );
 
         SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest);
@@ -159,8 +164,7 @@ public class SearchSuggestionsDatabaseUtilTest {
                 null,
                 mediaSetID,
                 authority,
-                SEARCH_SUGGESTION_LOCATION,
-                null
+                SEARCH_SUGGESTION_LOCATION
         );
 
         SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest);
@@ -198,8 +202,7 @@ public class SearchSuggestionsDatabaseUtilTest {
                 null,
                 mediaSetId2,
                 authority2,
-                SEARCH_SUGGESTION_LOCATION,
-                null
+                SEARCH_SUGGESTION_LOCATION
         );
 
         SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest2);
@@ -264,11 +267,18 @@ public class SearchSuggestionsDatabaseUtilTest {
                 null,
                 mediaSetId2,
                 authority2,
-                SEARCH_SUGGESTION_LOCATION,
-                null
+                SEARCH_SUGGESTION_LOCATION
         );
 
         SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest2);
+
+        final String searchText3 = "Mormot";
+        final SearchTextRequest searchRequest3 = new SearchTextRequest(
+                /* mimeTypes */ null,
+                searchText3
+        );
+
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest3);
 
         final List<SearchSuggestion> searchSuggestions =
                 SearchSuggestionsDatabaseUtils.getHistorySuggestions(
@@ -276,29 +286,25 @@ public class SearchSuggestionsDatabaseUtilTest {
                         getSearchSuggestionQuery(
                                 /* providers */ List.of(authority2),
                                 /* limit */ 10,
-                                /* historyLimit */ 1,
-                                /* prefix */ ""));
+                                /* historyLimit */ 2,
+                                /* prefix */ "mo"));
 
         assertWithMessage("Search history suggestions cannot be null")
                 .that(searchSuggestions)
                 .isNotNull();
         assertWithMessage("Unexpected number of search history suggestions.")
                 .that(searchSuggestions.size())
-                .isEqualTo(1);
+                .isEqualTo(2);
 
-        final SearchSuggestion result = searchSuggestions.get(0);
+        final SearchSuggestion suggestion1 = searchSuggestions.get(0);
         assertWithMessage("Search history search text is not as expected")
-                .that(result.getSearchText())
-                .isNull();
-        assertWithMessage("Search history media set id is not as expected")
-                .that(result.getMediaSetId())
-                .isEqualTo(mediaSetId2);
-        assertWithMessage("Search history authority is not as expected")
-                .that(result.getAuthority())
-                .isEqualTo(authority2);
-        assertWithMessage("Search history suggestion type is not as expected")
-                .that(result.getSearchSuggestionType())
-                .isEqualTo(SEARCH_SUGGESTION_HISTORY);
+                .that(suggestion1.getSearchText())
+                .isEqualTo(searchText3);
+
+        final SearchSuggestion suggestion2 = searchSuggestions.get(1);
+        assertWithMessage("Search history search text is not as expected")
+                .that(suggestion2.getSearchText())
+                .isEqualTo(searchText1);
     }
 
     @Test
@@ -316,8 +322,7 @@ public class SearchSuggestionsDatabaseUtilTest {
                 searchText2,
                 "mediaSetId",
                 "authority",
-                SEARCH_SUGGESTION_LOCATION,
-                null
+                SEARCH_SUGGESTION_LOCATION
         );
         SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest2);
 
@@ -533,6 +538,66 @@ public class SearchSuggestionsDatabaseUtilTest {
     }
 
     @Test
+    public void testSuggestionsCacheQueryLimit() {
+        final String searchText1 = "BUTTER";
+        final String mediaSetId1 = "MEDIA-SET-ID-1";
+        final String authority = "com.random.authority";
+        SearchSuggestion searchSuggestion1 = new SearchSuggestion(
+                searchText1,
+                mediaSetId1,
+                authority,
+                SEARCH_SUGGESTION_LOCATION,
+                /* coverMediaId */ null
+        );
+
+        final String searchText2 = "dragon";
+        final String mediaSetId2 = "MEDIA-SET-ID-2";
+        SearchSuggestion searchSuggestion2 = new SearchSuggestion(
+                searchText2,
+                mediaSetId2,
+                authority,
+                SEARCH_SUGGESTION_ALBUM,
+                /* coverMediaId */ null
+        );
+
+        final String searchText3 = "Butterfly";
+        final String mediaSetId3 = "MEDIA-SET-ID-3";
+        SearchSuggestion searchSuggestion3 = new SearchSuggestion(
+                searchText3,
+                mediaSetId3,
+                authority,
+                SEARCH_SUGGESTION_FACE,
+                /* coverMediaId */ null
+        );
+
+        SearchSuggestionsDatabaseUtils.cacheSearchSuggestions(mDatabase, authority,
+                List.of(searchSuggestion1, searchSuggestion2, searchSuggestion3));
+
+        final List<SearchSuggestion> resultSearchSuggestions =
+                SearchSuggestionsDatabaseUtils.getCachedSuggestions(
+                        mDatabase,
+                        getSearchSuggestionQuery(
+                                /* providers */ List.of("test", authority),
+                                /* limit */ 2,
+                                /* historyLimit */ 3,
+                                /* prefix */ "but"));
+
+        assertWithMessage("Search suggestions cannot be null")
+                .that(resultSearchSuggestions)
+                .isNotNull();
+        assertWithMessage("Unexpected number of search suggestions.")
+                .that(resultSearchSuggestions.size())
+                .isEqualTo(2);
+
+        assertWithMessage("Search search text is not as expected")
+                .that(resultSearchSuggestions.get(1).getSearchText())
+                .isEqualTo(searchSuggestion3.getSearchText());
+        assertWithMessage("Search search text is not as expected")
+                .that(resultSearchSuggestions.get(0).getSearchText())
+                .isEqualTo(searchSuggestion1.getSearchText());
+    }
+
+    @Test
     public void testSaveSuggestionWithNullMediaSetId() {
         final String authority = "com.random.authority";
         SearchSuggestion searchSuggestion = new SearchSuggestion(
@@ -612,6 +677,77 @@ public class SearchSuggestionsDatabaseUtilTest {
                 .isNotNull();
         assertWithMessage("Unexpected number of search suggestions.")
                 .that(resultSearchSuggestions2.size())
+                .isEqualTo(1);
+    }
+
+    @Test
+    public void testClearExpiredCachedSuggestions() {
+        final String authority = "com.random.authority";
+        SearchSuggestion searchSuggestion1 = new SearchSuggestion(
+                /* searchText */ null,
+                "media-set-id1",
+                authority,
+                SEARCH_SUGGESTION_ALBUM,
+                /* coverMediaId */ null
+        );
+        SearchSuggestion searchSuggestion2 = new SearchSuggestion(
+                /* searchText */ "test",
+                "media-set-id2",
+                authority,
+                SEARCH_SUGGESTION_ALBUM,
+                /* coverMediaId */ null
+        );
+
+        SearchSuggestionsDatabaseUtils.cacheSearchSuggestions(
+                mDatabase, authority, List.of(searchSuggestion1, searchSuggestion2));
+
+        final ContentValues contentValues = new ContentValues();
+        contentValues.put(
+                PickerSQLConstants.SearchSuggestionsTableColumns.CREATION_TIME_MS.getColumnName(),
+                System.currentTimeMillis()
+                        - TimeUnit.DAYS.toMillis(TTL_CACHED_SUGGESTIONS_IN_DAYS + 1));
+        mDatabase.update(
+                PickerSQLConstants.Table.SEARCH_SUGGESTION.name(),
+                contentValues,
+                PickerSQLConstants.SearchSuggestionsTableColumns.MEDIA_SET_ID.getColumnName()
+                        + " = 'media-set-id2'", null);
+
+        final int rowsDeletedCount =
+                SearchSuggestionsDatabaseUtils.clearExpiredCachedSearchSuggestions(mDatabase);
+        assertWithMessage("Unexpected number of expired cached suggestions deleted.")
+                .that(rowsDeletedCount)
+                .isEqualTo(1);
+    }
+
+    @Test
+    public void testClearExpiredHistorySuggestions() {
+        SearchRequest searchRequest1 = new SearchTextRequest(
+                /* mimeTypes */ null,
+                "summer"
+        );
+        SearchRequest searchRequest2 = new SearchTextRequest(
+                /* mimeTypes */ null,
+                "coffee"
+        );
+
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest1);
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest2);
+
+        final ContentValues contentValues = new ContentValues();
+        contentValues.put(
+                PickerSQLConstants.SearchHistoryTableColumns.CREATION_TIME_MS.getColumnName(),
+                System.currentTimeMillis()
+                        - TimeUnit.DAYS.toMillis(TTL_HISTORY_SUGGESTIONS_IN_DAYS + 1));
+        mDatabase.update(
+                PickerSQLConstants.Table.SEARCH_HISTORY.name(),
+                contentValues,
+                PickerSQLConstants.SearchHistoryTableColumns.SEARCH_TEXT.getColumnName()
+                        + " = 'summer'", null);
+
+        final int rowsDeletedCount =
+                SearchSuggestionsDatabaseUtils.clearExpiredHistorySearchSuggestions(mDatabase);
+        assertWithMessage("Unexpected number of expired history suggestions deleted.")
+                .that(rowsDeletedCount)
                 .isEqualTo(1);
     }
 
