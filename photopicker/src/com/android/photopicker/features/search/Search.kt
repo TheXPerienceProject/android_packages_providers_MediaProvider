@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
@@ -290,58 +291,65 @@ fun SearchBarEnabled(params: LocationParams, viewModel: SearchViewModel, modifie
 fun SearchBarWithTooltip(modifier: Modifier) {
     val tooltipState = rememberTooltipState()
     val scope = rememberCoroutineScope()
-    TooltipBox(
-        positionProvider =
-            remember {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset {
-                        return IntOffset(
-                            x =
-                                anchorBounds.left +
-                                    (anchorBounds.width - popupContentSize.width) / 2,
-                            y = anchorBounds.bottom - popupContentSize.height,
-                        )
+    // Applying here the passed modifier to Box allowing the caller of the SearchBarWithTooltip
+    // function to control the appearance and layout of the entire search bar and tooltip unit so
+    // that the tooltip with disabled search bar can be modified to fill width of the box.
+    Box(modifier = modifier) {
+        TooltipBox(
+            positionProvider =
+                remember {
+                    object : PopupPositionProvider {
+                        override fun calculatePosition(
+                            anchorBounds: IntRect,
+                            windowSize: IntSize,
+                            layoutDirection: LayoutDirection,
+                            popupContentSize: IntSize,
+                        ): IntOffset {
+                            return IntOffset(
+                                x =
+                                    anchorBounds.left +
+                                        (anchorBounds.width - popupContentSize.width) / 2,
+                                y = anchorBounds.bottom - popupContentSize.height,
+                            )
+                        }
                     }
+                },
+            tooltip = {
+                PlainTooltip {
+                    Text(text = stringResource(R.string.photopicker_search_disabled_hint))
                 }
             },
-        tooltip = {
-            PlainTooltip { Text(text = stringResource(R.string.photopicker_search_disabled_hint)) }
-        },
-        state = tooltipState,
-    ) {
-        SearchBar(
-            inputField = {
-                SearchBarDefaults.InputField(
-                    query = "",
-                    enabled = false,
-                    placeholder = { SearchBarPlaceHolder(false) },
-                    colors = TextFieldDefaults.colors(MaterialTheme.colorScheme.surface),
-                    onQueryChange = {},
-                    onSearch = {},
-                    expanded = false,
-                    onExpandedChange = {},
-                    leadingIcon = { SearchBarIcon(false, {}, {}, searchDisabled = true) },
-                    modifier =
-                        modifier.height(MEASUREMENT_SEARCH_BAR_HEIGHT).clickable {
-                            scope.launch { tooltipState.show() }
-                        },
-                )
-            },
-            expanded = false,
-            onExpandedChange = {},
-            colors =
-                SearchBarDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    dividerColor = MaterialTheme.colorScheme.outlineVariant,
-                ),
-            modifier = modifier.padding(MEASUREMENT_SEARCH_BAR_PADDING),
-            content = {},
-        )
+            state = tooltipState,
+        ) {
+            SearchBar(
+                inputField = {
+                    SearchBarDefaults.InputField(
+                        query = "",
+                        enabled = false,
+                        placeholder = { SearchBarPlaceHolder(false) },
+                        colors = TextFieldDefaults.colors(MaterialTheme.colorScheme.surface),
+                        onQueryChange = {},
+                        onSearch = {},
+                        expanded = false,
+                        onExpandedChange = {},
+                        leadingIcon = { SearchBarIcon(false, {}, {}, searchDisabled = true) },
+                        modifier =
+                            Modifier.height(MEASUREMENT_SEARCH_BAR_HEIGHT).clickable {
+                                scope.launch { tooltipState.show() }
+                            },
+                    )
+                },
+                expanded = false,
+                onExpandedChange = {},
+                colors =
+                    SearchBarDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        dividerColor = MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                modifier = Modifier.fillMaxWidth().padding(MEASUREMENT_SEARCH_BAR_PADDING),
+                content = {},
+            )
+        }
     }
 }
 

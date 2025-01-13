@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ButtonDefaults
@@ -169,10 +170,18 @@ fun NavigationBarButton(
     val navController = LocalNavController.current
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val featureManager = LocalFeatureManager.current
+    val categoryGridFeatureEnabled =
+        featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
 
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier =
+            if (categoryGridFeatureEnabled) {
+                modifier.widthIn(120.dp)
+            } else {
+                modifier
+            },
         shape = MaterialTheme.shapes.medium,
         colors =
             if (isCurrentRoute(currentRoute ?: "")) {
@@ -207,6 +216,7 @@ private fun NavigationBarButtons(modifier: Modifier) {
     val featureManager = LocalFeatureManager.current
     val categoryGridFeatureEnabled =
         featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
+    val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
     Row(
         // Consume the incoming modifier to get the correct positioning.
         modifier =
@@ -231,7 +241,7 @@ private fun NavigationBarButtons(modifier: Modifier) {
                 Location.NAVIGATION_BAR_NAV_BUTTON,
                 maxSlots = 2,
                 modifier =
-                    if (categoryGridFeatureEnabled) {
+                    if (searchFeatureEnabled && categoryGridFeatureEnabled) {
                         Modifier.weight(1f)
                     } else {
                         Modifier // No modifier needed when search not enabled
@@ -437,7 +447,7 @@ private fun NavigationBarWithSearch(modifier: Modifier, params: LocationParams) 
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.Start,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             featureManager.composeLocation(
                 Location.SEARCH_BAR,
                 maxSlots = 1,

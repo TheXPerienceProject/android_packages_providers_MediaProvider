@@ -62,6 +62,7 @@ import com.android.photopicker.extensions.navigateToMediaSetGrid
 import com.android.photopicker.extensions.navigateToPhotoGrid
 import com.android.photopicker.features.navigationbar.NavigationBarButton
 import com.android.photopicker.features.photogrid.PhotoGridFeature
+import com.android.photopicker.features.search.SearchFeature
 import kotlinx.coroutines.launch
 
 /** The number of grid cells per row for Phone / narrow layouts */
@@ -204,6 +205,8 @@ fun CategoryButton(modifier: Modifier) {
     val sessionId = LocalPhotopickerConfiguration.current.sessionId
     val packageUid = LocalPhotopickerConfiguration.current.callingPackageUid ?: -1
     val contentDescriptionString = stringResource(R.string.photopicker_categories_nav_button_label)
+    val featureManager = LocalFeatureManager.current
+    val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
 
     NavigationBarButton(
         onClick = {
@@ -223,13 +226,19 @@ fun CategoryButton(modifier: Modifier) {
         modifier = modifier.semantics { contentDescription = contentDescriptionString },
         isCurrentRoute = { route -> route == PhotopickerDestinations.CATEGORY_GRID.route },
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = ImageVector.vectorResource(R.drawable.photopicker_category_icon),
-                contentDescription = contentDescriptionString,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.photopicker_categories_nav_button_label))
+        when {
+            searchFeatureEnabled -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector =
+                            ImageVector.vectorResource(R.drawable.photopicker_category_icon),
+                        contentDescription = contentDescriptionString,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photopicker_categories_nav_button_label))
+                }
+            }
+            else -> Text(stringResource(R.string.photopicker_categories_nav_button_label))
         }
     }
 }
