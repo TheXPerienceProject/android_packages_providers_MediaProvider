@@ -30,7 +30,7 @@ import android.graphics.pdf.flags.Flags;
  */
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_PAGE_OBJECTS)
 public final class PdfPagePathObject extends PdfPageObject {
-    private Path mPath;
+    private final Path mPath;
     private Color mStrokeColor;
     private float mStrokeWidth;
     private Color mFillColor;
@@ -39,30 +39,24 @@ public final class PdfPagePathObject extends PdfPageObject {
      * Constructor for the PdfPagePathObject. Sets the object type
      * to {@link PdfPageObjectType#PATH}.
      */
-    public PdfPagePathObject() {
+    public PdfPagePathObject(@NonNull Path path) {
         super(PdfPageObjectType.PATH);
-        this.mPath = new Path();
-        this.mStrokeColor = new Color(); // Default is opaque black in the sRGB color space.
-        this.mStrokeWidth = 1.0f;
+        this.mPath = path;
     }
 
     /**
      * Returns the path of the object.
+     * The returned path object might be an approximation of the one used to
+     * create the original one if the original object has elements with curvature.
+     * <p>
+     * Note: The path is immutable because the underlying library does
+     * not allow modifying the path once it is created.
      *
      * @return The path.
      */
     @NonNull
-    public Path getPath() {
-        return mPath;
-    }
-
-    /**
-     * Sets the path of the object.
-     *
-     * @param path The path to set.
-     */
-    public void setPath(@NonNull Path path) {
-        this.mPath = path;
+    public Path toPath() {
+        return new Path(mPath);
     }
 
     /**
@@ -70,7 +64,7 @@ public final class PdfPagePathObject extends PdfPageObject {
      *
      * @return The stroke color of the object.
      */
-    @NonNull
+    @Nullable
     public Color getStrokeColor() {
         return mStrokeColor;
     }
@@ -80,7 +74,7 @@ public final class PdfPagePathObject extends PdfPageObject {
      *
      * @param strokeColor The stroke color of the object.
      */
-    public void setStrokeColor(@NonNull Color strokeColor) {
+    public void setStrokeColor(@Nullable Color strokeColor) {
         this.mStrokeColor = strokeColor;
     }
 

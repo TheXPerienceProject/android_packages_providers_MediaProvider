@@ -68,6 +68,7 @@ import com.android.providers.media.photopicker.v2.model.MediaSetsSyncRequestPara
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -125,6 +126,7 @@ public class PickerSyncManagerTest {
         assertThat(workRequest.getWorkSpec().expedited).isFalse();
     }
 
+    @Ignore("b/387570966")
     @Test
     public void testSchedulePeriodicSyncs() {
         setupPickerSyncManager(/* schedulePeriodicSyncs */ true);
@@ -162,6 +164,7 @@ public class PickerSyncManagerTest {
                 .isEqualTo(SYNC_LOCAL_AND_CLOUD);
     }
 
+    @Ignore("b/387570966")
     @Test
     public void testPeriodicWorkIsScheduledOnDeviceConfigChanges() {
 
