@@ -195,9 +195,11 @@ public class MediaInMediaSetsSyncWorkerTest {
         assertEquals("Count of inserted media sets should be equal to the cursor size",
                 /*expected*/ c.getCount(), /*actual*/ mediaSetsInserted);
         Bundle extras = new Bundle();
-        extras.putString("authority", auth);
-        extras.putString("category_id", categoryId);
-        extras.putStringArray("mime_types", mimeTypes.toArray(new String[mimeTypes.size()]));
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
+        extras.putStringArray(
+                MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                mimeTypes.toArray(new String[mimeTypes.size()]));
         MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
         Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
                 mDatabase, requestParams);
@@ -314,9 +316,10 @@ public class MediaInMediaSetsSyncWorkerTest {
         assertEquals("Count of inserted media sets should be equal to the cursor size",
                 /*expected*/ c.getCount(), /*actual*/ mediaSetsInserted);
         Bundle extras = new Bundle();
-        extras.putString("authority", auth);
-        extras.putString("category_id", categoryId);
-        extras.putStringArray("mime_types", mimeTypes.toArray(new String[mimeTypes.size()]));
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
+        extras.putStringArray(MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                mimeTypes.toArray(new String[mimeTypes.size()]));
         MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
         Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
                 mDatabase, requestParams);
@@ -432,9 +435,10 @@ public class MediaInMediaSetsSyncWorkerTest {
         assertEquals("Count of inserted media sets should be equal to the cursor size",
                 /*expected*/ c.getCount(), /*actual*/ mediaSetsInserted);
         Bundle extras = new Bundle();
-        extras.putString("authority", auth);
-        extras.putString("category_id", categoryId);
-        extras.putStringArray("mime_types", mimeTypes.toArray(new String[mimeTypes.size()]));
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
+        extras.putStringArray(MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                mimeTypes.toArray(new String[mimeTypes.size()]));
         MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
         Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
                 mDatabase, requestParams);

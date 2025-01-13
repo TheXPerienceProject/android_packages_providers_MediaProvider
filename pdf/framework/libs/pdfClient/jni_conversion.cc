@@ -16,16 +16,25 @@
 
 #include "jni_conversion.h"
 
+#include <android/bitmap.h>
 #include <string.h>
 
+#include "logging.h"
 #include "rect.h"
 
+using pdfClient::Color;
 using pdfClient::Document;
+using pdfClient::ImageObject;
 using pdfClient::LinuxFileOps;
+using pdfClient::Matrix;
+using pdfClient::PageObject;
+using pdfClient::PathObject;
 using pdfClient::Rectangle_i;
 using pdfClient::SelectionBoundary;
 using std::string;
 using std::vector;
+
+#define LOG_TAG "jni_conversion"
 
 namespace convert {
 
@@ -42,7 +51,15 @@ static const char* kChoiceOption = "android/graphics/pdf/models/ListItem";
 static const char* kGotoLinkDestination =
         "android/graphics/pdf/content/PdfPageGotoLinkContent$Destination";
 static const char* kGotoLink = "android/graphics/pdf/content/PdfPageGotoLinkContent";
+static const char* kPageObject = "android/graphics/pdf/component/PdfPageObject";
+static const char* kPathObject = "android/graphics/pdf/component/PdfPagePathObject";
+static const char* kImageObject = "android/graphics/pdf/component/PdfPageImageObject";
 
+static const char* kBitmap = "android/graphics/Bitmap";
+static const char* kBitmapConfig = "android/graphics/Bitmap$Config";
+static const char* kColor = "android/graphics/Color";
+static const char* kMatrix = "android/graphics/Matrix";
+static const char* kPath = "android/graphics/Path";
 static const char* kRect = "android/graphics/Rect";
 static const char* kRectF = "android/graphics/RectF";
 static const char* kInteger = "java/lang/Integer";
@@ -104,6 +121,23 @@ jobject ToJavaString(JNIEnv* env, const std::string& s) {
 template <class T>
 jobject ToJavaList(JNIEnv* env, const vector<T>& input,
                    jobject (*ToJavaObject)(JNIEnv* env, const T&)) {
+    static jclass arraylist_class = GetPermClassRef(env, kArrayList);
+    static jmethodID init = env->GetMethodID(arraylist_class, "<init>", "(I)V");
+    static jmethodID add = env->GetMethodID(arraylist_class, "add", funcsig("Z", kObject).c_str());
+
+    jobject java_list = env->NewObject(arraylist_class, init, input.size());
+    for (size_t i = 0; i < input.size(); i++) {
+        jobject java_object = ToJavaObject(env, input[i]);
+        env->CallBooleanMethod(java_list, add, java_object);
+        env->DeleteLocalRef(java_object);
+    }
+    return java_list;
+}
+
+// Copy a C++ vector to a java ArrayList, using the given function to convert.
+template <class T>
+jobject ToJavaList(JNIEnv* env, const vector<T*>& input,
+                   jobject (*ToJavaObject)(JNIEnv* env, const T*)) {
     static jclass arraylist_class = GetPermClassRef(env, kArrayList);
     static jmethodID init = env->GetMethodID(arraylist_class, "<init>", "(I)V");
     static jmethodID add = env->GetMethodID(arraylist_class, "add", funcsig("Z", kObject).c_str());
@@ -322,6 +356,386 @@ jobject ToJavaGotoLink(JNIEnv* env, const GotoLink& link) {
 
 jobject ToJavaGotoLinks(JNIEnv* env, const vector<GotoLink>& links) {
     return ToJavaList(env, links, &ToJavaGotoLink);
+}
+
+jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height) {
+    // Find Java Bitmap class
+    static jclass bitmap_class = GetPermClassRef(env, kBitmap);
+
+    // Get createBitmap method ID
+    static jmethodID create_bitmap = env->GetStaticMethodID(
+            bitmap_class, "createBitmap", funcsig(kBitmap, "I", "I", kBitmapConfig).c_str());
+
+    // Get Bitmap.Config.ARGB_8888 field ID
+    static jclass bitmap_config_class = GetPermClassRef(env, kBitmapConfig);
+    static jfieldID argb8888_field =
+            env->GetStaticFieldID(bitmap_config_class, "ARGB_8888", sig(kBitmapConfig).c_str());
+    static jobject argb8888 =
+            env->NewGlobalRef(env->GetStaticObjectField(bitmap_config_class, argb8888_field));
+
+    // Create a Java Bitmap object
+    jobject java_bitmap =
+            env->CallStaticObjectMethod(bitmap_class, create_bitmap, width, height, argb8888);
+
+    // Lock the Bitmap pixels for copying
+    void* bitmap_pixels;
+    if (AndroidBitmap_lockPixels(env, java_bitmap, &bitmap_pixels) < 0) {
+        return NULL;
+    }
+
+    // Copy the buffer data into java Bitmap.
+    std::memcpy(bitmap_pixels, buffer, width * height);  // 4 bytes per pixel (ARGB_8888)
+
+    // Unlock the Bitmap pixels
+    AndroidBitmap_unlockPixels(env, java_bitmap);
+
+    return java_bitmap;
+}
+
+jobject ToJavaColor(JNIEnv* env, Color color) {
+    // Find Java Color class
+    static jclass color_class = GetPermClassRef(env, kColor);
+
+    // Get valueOf method ID
+    static jmethodID value_of =
+            env->GetStaticMethodID(color_class, "valueOf", funcsig(kColor, "I").c_str());
+
+    // Get ARGB values from Native Color
+    uint A = color.a;
+    uint R = color.r;
+    uint G = color.g;
+    uint B = color.b;
+
+    // Make ARGB  java color int
+    int java_color_int = (A & 0xFF) << 24 | (R & 0xFF) << 16 | (G & 0xFF) << 8 | (B & 0xFF);
+
+    // Create a Java Color Object.
+    jobject java_color = env->CallStaticObjectMethod(color_class, value_of, java_color_int);
+
+    return java_color;
+}
+
+jfloatArray ToJavaFloatArray(JNIEnv* env, const float arr[], size_t length) {
+    // Create Java float Array.
+    jfloatArray java_float_array = env->NewFloatArray(length);
+
+    // Copy data from the C++ float Array to the Java float Array
+    env->SetFloatArrayRegion(java_float_array, 0, length, arr);
+
+    return java_float_array;
+}
+
+jobject ToJavaMatrix(JNIEnv* env, const Matrix matrix) {
+    // Find Java Matrix class
+    static jclass matrix_class = GetPermClassRef(env, kMatrix);
+    // Get the constructor method ID
+    static jmethodID init = env->GetMethodID(matrix_class, "<init>", funcsig("V").c_str());
+
+    // Create Java Matrix object.
+    jobject java_matrix = env->NewObject(matrix_class, init);
+
+    // Create Transform Array.
+    float transform[9] = {matrix.a, matrix.c, matrix.e, matrix.b, matrix.d, matrix.f, 0, 0, 1};
+
+    // Convert to Java floatArray.
+    jfloatArray java_float_array =
+            ToJavaFloatArray(env, transform, sizeof(transform) / sizeof(transform[0]));
+
+    // Matrix setValues.
+    static jmethodID set_values = env->GetMethodID(matrix_class, "setValues", "([F)V");
+    env->CallVoidMethod(java_matrix, set_values, java_float_array);
+
+    return java_matrix;
+}
+
+jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments) {
+    // Find Java Path class.
+    static jclass path_class = GetPermClassRef(env, kPath);
+    // Get the constructor methodID.
+    static jmethodID init = env->GetMethodID(path_class, "<init>", funcsig("V").c_str());
+
+    // Create Java Path object.
+    jobject java_path = env->NewObject(path_class, init);
+
+    // Set Path Segments in Java.
+    for (auto& segment : segments) {
+        switch (segment.command) {
+            case PathObject::Segment::Command::Move: {
+                static jmethodID move_to =
+                        env->GetMethodID(path_class, "moveTo", funcsig("V", "F", "F").c_str());
+
+                env->CallVoidMethod(java_path, move_to, segment.x, segment.y);
+                break;
+            }
+            case PathObject::Segment::Command::Line: {
+                static jmethodID line_to =
+                        env->GetMethodID(path_class, "lineTo", funcsig("V", "F", "F").c_str());
+
+                env->CallVoidMethod(java_path, line_to, segment.x, segment.y);
+                break;
+            }
+            default:
+                break;
+        }
+        // Check if segment isClosed.
+        if (segment.is_closed) {
+            static jmethodID close = env->GetMethodID(path_class, "close", funcsig("V").c_str());
+
+            env->CallVoidMethod(java_path, close);
+        }
+    }
+
+    return java_path;
+}
+
+jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object) {
+    // Check for Native Supported Object.
+    if (!page_object) {
+        return NULL;
+    }
+
+    jobject java_page_object = NULL;
+
+    switch (page_object->GetType()) {
+        case PageObject::Type::Path: {
+            // Cast to PathObject
+            const PathObject* path_object = static_cast<const PathObject*>(page_object);
+
+            // Find Java PathObject Class.
+            static jclass path_object_class = GetPermClassRef(env, kPathObject);
+            // Get Constructor Id.
+            static jmethodID init_path =
+                    env->GetMethodID(path_object_class, "<init>", funcsig("V", kPath).c_str());
+
+            // Create Java Path from Native PathSegments.
+            jobject java_path = ToJavaPath(env, path_object->segments);
+
+            // Create Java PathObject Instance.
+            java_page_object = env->NewObject(path_object_class, init_path, java_path);
+
+            // Set Java PathObject FillColor.
+            if (path_object->is_fill_mode) {
+                static jmethodID set_fill_color = env->GetMethodID(
+                        path_object_class, "setFillColor", funcsig("V", kColor).c_str());
+
+                env->CallVoidMethod(java_page_object, set_fill_color,
+                                    ToJavaColor(env, path_object->fill_color));
+            }
+
+            // Set Java PathObject StrokeColor.
+            if (path_object->is_stroke) {
+                static jmethodID set_stroke_color = env->GetMethodID(
+                        path_object_class, "setStrokeColor", funcsig("V", kColor).c_str());
+
+                env->CallVoidMethod(java_page_object, set_stroke_color,
+                                    ToJavaColor(env, path_object->stroke_color));
+            }
+
+            // Set Java Stroke Width.
+            static jmethodID set_stroke_width =
+                    env->GetMethodID(path_object_class, "setStrokeWidth", "(F)V");
+            env->CallVoidMethod(java_page_object, set_stroke_width, path_object->stroke_width);
+
+            break;
+        }
+        case PageObject::Type::Image: {
+            // Cast to ImageObject
+            const ImageObject* image_object = static_cast<const ImageObject*>(page_object);
+
+            // Find Java ImageObject Class.
+            static jclass image_object_class = GetPermClassRef(env, kImageObject);
+            // Get Constructor Id.
+            static jmethodID init_image =
+                    env->GetMethodID(image_object_class, "<init>", funcsig("V", kBitmap).c_str());
+
+            // Get Bitmap readable buffer from ImageObject Data.
+            void* buffer = image_object->GetBitmapReadableBuffer();
+
+            // Create Java Bitmap from Native Bitmap Buffer.
+            jobject java_bitmap =
+                    ToJavaBitmap(env, buffer, image_object->width, image_object->height);
+
+            // Create Java ImageObject Instance.
+            java_page_object = env->NewObject(image_object_class, init_image, java_bitmap);
+
+            break;
+        }
+        default:
+            break;
+    }
+
+    // If no PageObject was created, return null
+    if (java_page_object == NULL) {
+        return NULL;
+    }
+
+    // Find Java PageObject class
+    static jclass page_object_class = GetPermClassRef(env, kPageObject);
+
+    // Set Java Matrix
+    static jmethodID set_matrix =
+            env->GetMethodID(page_object_class, "setMatrix", funcsig("V", kMatrix).c_str());
+    env->CallVoidMethod(java_page_object, set_matrix, ToJavaMatrix(env, page_object->matrix));
+
+    return java_page_object;
+}
+
+jobject ToJavaPdfPageObjects(JNIEnv* env, const vector<PageObject*>& page_objects) {
+    return ToJavaList(env, page_objects, &ToJavaPdfPageObject);
+}
+
+Color ToNativeColor(JNIEnv* env, jobject java_color) {
+    // Find Java Color class
+    static jclass color_class = GetPermClassRef(env, kColor);
+
+    // Get the color as an ARGB integer
+    jmethodID get_color_int = env->GetMethodID(color_class, "toArgb", funcsig("I").c_str());
+    jint java_color_int = env->CallIntMethod(java_color, get_color_int);
+
+    // Decoding RGBA components
+    unsigned int red = (java_color_int >> 16) & 0xFF;
+    unsigned int green = (java_color_int >> 8) & 0xFF;
+    unsigned int blue = java_color_int & 0xFF;
+    unsigned int alpha = (java_color_int >> 24) & 0xFF;
+
+    return Color(red, green, blue, alpha);
+}
+
+std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object) {
+    // Find Java PageObject class and GetType
+    static jclass page_object_class = GetPermClassRef(env, kPageObject);
+    static jmethodID get_type = env->GetMethodID(page_object_class, "getPdfObjectType", "()I");
+    jint page_object_type = env->CallIntMethod(java_page_object, get_type);
+
+    // Pointer to PageObject
+    std::unique_ptr<PageObject> page_object = nullptr;
+
+    switch (static_cast<PageObject::Type>(page_object_type)) {
+        case PageObject::Type::Path: {
+            // Create PathObject Data Instance.
+            auto path_object = std::make_unique<PathObject>();
+
+            // Get Ref to Java PathObject Class.
+            static jclass path_object_class = GetPermClassRef(env, kPathObject);
+
+            // Get Path from Java PathObject.
+            static jmethodID to_path =
+                    env->GetMethodID(path_object_class, "toPath", funcsig(kPath).c_str());
+            jobject java_path = env->CallObjectMethod(java_page_object, to_path);
+
+            // Find Java Path Class.
+            static jclass path_class = GetPermClassRef(env, kPath);
+
+            // Get the Approximate Array for the Path.
+            static jmethodID approximate = env->GetMethodID(path_class, "approximate", "(F)[F");
+            jfloatArray java_approximate =
+                    (jfloatArray)env->CallObjectMethod(java_path, approximate);
+            const jsize size = env->GetArrayLength(java_approximate);
+
+            // Copy Java Array to Native Array
+            float path_approximate[size];
+            env->GetFloatArrayRegion(java_approximate, 0, size, path_approximate);
+
+            // Set PathObject Data PathSegments.
+            auto& segments = path_object->segments;
+            for (int i = 0; i < size; i += 3) {
+                if (i == 0 || path_approximate[i] == path_approximate[i - 3]) {
+                    segments.emplace_back(PathObject::Segment::Command::Move,
+                                          path_approximate[i + 1], path_approximate[i + 2]);
+                } else {
+                    segments.emplace_back(PathObject::Segment::Command::Line,
+                                          path_approximate[i + 1], path_approximate[i + 2]);
+                }
+            }
+
+            // Get Java PathObject Fill Color.
+            static jmethodID get_fill_color =
+                    env->GetMethodID(path_object_class, "getFillColor", funcsig(kColor).c_str());
+            jobject java_fill_color = env->CallObjectMethod(java_page_object, get_fill_color);
+
+            // Set PathObject Data Fill Mode and Fill Color
+            path_object->is_fill_mode = (java_fill_color != NULL);
+            if (path_object->is_fill_mode) {
+                path_object->fill_color = ToNativeColor(env, java_fill_color);
+            }
+
+            // Get Java PathObject Stroke Color.
+            static jmethodID get_stroke_color =
+                    env->GetMethodID(path_object_class, "getStrokeColor", funcsig(kColor).c_str());
+            jobject java_stroke_color = env->CallObjectMethod(java_page_object, get_stroke_color);
+
+            // Set PathObject Data Stroke Mode and Stroke Color.
+            path_object->is_stroke = (java_stroke_color != NULL);
+            if (path_object->is_stroke) {
+                path_object->stroke_color = ToNativeColor(env, java_stroke_color);
+            }
+
+            // Get Java PathObject Stroke Width.
+            static jmethodID get_stroke_width =
+                    env->GetMethodID(path_object_class, "getStrokeWidth", funcsig("F").c_str());
+            jfloat stroke_width = env->CallFloatMethod(java_page_object, get_stroke_width);
+
+            // Set PathObject Data Stroke Width.
+            path_object->stroke_width = stroke_width;
+
+            page_object = std::move(path_object);
+            break;
+        }
+        case PageObject::Type::Image: {
+            // Create ImageObject Data Instance.
+            auto image_object = std::make_unique<ImageObject>();
+
+            // Get Ref to Java ImageObject Class.
+            static jclass image_object_class = GetPermClassRef(env, kImageObject);
+
+            // Get the bitmap from the Java ImageObject
+            static jmethodID get_bitmap =
+                    env->GetMethodID(image_object_class, "getBitmap", funcsig(kBitmap).c_str());
+            jobject java_bitmap = env->CallObjectMethod(java_page_object, get_bitmap);
+
+            // Create an FPDF_BITMAP from the Android Bitmap
+            void* bitmap_pixels;
+            if (AndroidBitmap_lockPixels(env, java_bitmap, &bitmap_pixels) < 0) {
+                break;
+            }
+
+            AndroidBitmapInfo bitmap_info;
+            AndroidBitmap_getInfo(env, java_bitmap, &bitmap_info);
+            const int stride = bitmap_info.width * 4;
+
+            // Set ImageObject Data Bitmap
+            image_object->bitmap = ScopedFPDFBitmap(FPDFBitmap_CreateEx(
+                    bitmap_info.width, bitmap_info.height, FPDFBitmap_BGRA, bitmap_pixels, stride));
+
+            // Unlock the Android Bitmap
+            AndroidBitmap_unlockPixels(env, java_bitmap);
+
+            page_object = std::move(image_object);
+            break;
+        }
+        default:
+            break;
+    }
+
+    if (!page_object) {
+        return nullptr;
+    }
+
+    // Get Matrix from Java PageObject.
+    static jmethodID get_matrix = env->GetMethodID(page_object_class, "getMatrix", "()[F");
+    jfloatArray java_matrix_array =
+            (jfloatArray)env->CallObjectMethod(java_page_object, get_matrix);
+
+    // Copy Java Array to Native Array
+    float transform[9];
+    env->GetFloatArrayRegion(java_matrix_array, 0, 9, transform);
+
+    // Set PageObject Data Matrix.
+    page_object->matrix = {transform[0 /*kMScaleX*/], transform[3 /*kMSkewY*/],
+                           transform[1 /*kMSkewX*/],  transform[4 /*kMScaleY*/],
+                           transform[2 /*kMTransX*/], transform[5 /*kMTransY*/]};
+
+    return page_object;
 }
 
 }  // namespace convert

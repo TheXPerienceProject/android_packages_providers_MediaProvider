@@ -41,6 +41,15 @@ struct Color {
     static constexpr uint INVALID_COLOR = 256;
 };
 
+struct Matrix {
+    float a;
+    float b;
+    float c;
+    float d;
+    float e;
+    float f;
+};
+
 class PageObject {
   public:
     enum class Type {
@@ -49,17 +58,17 @@ class PageObject {
         Image = 3,
     };
 
-    Type GetType();
+    Type GetType() const;
     // Returns a FPDF Instance for a PageObject.
     virtual ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) = 0;
-    // Updates the FPDF Instance of PageObject present at given index on Page.
+    // Updates the FPDF Instance of PageObject present on Page.
     virtual bool UpdateFPDFInstance(FPDF_PAGEOBJECT page_object) = 0;
     // Populates data from FPDFInstance of PageObject present on Page.
     virtual bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT page_object) = 0;
 
     virtual ~PageObject();
 
-    FS_MATRIX matrix;  // Matrix used to scale, rotate, shear and translate the page object.
+    Matrix matrix;  // Matrix used to scale, rotate, shear and translate the page object.
     Color fill_color;
     Color stroke_color;
     float stroke_width = 1.0f;
@@ -98,8 +107,8 @@ class PathObject : public PageObject {
             : command(command), x(x), y(y), is_closed(is_closed) {}
     };
 
-    bool is_fill_mode = true;
-    bool is_stroke = false;
+    bool is_fill_mode;
+    bool is_stroke;
 
     std::vector<Segment> segments;
 };
@@ -112,8 +121,12 @@ class ImageObject : public PageObject {
     bool UpdateFPDFInstance(FPDF_PAGEOBJECT image_object) override;
     bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT image_object) override;
 
+    void* GetBitmapReadableBuffer() const;
+
     ~ImageObject();
 
+    int width;
+    int height;
     ScopedFPDFBitmap bitmap;
 };
 

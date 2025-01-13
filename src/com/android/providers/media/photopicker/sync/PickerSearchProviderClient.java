@@ -88,7 +88,7 @@ public class PickerSearchProviderClient {
 
         final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_SEARCH_MEDIA),
-                null, queryArgs,  cancellationSignal);
+                null, queryArgs, null);
 
         if (cursor == null) {
             Log.d(TAG, "Search results response from the CMP is null.");
@@ -115,7 +115,7 @@ public class PickerSearchProviderClient {
 
         final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_SEARCH_SUGGESTION),
-                null, queryArgs,  cancellationSignal);
+                null, queryArgs, null);
 
         if (cursor == null) {
             Log.d(TAG, "Search suggestions response from the CMP is null.");
@@ -144,7 +144,7 @@ public class PickerSearchProviderClient {
 
         final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_MEDIA_CATEGORY),
-                null, queryArgs, cancellationSignal);
+                null, queryArgs, null);
 
         if (cursor == null) {
             Log.d(TAG, "Categories response from the CMP is null.");
@@ -174,7 +174,7 @@ public class PickerSearchProviderClient {
 
         final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_MEDIA_SET),
-                null, queryArgs,  cancellationSignal);
+                null, queryArgs, null);
 
         if (cursor == null) {
             Log.d(TAG, "Media sets response from the CMP is null.");
@@ -209,7 +209,7 @@ public class PickerSearchProviderClient {
 
         final Cursor cursor = mContext.getContentResolver().query(
                 getCloudUriFromPath(CloudMediaProviderContract.URI_PATH_MEDIA_IN_MEDIA_SET),
-                null, queryArgs,  cancellationSignal);
+                null, queryArgs, null);
 
         if (cursor == null) {
             Log.d(TAG, "Media set contents response from the CMP is null.");

@@ -30,7 +30,7 @@ namespace pdfClient {
 
 PageObject::PageObject(Type type) : type(type) {}
 
-PageObject::Type PageObject::GetType() {
+PageObject::Type PageObject::GetType() const {
     return type;
 }
 
@@ -100,7 +100,7 @@ bool PathObject::UpdateFPDFInstance(FPDF_PAGEOBJECT path_object) {
     }
 
     // Set the updated matrix.
-    if (!FPDFPageObj_SetMatrix(path_object, &matrix)) {
+    if (!FPDFPageObj_SetMatrix(path_object, reinterpret_cast<FS_MATRIX*>(&matrix))) {
         return false;
     }
 
@@ -159,7 +159,7 @@ bool PathObject::PopulateFromFPDFInstance(FPDF_PAGEOBJECT path_object) {
     this->is_stroke = stroke;
 
     // Get Matrix
-    if (!FPDFPageObj_GetMatrix(path_object, &matrix)) {
+    if (!FPDFPageObj_GetMatrix(path_object, reinterpret_cast<FS_MATRIX*>(&matrix))) {
         return false;
     }
 
@@ -208,26 +208,36 @@ bool ImageObject::UpdateFPDFInstance(FPDF_PAGEOBJECT image_object) {
     }
 
     // Set the updated matrix.
-    if (!FPDFPageObj_SetMatrix(image_object, &matrix)) {
+    if (!FPDFPageObj_SetMatrix(image_object, reinterpret_cast<FS_MATRIX*>(&matrix))) {
         return false;
     }
+
+    width = FPDFBitmap_GetWidth(bitmap.get());
+    height = FPDFBitmap_GetHeight(bitmap.get());
 
     return true;
 }
 
 bool ImageObject::PopulateFromFPDFInstance(FPDF_PAGEOBJECT image_object) {
     // Get Bitmap
-    this->bitmap = ScopedFPDFBitmap(FPDFImageObj_GetBitmap(image_object));
+    bitmap = ScopedFPDFBitmap(FPDFImageObj_GetBitmap(image_object));
     if (bitmap.get() == nullptr) {
         return false;
     }
 
     // Get Matrix
-    if (!FPDFPageObj_GetMatrix(image_object, &matrix)) {
+    if (!FPDFPageObj_GetMatrix(image_object, reinterpret_cast<FS_MATRIX*>(&matrix))) {
         return false;
     }
 
+    width = FPDFBitmap_GetWidth(bitmap.get());
+    height = FPDFBitmap_GetHeight(bitmap.get());
+
     return true;
+}
+
+void* ImageObject::GetBitmapReadableBuffer() const {
+    return FPDFBitmap_GetBuffer(bitmap.get());
 }
 
 ImageObject::~ImageObject() = default;

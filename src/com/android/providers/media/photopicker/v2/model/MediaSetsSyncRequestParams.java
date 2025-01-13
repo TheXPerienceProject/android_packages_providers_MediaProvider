@@ -27,6 +27,9 @@ import java.util.Objects;
  provider.
  */
 public class MediaSetsSyncRequestParams {
+    public static final String KEY_PARENT_CATEGORY_AUTHORITY = "parent_category_authority";
+    public static final String KEY_MIME_TYPES = "mime_types";
+    public static final String KEY_PARENT_CATEGORY_ID = "parent_category_id";
 
     private final String mAuthority;
     private final String mCategoryId;
@@ -34,9 +37,9 @@ public class MediaSetsSyncRequestParams {
 
     public MediaSetsSyncRequestParams(@NonNull Bundle extras) {
         Objects.requireNonNull(extras);
-        mAuthority = extras.getString("authority");
-        mMimeTypes = extras.getStringArray("mime_types");
-        mCategoryId = extras.getString("category_id");
+        mAuthority = extras.getString(KEY_PARENT_CATEGORY_AUTHORITY);
+        mMimeTypes = extras.getStringArray(KEY_MIME_TYPES);
+        mCategoryId = extras.getString(KEY_PARENT_CATEGORY_ID);
     }
 
     public String getAuthority() {

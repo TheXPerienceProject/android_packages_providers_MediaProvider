@@ -519,9 +519,10 @@ public class PickerSyncManagerTest {
         String categoryId = "id";
         String[] mimeTypes = new String[] { "image/*" };
         Bundle extras = new Bundle();
-        extras.putString("authority", SearchProvider.AUTHORITY);
-        extras.putStringArray("mime_types", mimeTypes);
-        extras.putString("category_id", categoryId);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY,
+                SearchProvider.AUTHORITY);
+        extras.putStringArray(MediaSetsSyncRequestParams.KEY_MIME_TYPES, mimeTypes);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
         extras.putStringArrayList("providers", new ArrayList<>(List.of(
                 PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY)));
 
@@ -563,9 +564,10 @@ public class PickerSyncManagerTest {
         String categoryId = "id";
         String[] mimeTypes = new String[] { "image/*" };
         Bundle extras = new Bundle();
-        extras.putString("authority", SearchProvider.AUTHORITY);
-        extras.putStringArray("mime_types", mimeTypes);
-        extras.putString("category_id", categoryId);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY,
+                SearchProvider.AUTHORITY);
+        extras.putStringArray(MediaSetsSyncRequestParams.KEY_MIME_TYPES, mimeTypes);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
         extras.putStringArrayList("providers", new ArrayList<>(List.of(
                 SearchProvider.AUTHORITY)));
 
@@ -604,10 +606,12 @@ public class PickerSyncManagerTest {
     public void testMediaInMediaSetSyncLocalProvider() {
         setupPickerSyncManager(/*schedulePeriodicSyncs*/ false);
 
-        String mediaSetPickerId = "id";
+        Long mediaSetPickerId = 1L;
         Bundle extras = new Bundle();
-        extras.putString("authority", SearchProvider.AUTHORITY);
-        extras.putString("media_set_picker_id", mediaSetPickerId);
+        extras.putString(MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_AUTHORITY,
+                SearchProvider.AUTHORITY);
+        extras.putLong(MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_PICKER_ID,
+                mediaSetPickerId);
         extras.putStringArrayList("providers", new ArrayList<>(List.of(
                 PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY)));
 
@@ -633,7 +637,7 @@ public class PickerSyncManagerTest {
                 .getInt(SYNC_WORKER_INPUT_SYNC_SOURCE, -1))
                 .isEqualTo(SYNC_LOCAL_ONLY);
         assertThat(workRequest.getWorkSpec().input
-                .getString(SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID))
+                .getLong(SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, -1))
                 .isEqualTo(mediaSetPickerId);
         assertThat(workRequest.getWorkSpec().input
                 .getString(SYNC_WORKER_INPUT_AUTHORITY))
@@ -644,10 +648,14 @@ public class PickerSyncManagerTest {
     public void testMediaInMediaSetSyncCloudProvider() {
         setupPickerSyncManager(/*schedulePeriodicSyncs*/ false);
 
-        String mediaSetPickerId = "id";
+        Long mediaSetPickerId = 1L;
         Bundle extras = new Bundle();
-        extras.putString("authority", SearchProvider.AUTHORITY);
-        extras.putString("media_set_picker_id", mediaSetPickerId);
+        extras.putString(
+                MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_AUTHORITY,
+                SearchProvider.AUTHORITY);
+        extras.putLong(
+                MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_PICKER_ID,
+                mediaSetPickerId);
         extras.putStringArrayList("providers", new ArrayList<>(List.of(
                 PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY)));
 
@@ -673,7 +681,7 @@ public class PickerSyncManagerTest {
                 .getInt(SYNC_WORKER_INPUT_SYNC_SOURCE, -1))
                 .isEqualTo(SYNC_CLOUD_ONLY);
         assertThat(workRequest.getWorkSpec().input
-                .getString(SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID))
+                .getLong(SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, -1))
                 .isEqualTo(mediaSetPickerId);
         assertThat(workRequest.getWorkSpec().input
                 .getString(SYNC_WORKER_INPUT_AUTHORITY))

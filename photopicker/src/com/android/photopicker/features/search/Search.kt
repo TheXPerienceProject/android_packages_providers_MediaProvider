@@ -633,11 +633,13 @@ private fun ShowSuggestions(
                     onSuggestionClick,
                 )
             }
-            item {
-                Text(
-                    text = stringResource(R.string.photopicker_search_suggestions_text),
-                    modifier = Modifier.padding(SUGGESTION_TITLE_PADDING),
-                )
+            if (faceSuggestions.isNotEmpty() || otherSuggestions.isNotEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.photopicker_search_suggestions_text),
+                        modifier = Modifier.padding(SUGGESTION_TITLE_PADDING),
+                    )
+                }
             }
             if (faceSuggestions.size > 0) {
                 item {
