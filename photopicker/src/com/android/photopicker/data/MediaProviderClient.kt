@@ -834,12 +834,17 @@ open class MediaProviderClient {
         contentResolver: ContentResolver,
         category: Group.Category,
         config: PhotopickerConfiguration,
+        providers: List<Provider>,
     ) {
         val extras =
             bundleOf(
                 EXTRA_MIME_TYPES to config.mimeTypes,
                 MediaSetsQuery.PARENT_CATEGORY_ID.key to category.id,
                 MediaSetsQuery.PARENT_CATEGORY_AUTHORITY.key to category.authority,
+                MediaQuery.PROVIDERS.key to
+                    ArrayList<String>().apply {
+                        providers.forEach { provider -> add(provider.authority) }
+                    },
             )
 
         try {
@@ -863,12 +868,17 @@ open class MediaProviderClient {
         contentResolver: ContentResolver,
         mediaSet: Group.MediaSet,
         config: PhotopickerConfiguration,
+        providers: List<Provider>,
     ) {
         val extras =
             bundleOf(
                 EXTRA_MIME_TYPES to config.mimeTypes,
-                MediaSetContentsQuery.PARENT_MEDIA_SET_PICKER_ID.key to mediaSet.id,
+                MediaSetContentsQuery.PARENT_MEDIA_SET_PICKER_ID.key to mediaSet.pickerId,
                 MediaSetContentsQuery.PARENT_MEDIA_SET_AUTHORITY.key to mediaSet.authority,
+                MediaQuery.PROVIDERS.key to
+                    ArrayList<String>().apply {
+                        providers.forEach { provider -> add(provider.authority) }
+                    },
             )
 
         try {

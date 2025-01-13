@@ -127,7 +127,7 @@ public class MediaInMediaSetsSyncWorkerTest {
                 new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)
                         .setInputData(
                                 new Data(Map.of(SYNC_WORKER_INPUT_SYNC_SOURCE, 56,
-                                        SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, "mediaSetPickerId",
+                                        SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, 1L,
                                         SYNC_WORKER_INPUT_AUTHORITY, SearchProvider.AUTHORITY)))
                         .build();
 
@@ -167,7 +167,7 @@ public class MediaInMediaSetsSyncWorkerTest {
                 new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)
                         .setInputData(
                                 new Data(Map.of(SYNC_WORKER_INPUT_SYNC_SOURCE, SYNC_LOCAL_ONLY,
-                                        SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, "mediaSetPickerId",
+                                        SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, 1L,
                                         SYNC_WORKER_INPUT_AUTHORITY, "")))
                         .build();
 
@@ -185,7 +185,7 @@ public class MediaInMediaSetsSyncWorkerTest {
 
         String categoryId = "categoryId";
         String auth = String.valueOf(SYNC_CLOUD_ONLY);
-        String mediaSetPickerId = "";
+        long mediaSetPickerId = 1L;
         Cursor c = getCursorForMediaSetInsertionTest();
         List<String> mimeTypes = new ArrayList<>();
         mimeTypes.add("img");
@@ -197,14 +197,14 @@ public class MediaInMediaSetsSyncWorkerTest {
         Bundle extras = new Bundle();
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
-        extras.putStringArray(
+        extras.putStringArrayList(
                 MediaSetsSyncRequestParams.KEY_MIME_TYPES,
-                mimeTypes.toArray(new String[mimeTypes.size()]));
+                new ArrayList<String>(mimeTypes));
         MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
         Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
                 mDatabase, requestParams);
         if (fetchMediaSetCursor.moveToFirst()) {
-            mediaSetPickerId = fetchMediaSetCursor.getString(
+            mediaSetPickerId = fetchMediaSetCursor.getLong(
                     fetchMediaSetCursor.getColumnIndexOrThrow(
                             PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName()));
         }
@@ -256,7 +256,7 @@ public class MediaInMediaSetsSyncWorkerTest {
                                     ))
                     );
 
-                    assertEquals(mediaInMediaSetsTableCursor.getString(
+                    assertEquals((long) mediaInMediaSetsTableCursor.getLong(
                                     mediaInMediaSetsTableCursor.getColumnIndex(
                                             PickerSQLConstants.MediaInMediaSetsTableColumns
                                                     .MEDIA_SETS_PICKER_ID.getColumnName())),
@@ -306,7 +306,7 @@ public class MediaInMediaSetsSyncWorkerTest {
 
         String categoryId = "categoryId";
         String auth = String.valueOf(SYNC_LOCAL_ONLY);
-        String mediaSetPickerId = "";
+        long mediaSetPickerId = 1L;
         Cursor c = getCursorForMediaSetInsertionTest();
         List<String> mimeTypes = new ArrayList<>();
         mimeTypes.add("img");
@@ -318,13 +318,13 @@ public class MediaInMediaSetsSyncWorkerTest {
         Bundle extras = new Bundle();
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
-        extras.putStringArray(MediaSetsSyncRequestParams.KEY_MIME_TYPES,
-                mimeTypes.toArray(new String[mimeTypes.size()]));
+        extras.putStringArrayList(MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                new ArrayList<String>(mimeTypes));
         MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
         Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
                 mDatabase, requestParams);
         if (fetchMediaSetCursor.moveToFirst()) {
-            mediaSetPickerId = fetchMediaSetCursor.getString(
+            mediaSetPickerId = fetchMediaSetCursor.getLong(
                     fetchMediaSetCursor.getColumnIndexOrThrow(
                             PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName()));
         }
@@ -376,7 +376,7 @@ public class MediaInMediaSetsSyncWorkerTest {
                                     ))
                     );
 
-                    assertEquals(mediaInMediaSetsTableCursor.getString(
+                    assertEquals((long) mediaInMediaSetsTableCursor.getLong(
                                     mediaInMediaSetsTableCursor.getColumnIndex(
                                             PickerSQLConstants.MediaInMediaSetsTableColumns
                                                     .MEDIA_SETS_PICKER_ID.getColumnName())),
@@ -425,7 +425,7 @@ public class MediaInMediaSetsSyncWorkerTest {
 
         String categoryId = "categoryId";
         String auth = String.valueOf(SYNC_CLOUD_ONLY);
-        String mediaSetPickerId = "";
+        long mediaSetPickerId = 1L;
         Cursor c = getCursorForMediaSetInsertionTest();
         List<String> mimeTypes = new ArrayList<>();
         mimeTypes.add("img");
@@ -437,13 +437,13 @@ public class MediaInMediaSetsSyncWorkerTest {
         Bundle extras = new Bundle();
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
-        extras.putStringArray(MediaSetsSyncRequestParams.KEY_MIME_TYPES,
-                mimeTypes.toArray(new String[mimeTypes.size()]));
+        extras.putStringArrayList(MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                new ArrayList<String>(mimeTypes));
         MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
         Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
                 mDatabase, requestParams);
         if (fetchMediaSetCursor.moveToFirst()) {
-            mediaSetPickerId = fetchMediaSetCursor.getString(
+            mediaSetPickerId = fetchMediaSetCursor.getLong(
                     fetchMediaSetCursor.getColumnIndexOrThrow(
                             PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName()));
         }

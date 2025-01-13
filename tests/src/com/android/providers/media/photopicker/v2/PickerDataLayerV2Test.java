@@ -843,9 +843,9 @@ public class PickerDataLayerV2Test {
         extras.putString(
                 MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY,
                 SearchProvider.AUTHORITY);
-        extras.putStringArray(
+        extras.putStringArrayList(
                 MediaSetsSyncRequestParams.KEY_MIME_TYPES,
-                new String[] { "image/*" });
+                new ArrayList<>(List.of("image/*")));
         extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
         extras.putStringArrayList("providers", new ArrayList<>(List.of(SearchProvider.AUTHORITY)));
 

@@ -54,7 +54,7 @@ import java.util.Objects;
  */
 public class MediaInMediaSetsSyncWorker extends Worker {
 
-    private static final String TAG = "SearchSyncWorker";
+    private static final String TAG = "MediaSetsContentSyncWorker";
     private static final int SYNC_PAGE_COUNT = Integer.MAX_VALUE;
     private static final int PAGE_SIZE = 500;
     private static final int INVALID_SYNC_SOURCE = -1;
@@ -77,7 +77,8 @@ public class MediaInMediaSetsSyncWorker extends Worker {
         final int syncSource = getInputData().getInt(SYNC_WORKER_INPUT_SYNC_SOURCE,
                 /* defaultValue */ INVALID_SYNC_SOURCE);
         String mediaSetAuthority = getInputData().getString(SYNC_WORKER_INPUT_AUTHORITY);
-        String mediaSetPickerId = getInputData().getString(SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID);
+        Long mediaSetPickerId = getInputData().getLong(
+                SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, Long.MIN_VALUE);
         String mediaSetId = "";
 
         try {
@@ -110,7 +111,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
 
         } catch (RuntimeException | RequestObsoleteException e) {
             Log.e(TAG, "Could not complete media in media set sync from sync source "
-                    + " for mediaSetId " + mediaSetId);
+                    + " for mediaSetId " + mediaSetId, e);
             return ListenableWorker.Result.failure();
         } finally {
             // mark sync as complete
@@ -126,7 +127,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
      */
     private void syncMediaInMediaSet(
             int syncSource, @NonNull String mediaSetId,
-            @NonNull String mediaSetPickerId, @NonNull String mediaSetAuthority,
+            @NonNull Long mediaSetPickerId, @NonNull String mediaSetAuthority,
             @Nullable String[] mimeTypes)
             throws RequestObsoleteException, IllegalArgumentException {
         final PickerSearchProviderClient searchClient =
@@ -233,7 +234,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
 
     private void checkValidityOfWorkerInputParams(
             @NonNull String mediaSetId, int syncSource,
-            @NonNull String mediaSetPickerId, @NonNull String mediaSetAuthority) {
+            @NonNull Long mediaSetPickerId, @NonNull String mediaSetAuthority) {
         Objects.requireNonNull(mediaSetId);
         if (mediaSetId.isEmpty()) {
             Log.e(TAG, "Received empty mediaSetId id to fetch media set items");
@@ -241,10 +242,6 @@ public class MediaInMediaSetsSyncWorker extends Worker {
         }
 
         Objects.requireNonNull(mediaSetPickerId);
-        if (mediaSetPickerId.isEmpty()) {
-            Log.e(TAG, "Received empty mediaSetPickerId id to fetch media set items");
-            throw new IllegalArgumentException("mediaSetPickerId was an empty string");
-        }
 
         // SyncSource should either be cloud or local in order to fetch media set items
         if (syncSource != SYNC_LOCAL_ONLY && syncSource != SYNC_CLOUD_ONLY) {

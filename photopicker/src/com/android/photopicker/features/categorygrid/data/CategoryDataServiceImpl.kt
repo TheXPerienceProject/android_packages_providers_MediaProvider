@@ -297,7 +297,7 @@ class CategoryDataServiceImpl(
                     " for parent category ${category.categoryType}",
             )
 
-            mediaProviderClient.refreshMediaSets(contentResolver, category, config.value)
+            mediaProviderClient.refreshMediaSets(contentResolver, category, config.value, providers)
         } else {
             Log.e(
                 CategoryDataService.TAG,
@@ -321,7 +321,12 @@ class CategoryDataServiceImpl(
                     " for parent media set ${mediaSet.id}",
             )
 
-            mediaProviderClient.refreshMediaSetContents(contentResolver, mediaSet, config.value)
+            mediaProviderClient.refreshMediaSetContents(
+                contentResolver,
+                mediaSet,
+                config.value,
+                providers,
+            )
         } else {
             Log.e(
                 CategoryDataService.TAG,

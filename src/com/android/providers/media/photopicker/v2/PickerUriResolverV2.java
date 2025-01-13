@@ -50,6 +50,7 @@ public class PickerUriResolverV2 {
     private static final String SEARCH_SUGGESTIONS_PATH_SEGMENT = "search_suggestions";
     private static final String CATEGORIES_PATH_SEGMENT = "categories";
     private static final String MEDIA_SETS_PATH_SEGMENT = "media_sets";
+    private static final String MEDIA_SET_CONTENTS_PATH_SEGMENT = "media_set_contents";
 
 
     static final UriMatcher sUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -65,6 +66,7 @@ public class PickerUriResolverV2 {
     static final int PICKER_INTERNAL_SEARCH_SUGGESTIONS = 10;
     static final int PICKER_INTERNAL_CATEGORIES = 11;
     static final int PICKER_INTERNAL_MEDIA_SETS = 12;
+    static final int PICKER_INTERNAL_MEDIA_SET_CONTENTS = 13;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({
@@ -80,7 +82,8 @@ public class PickerUriResolverV2 {
             PICKER_INTERNAL_SEARCH_MEDIA,
             PICKER_INTERNAL_SEARCH_SUGGESTIONS,
             PICKER_INTERNAL_CATEGORIES,
-            PICKER_INTERNAL_MEDIA_SETS
+            PICKER_INTERNAL_MEDIA_SETS,
+            PICKER_INTERNAL_MEDIA_SET_CONTENTS
     })
     private @interface PickerQuery {}
 
@@ -126,6 +129,9 @@ public class PickerUriResolverV2 {
         sUriMatcher.addURI(MediaStore.AUTHORITY,
                 BASE_PICKER_PATH + MEDIA_SETS_PATH_SEGMENT,
                 PICKER_INTERNAL_MEDIA_SETS);
+        sUriMatcher.addURI(MediaStore.AUTHORITY,
+                BASE_PICKER_PATH + MEDIA_SET_CONTENTS_PATH_SEGMENT,
+                PICKER_INTERNAL_MEDIA_SET_CONTENTS);
     }
 
     /**
@@ -182,6 +188,8 @@ public class PickerUriResolverV2 {
                         cancellationSignal);
             case PICKER_INTERNAL_MEDIA_SETS:
                 return PickerDataLayerV2.queryMediaSets(requireNonNull(queryArgs));
+            case PICKER_INTERNAL_MEDIA_SET_CONTENTS:
+                return PickerDataLayerV2.queryMediaInMediaSet(requireNonNull(queryArgs));
             default:
                 throw new UnsupportedOperationException("Could not recognize content URI " + uri);
         }

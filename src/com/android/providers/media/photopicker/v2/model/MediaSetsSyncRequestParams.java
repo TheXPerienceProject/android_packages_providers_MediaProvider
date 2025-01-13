@@ -20,6 +20,7 @@ import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 
+import java.util.List;
 import java.util.Objects;
 
 /*
@@ -33,12 +34,12 @@ public class MediaSetsSyncRequestParams {
 
     private final String mAuthority;
     private final String mCategoryId;
-    private final String[] mMimeTypes;
+    private final List<String> mMimeTypes;
 
     public MediaSetsSyncRequestParams(@NonNull Bundle extras) {
         Objects.requireNonNull(extras);
         mAuthority = extras.getString(KEY_PARENT_CATEGORY_AUTHORITY);
-        mMimeTypes = extras.getStringArray(KEY_MIME_TYPES);
+        mMimeTypes = extras.getStringArrayList(KEY_MIME_TYPES);
         mCategoryId = extras.getString(KEY_PARENT_CATEGORY_ID);
     }
 
@@ -50,7 +51,7 @@ public class MediaSetsSyncRequestParams {
         return mCategoryId;
     }
 
-    public String[] getMimeTypes() {
+    public List<String> getMimeTypes() {
         return mMimeTypes;
     }
 }
