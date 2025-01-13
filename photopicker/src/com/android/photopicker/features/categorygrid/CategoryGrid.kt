@@ -58,6 +58,7 @@ import com.android.photopicker.core.obtainViewModel
 import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.extensions.navigateToAlbumMediaGridForCategories
 import com.android.photopicker.extensions.navigateToCategoryGrid
+import com.android.photopicker.extensions.navigateToMediaSetGrid
 import com.android.photopicker.extensions.navigateToPhotoGrid
 import com.android.photopicker.features.navigationbar.NavigationBarButton
 import com.android.photopicker.features.photogrid.PhotoGridFeature
@@ -80,7 +81,7 @@ private val MEASUREMENT_HORIZONTAL_CELL_SPACING_CATEGORY_GRID = 16.dp
  */
 @Composable
 fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
-    val items = viewModel.getAlbums().collectAsLazyPagingItems()
+    val items = viewModel.getCategoriesAndAlbums().collectAsLazyPagingItems()
     val state = rememberLazyGridState()
     val navController = LocalNavController.current
     val featureManager = LocalFeatureManager.current
@@ -160,6 +161,8 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
                         )
                     }
                     navController.navigateToAlbumMediaGridForCategories(album = item.album)
+                } else if (item is MediaGridItem.CategoryItem) {
+                    navController.navigateToMediaSetGrid(category = item.category)
                 }
             },
             isExpandedScreen = isExpandedScreen,
@@ -178,7 +181,7 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
             scope.launch {
                 events.dispatch(
                     Event.LogPhotopickerUIEvent(
-                        FeatureToken.PHOTO_GRID.token,
+                        FeatureToken.CATEGORY_GRID.token,
                         configuration.sessionId,
                         configuration.callingPackageUid ?: -1,
                         Telemetry.UiEvent.UI_LOADED_ALBUMS,

@@ -87,21 +87,21 @@ val DEFAULT_SEARCH_SUGGESTIONS: List<SearchSuggestion> =
             authority = null,
             type = SearchSuggestionType.HISTORY,
             displayText = "Text",
-            iconUri = null,
+            icon = null,
         ),
         SearchSuggestion(
             mediaSetId = "media-set-id-1",
             authority = "cloud.provider",
             type = SearchSuggestionType.FACE,
             displayText = null,
-            iconUri = Uri.parse("content://cloud.provider/1234"),
+            icon = Icon(Uri.parse("content://cloud.provider/1234"), MediaSource.LOCAL),
         ),
         SearchSuggestion(
             mediaSetId = "media-set-id-1",
             authority = "local-provider",
             type = SearchSuggestionType.TEXT,
             displayText = "Text",
-            iconUri = null,
+            icon = null,
         ),
     )
 
@@ -438,7 +438,7 @@ class TestMediaProvider(
                     suggestion.authority,
                     suggestion.mediaSetId,
                     suggestion.displayText,
-                    suggestion.iconUri.toString(),
+                    suggestion.icon,
                     suggestion.type.key,
                 )
             )

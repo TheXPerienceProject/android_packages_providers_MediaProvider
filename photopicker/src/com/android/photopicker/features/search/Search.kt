@@ -71,7 +71,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -98,6 +97,8 @@ import com.android.photopicker.core.events.Telemetry
 import com.android.photopicker.core.features.FeatureToken
 import com.android.photopicker.core.features.LocalFeatureManager
 import com.android.photopicker.core.features.LocationParams
+import com.android.photopicker.core.glide.Resolution
+import com.android.photopicker.core.glide.loadMedia
 import com.android.photopicker.core.navigation.LocalNavController
 import com.android.photopicker.core.obtainViewModel
 import com.android.photopicker.core.selection.LocalSelection
@@ -107,7 +108,6 @@ import com.android.photopicker.features.preview.PreviewFeature
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
 import com.android.photopicker.features.search.model.UserSearchState
-import com.android.photopicker.util.rememberBitmapFromUri
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -376,12 +376,7 @@ fun SearchInputContent(
             searchState.suggestion.type == SearchSuggestionType.FACE
     ) {
         true -> {
-            ShowSearchInputWithCustomIcon(
-                searchState.suggestion,
-                onFocused,
-                onSearchQueryChanged,
-                viewModel,
-            )
+            ShowSearchInputWithCustomIcon(searchState.suggestion, onFocused, onSearchQueryChanged)
         }
         else -> {
             SearchInput(
@@ -475,14 +470,12 @@ private fun SearchInput(
  * @param onFocused A callback function to be invoked when the focus state of the search field
  *   changes.
  * @param onSearchQueryChanged A callback function to be invoked when the search query text changes.
- * @param viewModel The `SearchViewModel` providing the search logic and state.
  */
 @Composable
 fun ShowSearchInputWithCustomIcon(
     suggestion: SearchSuggestion,
     onFocused: (Boolean) -> Unit,
     onSearchQueryChanged: (String) -> Unit,
-    viewModel: SearchViewModel = obtainViewModel(),
 ) {
     Row(
         modifier = Modifier.padding(MEASUREMENT_SMALL_PADDING).fillMaxWidth(),
@@ -493,11 +486,8 @@ fun ShowSearchInputWithCustomIcon(
             onFocused = onFocused,
             onSearchQueryChanged = { onSearchQueryChanged("") },
         )
-        val imageBitmap =
-            suggestion.iconUri?.let { rememberBitmapFromUri(it, viewModel.backgroundDispatcher) }
         ShowSuggestionIcon(
             suggestion,
-            imageBitmap,
             modifier = Modifier.clip(CircleShape).size(MEASUREMENT_FACE_RESULT_ICON),
         )
         Text(
@@ -709,10 +699,9 @@ private fun ShowSuggestionCard(
  * Composable that displays the actual suggestion item within a suggestion card
  *
  * @param suggestion The search suggestion item to display.
- * @param viewModel The `SearchViewModel` providing the search logic and state.
  */
 @Composable
-fun SuggestionItem(suggestion: SearchSuggestion, viewModel: SearchViewModel = obtainViewModel()) {
+fun SuggestionItem(suggestion: SearchSuggestion) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(MEASUREMENT_SUGGESTION_ITEM_PADDING),
@@ -728,15 +717,8 @@ fun SuggestionItem(suggestion: SearchSuggestion, viewModel: SearchViewModel = ob
         }
         val text = suggestion.displayText ?: ""
         Text(text = text, modifier = Modifier.padding(start = MEASUREMENT_LARGE_PADDING).weight(1f))
-        if (suggestion.type != SearchSuggestionType.FACE && suggestion.iconUri != null) {
-            rememberBitmapFromUri(suggestion.iconUri, viewModel.backgroundDispatcher)?.let {
-                imageBitmap ->
-                ShowSuggestionIcon(
-                    suggestion,
-                    imageBitmap,
-                    modifier = Modifier.size(MEASUREMENT_OTHER_ICON),
-                )
-            }
+        if (suggestion.type != SearchSuggestionType.FACE && suggestion.icon != null) {
+            ShowSuggestionIcon(suggestion, Modifier.size(MEASUREMENT_OTHER_ICON).clip(CircleShape))
         }
     }
 }
@@ -747,14 +729,12 @@ fun SuggestionItem(suggestion: SearchSuggestion, viewModel: SearchViewModel = ob
  * @param list The list of `SearchSuggestion` objects of type FACE to be displayed.
  * @param onSuggestionClick A callback function to be invoked when a suggestion is clicked.
  * @param otherTypeCount The number of suggestions of other type in search suggestions list.
- * @param viewModel The `SearchViewModel` providing the search logic and state.
  */
 @Composable
 fun ShowFaceSuggestions(
     list: List<SearchSuggestion>,
     onSuggestionClick: (SearchSuggestion) -> Unit,
     otherTypeCount: Int,
-    viewModel: SearchViewModel = obtainViewModel(),
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(MEASUREMENT_EXTRA_SMALL_PADDING),
@@ -773,13 +753,8 @@ fun ShowFaceSuggestions(
             horizontalArrangement = Arrangement.spacedBy(MEASUREMENT_ITEM_GAP_PADDING),
         ) {
             list.take(SearchViewModel.FACE_SUGGESTION_MAX_LIMIT).forEach { suggestion ->
-                val imageBitmap =
-                    suggestion.iconUri?.let {
-                        rememberBitmapFromUri(it, viewModel.backgroundDispatcher)
-                    }
                 ShowSuggestionIcon(
                     suggestion,
-                    imageBitmap,
                     modifier =
                         Modifier.size(MEASUREMENT_FACE_SUGGESTION_ICON)
                             .clip(CircleShape)
@@ -798,19 +773,18 @@ fun ShowFaceSuggestions(
  * icon.
  *
  * @param suggestion The `SearchSuggestion` object containing the icon URI and suggestion type.
- * @param imageBitmap Bitmap for the suggestion icon to be shown.
  * @param modifier Modifiers to be applied to the Icon composable.
  */
 @Composable
-fun ShowSuggestionIcon(
-    suggestion: SearchSuggestion,
-    imageBitmap: ImageBitmap?,
-    modifier: Modifier,
-) {
+fun ShowSuggestionIcon(suggestion: SearchSuggestion, modifier: Modifier) {
     val imageDescription = suggestion.displayText ?: ""
     when {
-        imageBitmap != null -> {
-            Icon(bitmap = imageBitmap, contentDescription = imageDescription, modifier = modifier)
+        suggestion.icon != null -> {
+            loadMedia(
+                media = suggestion.icon,
+                resolution = Resolution.THUMBNAIL,
+                modifier = modifier.background(MaterialTheme.colorScheme.surface),
+            )
         }
         else -> {
             Icon(

@@ -59,6 +59,7 @@ import com.android.photopicker.core.theme.CustomAccentColorScheme
 import com.android.photopicker.data.model.Group
 import com.android.photopicker.extensions.navigateToAlbumGrid
 import com.android.photopicker.extensions.navigateToCategoryGrid
+import com.android.photopicker.extensions.navigateToMediaSetGrid
 import com.android.photopicker.features.albumgrid.AlbumGridFeature
 import com.android.photopicker.features.categorygrid.CategoryGridFeature
 import com.android.photopicker.features.overflowmenu.OverflowMenuFeature
@@ -126,6 +127,14 @@ fun NavigationBar(modifier: Modifier = Modifier, params: LocationParams) {
                 } else {
                     NavigationBarForGroup(modifier)
                 }
+            }
+
+            currentRoute == PhotopickerDestinations.MEDIA_SET_GRID.route -> {
+                NavigationBarForGroup(modifier)
+            }
+
+            currentRoute == PhotopickerDestinations.MEDIA_SET_CONTENT_GRID.route -> {
+                NavigationBarForGroup(modifier)
             }
 
             // When search feature is enabled then display search bar along with profile selector,
@@ -297,8 +306,8 @@ private fun NavigationBarForAlbum(modifier: Modifier) {
 }
 
 /**
- * Composable that provides Navigation Bar when inside an album that displays the album title and a
- * back button
+ * Composable that provides Navigation Bar when inside a group displays the album or media set title
+ * and a back button
  *
  * @param modifier Modifier used to configure the layout of the navigation bar.
  */
@@ -336,6 +345,58 @@ private fun NavigationBarForGroup(modifier: Modifier) {
                         maxLines = 1,
                         style = MaterialTheme.typography.titleLarge,
                         // Traversal index -1 forces TalkBack to focus on the album title first.
+                        modifier = Modifier.semantics { traversalIndex = -1f },
+                    )
+                }
+            }
+            is Group.Category -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // back button
+                    IconButton(
+                        modifier =
+                            Modifier.width(MEASUREMENT_ICON_BUTTON_WIDTH)
+                                .padding(horizontal = MEASUREMENT_ICON_BUTTON_OUTSIDE_PADDING),
+                        onClick = { navController.navigateToCategoryGrid() },
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            // For accessibility
+                            contentDescription = stringResource(R.string.photopicker_back_option),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Text(
+                        text = group.displayName ?: "",
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.titleLarge,
+                        // Traversal index -1 forces TalkBack to focus on the mediaset title first.
+                        modifier = Modifier.semantics { traversalIndex = -1f },
+                    )
+                }
+            }
+            is Group.MediaSet -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // back button
+                    IconButton(
+                        modifier =
+                            Modifier.width(MEASUREMENT_ICON_BUTTON_WIDTH)
+                                .padding(horizontal = MEASUREMENT_ICON_BUTTON_OUTSIDE_PADDING),
+                        onClick = { navController.navigateToMediaSetGrid() },
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            // For accessibility
+                            contentDescription = stringResource(R.string.photopicker_back_option),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Text(
+                        text = group.displayName ?: "",
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.titleLarge,
+                        // Traversal index -1 forces TalkBack to focus on the mediaset title first.
                         modifier = Modifier.semantics { traversalIndex = -1f },
                     )
                 }

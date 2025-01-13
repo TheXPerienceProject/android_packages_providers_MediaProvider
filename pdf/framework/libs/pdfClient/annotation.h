@@ -24,6 +24,7 @@
 #include "page_object.h"
 #include "rect.h"
 
+using pdfClient::Color;
 using pdfClient::PageObject;
 using pdfClient::Rectangle_f;
 
@@ -31,7 +32,7 @@ namespace pdfClient {
 // Base class for different type of annotations
 class Annotation {
   public:
-    enum class Type { UNKNOWN = 0, Stamp = 1 };
+    enum class Type { UNKNOWN = 0, Highlight = 2, Stamp = 3 };
 
     Annotation(Type type, const Rectangle_f& bounds) : type_(type), bounds_(bounds) {}
     virtual ~Annotation() = default;
@@ -78,6 +79,21 @@ class StampAnnotation : public Annotation {
 
   private:
     std::vector<std::unique_ptr<PageObject>> pageObjects_;
+};
+
+class HighlightAnnotation : public Annotation {
+  public:
+    HighlightAnnotation(const Rectangle_f& bounds) : Annotation(Type::Highlight, bounds) {}
+
+    Color GetColor() const { return color_; }
+    void SetColor(Color color) { color_ = color; }
+
+    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) override;
+    ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) override;
+    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) override;
+
+  private:
+    Color color_;
 };
 
 }  // namespace pdfClient

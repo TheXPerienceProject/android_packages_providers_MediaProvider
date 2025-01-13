@@ -160,4 +160,66 @@ bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCU
     return true;
 }
 
+bool HighlightAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) {
+    // Get color
+    unsigned int R;
+    unsigned int G;
+    unsigned int B;
+    unsigned int A;
+
+    if (FPDFAnnot_GetColor(fpdf_annot, FPDFANNOT_COLORTYPE_Color, &R, &G, &B, &A)) {
+        LOGE("Couldn't get color of highlight annotation");
+        return false;
+    }
+
+    Color color(R, G, B, A);
+    this->SetColor(color);
+    return true;
+}
+
+ScopedFPDFAnnotation HighlightAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT document,
+                                                               FPDF_PAGE page) {
+    ScopedFPDFAnnotation scoped_annot =
+            ScopedFPDFAnnotation(FPDFPage_CreateAnnot(page, FPDF_ANNOT_HIGHLIGHT));
+
+    if (!scoped_annot) {
+        LOGE("Failed to create highlight Annotation.");
+        return nullptr;
+    }
+
+    if (!this->UpdatePdfiumInstance(scoped_annot.get(), document)) {
+        LOGE("Failed to create highlight annotation with given parameters");
+    }
+
+    return scoped_annot;
+}
+
+bool HighlightAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) {
+    if (FPDFAnnot_GetSubtype(fpdf_annot) != FPDF_ANNOT_HIGHLIGHT) {
+        LOGE("Unsupported operation - can't update a highlight annotation with some other type of "
+             "annotation");
+        return false;
+    }
+
+    Rectangle_f annotation_bounds = this->GetBounds();
+    FS_RECTF rect;
+    rect.left = annotation_bounds.left;
+    rect.bottom = annotation_bounds.bottom;
+    rect.right = annotation_bounds.right;
+    rect.top = annotation_bounds.top;
+
+    if (!FPDFAnnot_SetRect(fpdf_annot, &rect)) {
+        LOGE("Highlight Annotation bounds couldn't be updated");
+        return false;
+    }
+
+    Color new_color = this->GetColor();
+    if (!FPDFAnnot_SetColor(fpdf_annot, FPDFANNOT_COLORTYPE_Color, new_color.r, new_color.g,
+                            new_color.b, new_color.a)) {
+        LOGE("Highlight Annotation color couldn't be updated");
+        return false;
+    }
+    return true;
+}
+
 }  // namespace pdfClient

@@ -623,7 +623,7 @@ open class MediaProviderClient {
 
             return resolver
                 .query(SEARCH_SUGGESTIONS_URI, /* projection */ null, input, cancellationSignal)
-                ?.getListOfSearchSuggestions() ?: ArrayList()
+                ?.getListOfSearchSuggestions(availableProviders) ?: ArrayList()
         } catch (e: RuntimeException) {
             throw RuntimeException("Could not fetch search suggestions", e)
         }
@@ -1244,16 +1244,16 @@ open class MediaProviderClient {
     }
 
     /** Creates a list of [SearchSuggestion]-s from the given [Cursor]. */
-    private fun Cursor.getListOfSearchSuggestions(): List<SearchSuggestion> {
+    private fun Cursor.getListOfSearchSuggestions(
+        availableProviders: List<Provider>
+    ): List<SearchSuggestion> {
         val result: MutableList<SearchSuggestion> = mutableListOf<SearchSuggestion>()
+        val authorityToSourceMap: Map<String, MediaSource> =
+            availableProviders.associate { provider -> provider.authority to provider.mediaSource }
 
         if (this.moveToFirst()) {
             do {
                 try {
-                    val uriString: String? =
-                        getString(
-                            getColumnIndexOrThrow(SearchSuggestionsResponse.COVER_MEDIA_URI.key)
-                        )
                     result.add(
                         SearchSuggestion(
                             mediaSetId =
@@ -1278,7 +1278,11 @@ open class MediaProviderClient {
                                         )
                                     )
                                 ),
-                            iconUri = if (uriString != null) Uri.parse(uriString) else null,
+                            icon =
+                                this.getIcon(
+                                    authorityToSourceMap,
+                                    SearchSuggestionsResponse.COVER_MEDIA_URI.key,
+                                ),
                         )
                     )
                 } catch (e: RuntimeException) {

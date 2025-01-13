@@ -628,8 +628,10 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
 
             // Get the Approximate Array for the Path.
             static jmethodID approximate = env->GetMethodID(path_class, "approximate", "(F)[F");
+            // The acceptable error while approximating a Path Curve with a line.
+            static const float acceptable_error = 0.5f;
             jfloatArray java_approximate =
-                    (jfloatArray)env->CallObjectMethod(java_path, approximate);
+                    (jfloatArray)env->CallObjectMethod(java_path, approximate, acceptable_error);
             const jsize size = env->GetArrayLength(java_approximate);
 
             // Copy Java Array to Native Array

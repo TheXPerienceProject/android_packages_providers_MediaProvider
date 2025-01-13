@@ -849,6 +849,10 @@ void Page::PopulateAnnotations() {
                 annotation = std::make_unique<StampAnnotation>(bounds);
                 break;
             }
+            case FPDF_ANNOT_HIGHLIGHT: {
+                annotation = std::make_unique<HighlightAnnotation>(bounds);
+                break;
+            }
             default: {
                 break;
             }
