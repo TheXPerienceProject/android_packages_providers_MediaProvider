@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -381,7 +382,11 @@ fun PhotoGridNavButton(modifier: Modifier) {
                             stringResource(R.string.photopicker_photos_nav_button_label),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.photopicker_photos_nav_button_label))
+                    Text(
+                        stringResource(R.string.photopicker_photos_nav_button_label),
+                        maxLines = 1, // Limit the text to a single line
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             else -> Text(stringResource(R.string.photopicker_photos_nav_button_label))
