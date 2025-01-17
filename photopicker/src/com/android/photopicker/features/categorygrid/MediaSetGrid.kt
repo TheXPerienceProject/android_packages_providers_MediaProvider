@@ -51,7 +51,6 @@ import com.android.photopicker.core.obtainViewModel
 import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.data.model.Group
 import com.android.photopicker.extensions.navigateToMediaSetContentGrid
-import com.android.photopicker.extensions.transferTouchesToHostInEmbedded
 import kotlinx.coroutines.flow.StateFlow
 
 /** The number of grid cells per row for Phone / narrow layouts */
@@ -83,7 +82,6 @@ fun MediaSetGrid(
 
             val isEmbedded =
                 LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
-            val isExpanded = LocalEmbeddedState.current?.isExpanded ?: false
             val host = LocalEmbeddedState.current?.host
             // Use the expanded layout any time the Width is Medium or larger.
             val isExpandedScreen: Boolean =
@@ -111,7 +109,6 @@ fun MediaSetGrid(
                                     // state title and body clearly visible in collapse mode (small
                                     // view)
                                     Modifier.fillMaxWidth()
-                                        .transferTouchesToHostInEmbedded(host = host)
                                 } else {
                                     // Provide 20% of screen height as empty space above
                                     Modifier.fillMaxWidth().padding(top = emptyStatePadding)
@@ -128,11 +125,6 @@ fun MediaSetGrid(
                         // user.
                         mediaGrid(
                             items = mediaSetItems,
-                            userScrollEnabled =
-                                when (isEmbedded) {
-                                    true -> isExpanded
-                                    false -> true
-                                },
                             onItemClick = { item ->
                                 if (item is MediaGridItem.PersonMediaSetItem) {
                                     navController.navigateToMediaSetContentGrid(

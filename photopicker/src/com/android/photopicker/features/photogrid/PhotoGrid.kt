@@ -83,7 +83,6 @@ import com.android.photopicker.extensions.navigateToAlbumGrid
 import com.android.photopicker.extensions.navigateToCategoryGrid
 import com.android.photopicker.extensions.navigateToPhotoGrid
 import com.android.photopicker.extensions.navigateToPreviewMedia
-import com.android.photopicker.extensions.transferTouchesToHostInEmbedded
 import com.android.photopicker.features.albumgrid.AlbumGridFeature
 import com.android.photopicker.features.categorygrid.CategoryGridFeature
 import com.android.photopicker.features.navigationbar.NavigationBarButton
@@ -206,7 +205,7 @@ fun PhotoGrid(viewModel: PhotoGridViewModel = obtainViewModel()) {
                         if (SdkLevel.isAtLeastU() && isEmbedded && host != null) {
                             // In embedded no need to give extra top padding to make empty
                             // state title and body clearly visible in collapse mode (small view)
-                            Modifier.fillMaxWidth().transferTouchesToHostInEmbedded(host = host)
+                            Modifier.fillMaxWidth()
                         } else {
                             // Provide 20% of screen height as empty space above
                             Modifier.fillMaxWidth().padding(top = emptyStatePadding)
@@ -226,11 +225,6 @@ fun PhotoGrid(viewModel: PhotoGridViewModel = obtainViewModel()) {
                 mediaGrid(
                     items = items,
                     isExpandedScreen = isExpandedScreen,
-                    userScrollEnabled =
-                        when (isEmbedded) {
-                            true -> isExpanded
-                            false -> true
-                        },
                     selection = selection,
                     bannerContent = {
                         hideWhenState(

@@ -280,9 +280,9 @@ public class PickerSyncManagerTest {
         mConfigStore.disableCloudMediaFeature();
         waitForIdle();
 
-        // There should be 2 invocations, one for cancelling proactive media syncs,
-        // the other for albums reset.
-        verify(mMockWorkManager, times(2)).cancelUniqueWork(anyString());
+        // There should be 3 invocations, one for cancelling proactive media syncs,
+        // the other for albums reset and search reset syncs.
+        verify(mMockWorkManager, times(3)).cancelUniqueWork(anyString());
     }
 
     @Test
