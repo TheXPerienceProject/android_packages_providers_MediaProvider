@@ -75,6 +75,13 @@ class CategoryAndAlbumPagingSource(
                 }
             }
 
+        if (result is LoadResult.Page) {
+            Log.d(
+                TAG,
+                "Received ${result.data.size} category and album items from the data source.",
+            )
+        }
+
         return result
     }
 

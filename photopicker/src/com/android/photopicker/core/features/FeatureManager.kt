@@ -232,6 +232,8 @@ class FeatureManager(
                     inputMap = prefetchRequestMap,
                     input = prefetchDataService,
                     timeoutMillis = 200L,
+                    backgroundScope = scope,
+                    dispatcher = dispatcher,
                 )
             }
 
