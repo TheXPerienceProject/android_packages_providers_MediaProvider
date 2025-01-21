@@ -57,6 +57,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -618,13 +619,14 @@ public class PickerSyncManager {
      */
     public void syncMediaSetsForProvider(
             MediaSetsSyncRequestParams requestParams, @SyncSource int syncSource) {
-        final Data inputData =
-                new Data(
-                        Map.of(
-                                SYNC_WORKER_INPUT_AUTHORITY, requestParams.getAuthority(),
-                                SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource,
-                                SYNC_WORKER_INPUT_CATEGORY_ID, requestParams.getCategoryId(),
-                                EXTRA_MIME_TYPES, requestParams.getMimeTypes()));
+        final Map<String, Object> inputMap = new HashMap<>();
+        inputMap.put(SYNC_WORKER_INPUT_AUTHORITY, requestParams.getAuthority());
+        inputMap.put(SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource);
+        inputMap.put(SYNC_WORKER_INPUT_CATEGORY_ID, requestParams.getCategoryId());
+        if (requestParams.getMimeTypes() != null) {
+            inputMap.put(EXTRA_MIME_TYPES, requestParams.getMimeTypes().toArray(new String[0]));
+        }
+        final Data inputData = new Data(inputMap);
         final OneTimeWorkRequest syncRequest =
                 buildOneTimeWorkerRequest(MediaSetsSyncWorker.class, inputData);
 

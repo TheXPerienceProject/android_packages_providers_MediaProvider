@@ -58,9 +58,11 @@ import com.android.photopicker.core.obtainViewModel
 import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.extensions.navigateToAlbumMediaGridForCategories
 import com.android.photopicker.extensions.navigateToCategoryGrid
+import com.android.photopicker.extensions.navigateToMediaSetGrid
 import com.android.photopicker.extensions.navigateToPhotoGrid
 import com.android.photopicker.features.navigationbar.NavigationBarButton
 import com.android.photopicker.features.photogrid.PhotoGridFeature
+import com.android.photopicker.features.search.SearchFeature
 import kotlinx.coroutines.launch
 
 /** The number of grid cells per row for Phone / narrow layouts */
@@ -80,7 +82,7 @@ private val MEASUREMENT_HORIZONTAL_CELL_SPACING_CATEGORY_GRID = 16.dp
  */
 @Composable
 fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
-    val items = viewModel.getAlbums().collectAsLazyPagingItems()
+    val items = viewModel.getCategoriesAndAlbums().collectAsLazyPagingItems()
     val state = rememberLazyGridState()
     val navController = LocalNavController.current
     val featureManager = LocalFeatureManager.current
@@ -160,6 +162,8 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
                         )
                     }
                     navController.navigateToAlbumMediaGridForCategories(album = item.album)
+                } else if (item is MediaGridItem.CategoryItem) {
+                    navController.navigateToMediaSetGrid(category = item.category)
                 }
             },
             isExpandedScreen = isExpandedScreen,
@@ -178,7 +182,7 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
             scope.launch {
                 events.dispatch(
                     Event.LogPhotopickerUIEvent(
-                        FeatureToken.PHOTO_GRID.token,
+                        FeatureToken.CATEGORY_GRID.token,
                         configuration.sessionId,
                         configuration.callingPackageUid ?: -1,
                         Telemetry.UiEvent.UI_LOADED_ALBUMS,
@@ -201,6 +205,8 @@ fun CategoryButton(modifier: Modifier) {
     val sessionId = LocalPhotopickerConfiguration.current.sessionId
     val packageUid = LocalPhotopickerConfiguration.current.callingPackageUid ?: -1
     val contentDescriptionString = stringResource(R.string.photopicker_categories_nav_button_label)
+    val featureManager = LocalFeatureManager.current
+    val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
 
     NavigationBarButton(
         onClick = {
@@ -220,13 +226,19 @@ fun CategoryButton(modifier: Modifier) {
         modifier = modifier.semantics { contentDescription = contentDescriptionString },
         isCurrentRoute = { route -> route == PhotopickerDestinations.CATEGORY_GRID.route },
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = ImageVector.vectorResource(R.drawable.photopicker_category_icon),
-                contentDescription = contentDescriptionString,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.photopicker_categories_nav_button_label))
+        when {
+            searchFeatureEnabled -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector =
+                            ImageVector.vectorResource(R.drawable.photopicker_category_icon),
+                        contentDescription = contentDescriptionString,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photopicker_categories_nav_button_label))
+                }
+            }
+            else -> Text(stringResource(R.string.photopicker_categories_nav_button_label))
         }
     }
 }

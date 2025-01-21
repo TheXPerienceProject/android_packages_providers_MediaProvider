@@ -142,10 +142,12 @@ public class MediaGroupCursorUtils {
     /**
      * @param cursor Input
      * {@link com.android.providers.media.photopicker.v2.model.AlbumsCursorWrapper}
+     * @param index The index for the first album in the given albums cursor.
+     *              The index value can be used to generate unique picker id for albums.
      * @return Cursor with the columns {@link PickerSQLConstants.MediaGroupResponseColumns}.
      */
     @Nullable
-    public static Cursor getMediaGroupCursorForAlbums(@Nullable Cursor cursor) {
+    public static Cursor getMediaGroupCursorForAlbums(@Nullable Cursor cursor, long index) {
         if (cursor == null) {
             return null;
         }
@@ -173,8 +175,9 @@ public class MediaGroupCursorUtils {
                 final String albumId = cursor.getString(cursor.getColumnIndexOrThrow(
                                 PickerSQLConstants.AlbumResponse.ALBUM_ID.getColumnName()));
 
-                final String pickerId = cursor.getString(cursor.getColumnIndexOrThrow(
-                        PickerSQLConstants.AlbumResponse.PICKER_ID.getColumnName()));
+                // Sets the picker id of the current album and increments the index for the
+                // next album.
+                final long pickerId = index++;
 
                 final String displayName = cursor.getString(cursor.getColumnIndexOrThrow(
                         PickerSQLConstants.AlbumResponse.ALBUM_NAME.getColumnName()));
@@ -209,12 +212,16 @@ public class MediaGroupCursorUtils {
     /**
      * @param cursor Input
      * {@link CloudMediaProviderContract.MediaCategoryColumns} cursor.
+     * @param authority The authority of the category's CMP.
+     * @param index The index for the first category in the given categories cursor.
+     *              The index value can be used to generate unique picker id for categories.
      * @return Cursor with the columns {@link PickerSQLConstants.MediaGroupResponseColumns}.
      */
     @Nullable
     public static Cursor getMediaGroupCursorForCategories(
             @Nullable Cursor cursor,
-            @NonNull String authority) {
+            @NonNull String authority,
+            long index) {
         if (cursor == null) {
             return null;
         }
@@ -296,7 +303,7 @@ public class MediaGroupCursorUtils {
             response.addRow(new Object[]{
                     MediaGroup.CATEGORY.name(),
                     categoryId,
-                    /* pickerId */ null,
+                    index,
                     displayName,
                     authority,
                     coverUri1,

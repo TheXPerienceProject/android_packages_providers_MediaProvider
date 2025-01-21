@@ -100,9 +100,11 @@ import com.android.photopicker.core.components.MediaGridItem.Companion.defaultBu
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
 import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
 import com.android.photopicker.core.embedded.LocalEmbeddedState
+import com.android.photopicker.core.glide.ParcelableGlideLoadable
 import com.android.photopicker.core.glide.Resolution
 import com.android.photopicker.core.glide.loadMedia
 import com.android.photopicker.core.theme.CustomAccentColorScheme
+import com.android.photopicker.data.model.CategoryType
 import com.android.photopicker.data.model.Group.Album
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.extensions.circleBackground
@@ -234,6 +236,9 @@ fun mediaGrid(
                     )
 
                 is MediaGridItem.AlbumItem -> defaultBuildAlbumItem(item, onClick)
+                is MediaGridItem.CategoryItem -> defaultBuildCategoryItem(item, onClick)
+                is MediaGridItem.PersonMediaSetItem -> defaultBuildPersonMediaSetItem(item, onClick)
+                is MediaGridItem.MediaSetItem -> defaultBuildMediaSetItem(item, onClick)
                 else -> {}
             }
         },
@@ -304,7 +309,10 @@ fun mediaGrid(
                             dateFormat,
                         )
 
-                    is MediaGridItem.AlbumItem ->
+                    is MediaGridItem.AlbumItem,
+                    is MediaGridItem.CategoryItem,
+                    is MediaGridItem.MediaSetItem,
+                    is MediaGridItem.PersonMediaSetItem ->
                         contentItemFactory(
                             item,
                             /* isSelected */ false,
@@ -312,7 +320,6 @@ fun mediaGrid(
                             onItemLongPress,
                             dateFormat,
                         )
-
                     is MediaGridItem.SeparatorItem -> contentSeparatorFactory(item)
                 }
             }
@@ -612,7 +619,6 @@ private fun SelectedIconOverlay(isSelected: Boolean, selectedIndex: Int) {
 private fun defaultBuildAlbumItem(item: MediaGridItem, onClick: ((item: MediaGridItem) -> Unit)?) {
     when (item) {
         is MediaGridItem.AlbumItem -> {
-
             Column(
                 // Apply semantics for the click handlers
                 Modifier.semantics(mergeDescendants = true) {
@@ -669,9 +675,193 @@ private fun defaultBuildAlbumItem(item: MediaGridItem, onClick: ((item: MediaGri
                 )
             } // Album cell column
         }
-
         else -> {}
     }
+}
+
+/** Default [MediaGridItem.PersonMediaSetItem] builder that loads People and pets mediaset. */
+@Composable
+private fun defaultBuildPersonMediaSetItem(
+    item: MediaGridItem.PersonMediaSetItem,
+    onClick: ((item: MediaGridItem) -> Unit)?,
+) {
+    Box(
+        // Apply semantics for the click handlers
+        Modifier.semantics(mergeDescendants = true) {
+                contentDescription = item.mediaSet.displayName ?: ""
+                onClick(
+                    action = {
+                        onClick?.invoke(item)
+                        /* eventHandled= */ true
+                    }
+                )
+            }
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClick?.invoke(item) }) }
+    ) {
+        with(item.mediaSet) {
+            val modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+            loadMedia(media = icon, resolution = Resolution.THUMBNAIL, modifier = modifier)
+            Text(
+                text = displayName ?: "",
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
+            )
+        }
+    }
+}
+
+/** Default [MediaGridItem.MediaSetItem] builder that loads mediaset. */
+@Composable
+private fun defaultBuildMediaSetItem(
+    item: MediaGridItem.MediaSetItem,
+    onClick: ((item: MediaGridItem) -> Unit)?,
+) {
+    Column(
+        // Apply semantics for the click handlers
+        Modifier.semantics(mergeDescendants = true) {
+                contentDescription = item.mediaSet.displayName ?: ""
+                onClick(
+                    action = {
+                        onClick?.invoke(item)
+                        /* eventHandled= */ true
+                    }
+                )
+            }
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClick?.invoke(item) }) }
+            .padding(bottom = MEASUREMENT_DEFAULT_ALBUM_BOTTOM_PADDING)
+    ) {
+        with(item.mediaSet) {
+            val modifier =
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(MEASUREMENT_SELECTED_CORNER_RADIUS_FOR_ALBUMS))
+                    .aspectRatio(1f)
+            DefaultAlbumIcon(/* icon */ Icons.Outlined.PhotoCamera, modifier)
+            Spacer(Modifier.size(MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE))
+            // Media set title shown on the media set grid.
+            Text(
+                text = displayName ?: "",
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+/**
+ * Default [MediaGridItem.CategoryItem] builder that loads category into a square (1:1) aspect ratio
+ * GridCell with icons in square grid and provides a text title below it.
+ */
+@Composable
+private fun defaultBuildCategoryItem(
+    item: MediaGridItem.CategoryItem,
+    onClick: ((item: MediaGridItem) -> Unit)?,
+) {
+    Column(
+        // Apply semantics for the click handlers
+        Modifier.semantics(mergeDescendants = true) {
+                contentDescription = item.category.displayName ?: ""
+                onClick(
+                    action = {
+                        onClick?.invoke(item)
+                        /* eventHandled= */ true
+                    }
+                )
+            }
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClick?.invoke(item) }) }
+            .padding(bottom = MEASUREMENT_DEFAULT_ALBUM_BOTTOM_PADDING)
+    ) {
+        with(item.category) {
+            val modifier =
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(MEASUREMENT_SELECTED_CORNER_RADIUS_FOR_ALBUMS))
+                    .aspectRatio(1f)
+            IconGrid(icons, modifier = modifier, categoryType)
+            Spacer(Modifier.size(MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE))
+            // Category title shown below the category grid.
+            Text(
+                text = displayName ?: "",
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+fun IconGrid(
+    icons: List<ParcelableGlideLoadable>,
+    modifier: Modifier,
+    categoryType: CategoryType,
+    maxIcon: Int = 4,
+    iconPerRow: Int = 2,
+) {
+    Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Pad the list to ensure we required icons per row
+            val paddedIcons = (icons + List(maxIcon) { null }).take(maxIcon)
+            val iconsInRow = paddedIcons.chunked(iconPerRow)
+
+            iconsInRow.forEach { rowItem ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    rowItem.forEach { icon ->
+                        Box(modifier = Modifier.weight(1f).aspectRatio(1f)) {
+                            if (icon is ParcelableGlideLoadable) {
+                                CategoryIcon(icon, Modifier.fillMaxSize(), categoryType)
+                            } else {
+                                CategoryIconPlaceholder(Modifier.fillMaxSize(), categoryType)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryIconPlaceholder(modifier: Modifier, categoryType: CategoryType) {
+    Box(
+        modifier =
+            if (categoryType == CategoryType.PEOPLE_AND_PETS) {
+                modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+            } else {
+                modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(MEASUREMENT_SELECTED_CORNER_RADIUS_FOR_ALBUMS))
+                    .background(MaterialTheme.colorScheme.surface)
+            }
+    )
+}
+
+@Composable
+fun CategoryIcon(icon: ParcelableGlideLoadable, modifier: Modifier, categoryType: CategoryType) {
+    loadMedia(
+        media = icon,
+        resolution = Resolution.THUMBNAIL,
+        modifier =
+            if (categoryType == CategoryType.PEOPLE_AND_PETS) {
+                modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+            } else {
+                modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(MEASUREMENT_SELECTED_CORNER_RADIUS_FOR_ALBUMS))
+                    .background(MaterialTheme.colorScheme.surface)
+            },
+    )
 }
 
 /**

@@ -88,6 +88,7 @@ import com.android.photopicker.features.albumgrid.AlbumGridFeature
 import com.android.photopicker.features.categorygrid.CategoryGridFeature
 import com.android.photopicker.features.navigationbar.NavigationBarButton
 import com.android.photopicker.features.preview.PreviewFeature
+import com.android.photopicker.features.search.SearchFeature
 import com.android.photopicker.util.LocalLocalizationHelper
 import kotlinx.coroutines.launch
 
@@ -357,6 +358,7 @@ fun PhotoGridNavButton(modifier: Modifier) {
     val contentDescriptionString = stringResource(R.string.photopicker_photos_nav_button_label)
     val featureManager = LocalFeatureManager.current
     val categoryFeatureEnabled = featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
+    val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
 
     NavigationBarButton(
         onClick = {
@@ -376,8 +378,8 @@ fun PhotoGridNavButton(modifier: Modifier) {
         modifier = modifier.semantics { contentDescription = contentDescriptionString },
         isCurrentRoute = { route -> route == PHOTO_GRID.route },
     ) {
-        when (categoryFeatureEnabled) {
-            true -> {
+        when {
+            categoryFeatureEnabled && searchFeatureEnabled -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Outlined.PhotoAlbum,
@@ -388,7 +390,7 @@ fun PhotoGridNavButton(modifier: Modifier) {
                     Text(stringResource(R.string.photopicker_photos_nav_button_label))
                 }
             }
-            false -> Text(stringResource(R.string.photopicker_photos_nav_button_label))
+            else -> Text(stringResource(R.string.photopicker_photos_nav_button_label))
         }
     }
 }

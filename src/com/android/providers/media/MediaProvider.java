@@ -3981,7 +3981,8 @@ public class MediaProvider extends ContentProvider {
                     mPickerSyncController.getCloudProvider(), mPickerDataLayer);
         }
         if (table == PICKER_INTERNAL_V2) {
-            return PickerUriResolverV2.query(getContext().getApplicationContext(), uri, queryArgs);
+            return PickerUriResolverV2.query(
+                    getContext().getApplicationContext(), uri, queryArgs, signal);
         }
 
         final DatabaseHelper helper = getDatabaseForUri(uri);
@@ -7236,6 +7237,7 @@ public class MediaProvider extends ContentProvider {
         int userId;
         List<Uri> uris = null;
         String[] packageNames;
+        int packageUid;
         if (checkPermissionShell(caller)) {
             // If the caller is the shell, the accepted parameter is EXTRA_PACKAGE_NAME
             // (as string).
@@ -7244,7 +7246,14 @@ public class MediaProvider extends ContentProvider {
                         "Missing required extras arguments: EXTRA_URI or"
                                 + " EXTRA_PACKAGE_NAME");
             }
-            packageNames = new String[]{extras.getString(Intent.EXTRA_PACKAGE_NAME)};
+            String packageName = extras.getString(Intent.EXTRA_PACKAGE_NAME);
+            packageNames = new String[]{packageName};
+            try {
+                packageUid = mPackageManager.getPackageUid(packageName, 0);
+            } catch (NameNotFoundException e) {
+                Log.e(TAG, "No packageUid found for packageName " + packageName, e);
+                throw new RuntimeException(e);
+            }
             // Uris are not a requirement for revoke all call
             if (!isCallForRevokeAll) {
                 uris = List.of(Uri.parse(extras.getString(MediaStore.EXTRA_URI)));
@@ -7254,7 +7263,7 @@ public class MediaProvider extends ContentProvider {
             userId = UserHandle.myUserId();
         } else if (checkPermissionSelf(caller) || isCallerPhotoPicker()) {
             final PackageManager pm = getContext().getPackageManager();
-            final int packageUid = extras.getInt(Intent.EXTRA_UID);
+            packageUid = extras.getInt(Intent.EXTRA_UID);
             packageNames = pm.getPackagesForUid(packageUid);
             // Get the userId from packageUid as the initiator could be a cloned app, which
             // accesses Media via MP of its parent user and Binder's callingUid reflects
@@ -7270,12 +7279,12 @@ public class MediaProvider extends ContentProvider {
                     getSecurityExceptionMessage("revoke media grants"));
         }
 
-        if (isCallForRevokeAll && !isOwnedPhotosEnabled(caller)) {
+        if (isCallForRevokeAll && !isOwnedPhotosEnabled(packageUid)) {
             mMediaGrants.removeAllMediaGrantsForPackages(packageNames, "user de-selections",
                     userId);
         } else if (uris != null) {
             mMediaGrants.removeMediaGrantsForPackage(packageNames, uris, userId);
-            if (isOwnedPhotosEnabled(caller)) {
+            if (isOwnedPhotosEnabled(packageUid)) {
                 mFilesOwnershipUtils.removeOwnerPackageNameForUris(packageNames, uris,
                         userId);
             }

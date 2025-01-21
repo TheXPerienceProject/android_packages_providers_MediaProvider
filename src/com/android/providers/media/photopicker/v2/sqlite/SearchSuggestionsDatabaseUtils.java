@@ -257,7 +257,7 @@ public class SearchSuggestionsDatabaseUtils {
                 } catch (RuntimeException e) {
                     ContentValues contentValues = new ContentValues();
                     DatabaseUtils.cursorRowToContentValues(cursor, contentValues);
-                    Log.e(TAG, "Invalid search suggestion - skipping it: " + contentValues);
+                    Log.e(TAG, "Invalid search suggestion - skipping it: " + contentValues, e);
                 }
             } while (cursor.moveToNext());
         }
@@ -480,8 +480,7 @@ public class SearchSuggestionsDatabaseUtils {
         if (suggestionType == null) {
             throw new IllegalArgumentException("Suggestion type cannot be null");
         }
-
-        if (searchText == null && (suggestionType != SEARCH_SUGGESTION_FACE)) {
+        if (searchText == null && !suggestionType.equals(SEARCH_SUGGESTION_FACE)) {
             throw new IllegalArgumentException(
                     "Only FACE type suggestions can have null search text");
         }

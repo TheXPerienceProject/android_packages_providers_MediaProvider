@@ -145,7 +145,7 @@ public class PickerNotificationSender {
      */
     public static void notifySearchResultsChange(
             @NonNull Context context,
-            @NonNull int searchRequestId) {
+            int searchRequestId) {
         Log.d(TAG, "Sending a notification for search results update " + searchRequestId);
         context.getContentResolver().notifyChange(
                 getSearchResultsUpdateUri(searchRequestId),
@@ -162,7 +162,7 @@ public class PickerNotificationSender {
                 .build();
     }
 
-    private static Uri getSearchResultsUpdateUri(@NonNull int searchRequestId) {
+    private static Uri getSearchResultsUpdateUri(int searchRequestId) {
         return SEARCH_RESULTS_UPDATE_URI
                 .buildUpon()
                 .appendPath(Integer.toString(searchRequestId))

@@ -91,7 +91,7 @@ public class MediaSetsSyncWorker extends Worker {
             return ListenableWorker.Result.success();
         } catch (RuntimeException | RequestObsoleteException e) {
             Log.e(TAG, "Could not complete media sets sync from "
-                            + syncSource + " with categoryId " + categoryId + " due to " + e);
+                            + syncSource + " with categoryId " + categoryId, e);
             return ListenableWorker.Result.failure();
         }
     }

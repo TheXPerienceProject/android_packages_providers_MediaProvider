@@ -1423,7 +1423,8 @@ public class ItemsProviderTest {
     private Uri prepareFileAndGetUri(File file, long lastModifiedTime) throws IOException {
         ensureParentExists(file.getParentFile());
 
-        assertThat(file.createNewFile()).isTrue();
+        file.createNewFile();
+        assertThat(file.exists()).isTrue();
 
         // Write 1 byte because 0byte files are not valid in the picker db
         try (FileOutputStream fos = new FileOutputStream(file)) {

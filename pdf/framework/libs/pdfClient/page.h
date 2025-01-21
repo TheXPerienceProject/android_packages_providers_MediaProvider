@@ -26,6 +26,7 @@
 #include <utility>
 #include <vector>
 
+#include "annotation.h"
 #include "cpp/fpdf_scopers.h"
 #include "form_filler.h"
 #include "form_widget_info.h"
@@ -241,6 +242,20 @@ class Page {
     // the Page, we only modify the PageObject's attributes.
     bool UpdatePageObject(int index, std::unique_ptr<PageObject> page_object);
 
+    // Get all supported annotations. The list will contain null for the types of annotations
+    // which are not supported. Page will have ownership of annotations
+    std::vector<Annotation*> GetPageAnnotations();
+
+    // Add an annotation to the page
+    int AddPageAnnotation(std::unique_ptr<Annotation> annotation);
+
+    // Remove the annotation from the page at a given index
+    bool RemovePageAnnotation(int index);
+
+    // Update the attributes of the annotation on the Page. Ownership stays with
+    // the Page, we only modify the Annotation's attributes.
+    bool UpdatePageAnnotation(int index, std::unique_ptr<Annotation> annotation);
+
   private:
     // Convenience methods to access the variables dependent on an initialized
     // ScopedFPDFTextPage. We lazy init text_page_ for efficiency because many
@@ -352,6 +367,11 @@ class Page {
 
     // Populates page_objects_ with PageObjects on Page.
     void PopulatePageObjects(bool refetch);
+
+    // Annotations
+    std::vector<std::unique_ptr<Annotation>> annotations_;
+
+    void PopulateAnnotations();
 };
 
 }  // namespace pdfClient
