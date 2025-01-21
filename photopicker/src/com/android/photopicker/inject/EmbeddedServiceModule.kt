@@ -398,6 +398,7 @@ class EmbeddedServiceModule {
         @ApplicationContext context: Context,
         @Background backgroundDispatcher: CoroutineDispatcher,
         mediaProviderClient: MediaProviderClient,
+        @Background scope: CoroutineScope,
     ): PrefetchDataService {
 
         if (!::prefetchDataService.isInitialized) {
@@ -412,6 +413,7 @@ class EmbeddedServiceModule {
                     userMonitor,
                     context,
                     backgroundDispatcher,
+                    scope,
                 )
         }
         return prefetchDataService

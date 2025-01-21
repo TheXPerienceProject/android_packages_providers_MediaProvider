@@ -138,6 +138,22 @@ Point_d Page::UnapplyPageTransform(const Point_i& input) const {
     return output;
 }
 
+Point_f Page::PageToDevice(const Point_f& in) const {
+    // Get Device Coordinates from Page Coordinates
+    Point_i out;
+    FPDF_PageToDevice(page_.get(), 0, 0, Width(), Height(), 0, in.x, in.y, &out.x, &out.y);
+
+    return {static_cast<float>(out.x), static_cast<float>(out.y)};
+}
+
+Point_f Page::DeviceToPage(const Point_f& in) const {
+    // Get Page Coordinates from Device Coordinates
+    Point_d out;
+    FPDF_DeviceToPage(page_.get(), 0, 0, Width(), Height(), 0, in.x, in.y, &out.x, &out.y);
+
+    return {static_cast<float>(out.x), static_cast<float>(out.y)};
+}
+
 int Page::NumChars() {
     return FPDFText_CountChars(text_page());
 }
@@ -429,7 +445,7 @@ Rectangle_i Page::ConsumeInvalidRect() {
     return copy;
 }
 
-void* Page::page() {
+void* Page::Get() {
     return page_.get();
 }
 

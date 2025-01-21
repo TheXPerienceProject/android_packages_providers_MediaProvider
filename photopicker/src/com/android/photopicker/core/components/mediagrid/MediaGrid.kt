@@ -111,7 +111,7 @@ import com.android.photopicker.extensions.circleBackground
 import com.android.photopicker.extensions.insertMonthSeparators
 import com.android.photopicker.extensions.toMediaGridItemFromAlbum
 import com.android.photopicker.extensions.toMediaGridItemFromMedia
-import com.android.photopicker.extensions.transferGridTouchesToHostInEmbedded
+import com.android.photopicker.extensions.transferScrollableTouchesToHostInEmbedded
 import com.android.photopicker.util.LocalLocalizationHelper
 import com.android.photopicker.util.getMediaContentDescription
 import java.text.DateFormat
@@ -266,7 +266,7 @@ fun mediaGrid(
         columns = columns,
         modifier =
             if (SdkLevel.isAtLeastU() && isEmbedded && host != null) {
-                modifier.transferGridTouchesToHostInEmbedded(state, isExpanded, host)
+                modifier.transferScrollableTouchesToHostInEmbedded(state, isExpanded, host)
             } else {
                 modifier
             },

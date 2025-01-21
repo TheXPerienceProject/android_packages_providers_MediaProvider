@@ -39,14 +39,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.android.photopicker.R
 import com.android.photopicker.core.components.MediaGridItem
 import com.android.photopicker.core.components.mediaGrid
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
-import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
-import com.android.photopicker.core.embedded.LocalEmbeddedState
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.LocalEvents
 import com.android.photopicker.core.events.Telemetry
@@ -90,10 +89,6 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
     val events = LocalEvents.current
     val scope = rememberCoroutineScope()
 
-    val isEmbedded =
-        LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
-    val isExpanded = LocalEmbeddedState.current?.isExpanded ?: false
-
     // Use the expanded layout any time the Width is Medium or larger.
     val isExpandedScreen: Boolean =
         when (LocalWindowSizeClass.current.widthSizeClass) {
@@ -135,11 +130,6 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
         // the category content for the category that is selected by the user.
         mediaGrid(
             items = items,
-            userScrollEnabled =
-                when (isEmbedded) {
-                    true -> isExpanded
-                    false -> true
-                },
             onItemClick = { item ->
                 if (item is MediaGridItem.AlbumItem) {
                     // Dispatch events to log album related details
@@ -235,10 +225,19 @@ fun CategoryButton(modifier: Modifier) {
                         contentDescription = contentDescriptionString,
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.photopicker_categories_nav_button_label))
+                    Text(
+                        stringResource(R.string.photopicker_categories_nav_button_label),
+                        maxLines = 1, // Limit the text to a single line
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            else -> Text(stringResource(R.string.photopicker_categories_nav_button_label))
+            else ->
+                Text(
+                    stringResource(R.string.photopicker_categories_nav_button_label),
+                    maxLines = 1, // Limit the text to a single line
+                    overflow = TextOverflow.Ellipsis,
+                )
         }
     }
 }

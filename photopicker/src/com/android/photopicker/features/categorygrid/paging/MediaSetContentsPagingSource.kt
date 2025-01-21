@@ -76,6 +76,10 @@ class MediaSetContentsPagingSource(
                 }
             }
 
+        if (result is LoadResult.Page) {
+            Log.d(TAG, "Received ${result.data.size} media set contents from the data source.")
+        }
+
         return result
     }
 

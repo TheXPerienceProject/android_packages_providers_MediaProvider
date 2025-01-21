@@ -178,11 +178,12 @@ fun NavigationBarButton(
         onClick = onClick,
         modifier =
             if (categoryGridFeatureEnabled) {
-                modifier.widthIn(120.dp)
+                modifier.widthIn(min = 120.dp, max = 120.dp)
             } else {
                 modifier
             },
         shape = MaterialTheme.shapes.medium,
+        contentPadding = ButtonDefaults.TextButtonContentPadding,
         colors =
             if (isCurrentRoute(currentRoute ?: "")) {
                 ButtonDefaults.filledTonalButtonColors(

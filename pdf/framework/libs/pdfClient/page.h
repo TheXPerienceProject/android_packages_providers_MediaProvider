@@ -88,8 +88,20 @@ struct GotoLink {
     GotoLinkDest dest;
 };
 
+// Interface for converting coordinates between two spaces.
+class ICoordinateConverter {
+  public:
+    virtual ~ICoordinateConverter() = default;
+
+    // Convert a point from page coordinates to device coordinates
+    virtual Point_f PageToDevice(const Point_f& in) const = 0;
+
+    // Convert a point from device coordinates to page coordinates
+    virtual Point_f DeviceToPage(const Point_f& in) const = 0;
+};
+
 // Wrapper on a FPDF_PAGE that adds rendering functionality.
-class Page {
+class Page : public ICoordinateConverter {
   public:
     // FPDF_PAGE is opened when constructed.
     Page(FPDF_DOCUMENT doc, int page_num, FormFiller* form_filler);
@@ -121,6 +133,11 @@ class Page {
     // Transform from the external co-ordinate system (0, 0)-(Width(), Height())
     // back into the page's internal co-ordinate system.
     Point_d UnapplyPageTransform(const Point_i& input) const;
+
+    // ICoordinate Converter
+    Point_f PageToDevice(const Point_f& in) const override;
+
+    Point_f DeviceToPage(const Point_f& in) const override;
 
     int NumChars();
 
@@ -192,7 +209,7 @@ class Page {
     // Obtain form widget information for all form field annotations on the page,
     // optionally restricting by |type_ids| and store in |widget_infos|. See
     // fpdf_formfill.h for type constants. If |type_ids| is empty all form
-    // widgets on |page| will be added to |widget_infos|, if any.
+    // widgets on page will be added to |widget_infos|, if any.
     void GetFormWidgetInfos(const std::unordered_set<int>& type_ids,
                             std::vector<FormWidgetInfo>* widget_infos);
 
@@ -227,7 +244,7 @@ class Page {
     // Returns FPDF_PAGE. This Page retains ownership. All operations that wish
     // to access FPDF_PAGE should to call methods of this class instead of
     // requesting the FPDF_PAGE directly through this method.
-    void* page();
+    void* Get();
 
     // Get all PageObjects on this Page. Ownership of PageObjects is with Page.
     std::vector<PageObject*> GetPageObjects(bool refetch = false);
