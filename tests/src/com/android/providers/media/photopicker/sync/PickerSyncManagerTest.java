@@ -19,7 +19,7 @@ package com.android.providers.media.photopicker.sync;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.EXPIRED_SUGGESTIONS_RESET;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.EXTRA_MIME_TYPES;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_RESULTS_FULL_CACHE_RESET;
-import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_RESULTS_PARTIAL_CACHE_RESET;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_PARTIAL_CACHE_RESET;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_RESULTS_RESET_DELAY;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SHOULD_SYNC_GRANTS;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_CLOUD_ONLY;
@@ -818,7 +818,7 @@ public class PickerSyncManagerTest {
     public void testResetCloudSearchResults() {
         setupPickerSyncManager(/* schedulePeriodicSyncs */ false);
 
-        mPickerSyncManager.resetCloudSearchResults();
+        mPickerSyncManager.resetCloudSearchCache(null);
         verify(mMockWorkManager, times(1))
                 .enqueueUniqueWork(anyString(),
                         any(),
@@ -834,7 +834,7 @@ public class PickerSyncManagerTest {
                 .isEqualTo(SYNC_CLOUD_ONLY);
         assertThat(workRequest.getWorkSpec().input
                 .getInt(SYNC_WORKER_INPUT_RESET_TYPE, -1))
-                .isEqualTo(SEARCH_RESULTS_PARTIAL_CACHE_RESET);
+                .isEqualTo(SEARCH_PARTIAL_CACHE_RESET);
     }
 
     @Test

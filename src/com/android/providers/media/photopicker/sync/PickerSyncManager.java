@@ -35,6 +35,7 @@ import android.util.Log;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.work.Constraints;
 import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
@@ -52,8 +53,6 @@ import com.android.providers.media.flags.Flags;
 import com.android.providers.media.photopicker.data.PickerSyncRequestExtras;
 import com.android.providers.media.photopicker.v2.model.MediaInMediaSetSyncRequestParams;
 import com.android.providers.media.photopicker.v2.model.MediaSetsSyncRequestParams;
-
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -94,14 +93,14 @@ public class PickerSyncManager {
 
     /** Clears all search requests and search results from the database. */
     public static final int SEARCH_RESULTS_FULL_CACHE_RESET = 1;
-    /** Clears search results of the local or cloud provider from the database. */
-    public static final int SEARCH_RESULTS_PARTIAL_CACHE_RESET = 2;
+    /** Clears search results and suggestions of the local or cloud provider from the database. */
+    public static final int SEARCH_PARTIAL_CACHE_RESET = 2;
     /** Clears all expired history and cached suggestions from the database. */
     public static final int EXPIRED_SUGGESTIONS_RESET = 3;
 
     @IntDef(value = {
             SEARCH_RESULTS_FULL_CACHE_RESET,
-            SEARCH_RESULTS_PARTIAL_CACHE_RESET,
+            SEARCH_PARTIAL_CACHE_RESET,
             EXPIRED_SUGGESTIONS_RESET})
     @Retention(RetentionPolicy.SOURCE)
     public @interface SearchCacheResetType {}
@@ -532,15 +531,20 @@ public class PickerSyncManager {
     }
 
     /**
-     * Schedules work to reset all cloud search results synced in the database. This is used when
-     * the cloud media provider changes or the collection id of the cloud media provider changes
-     * indicating that a full reset of cloud media is required.
+     * Schedules work to reset all cloud search results and suggestions synced in the database.
+     * This is used when the cloud media provider changes or the collection id of the cloud media
+     * provider changes indicating that a full reset of cloud media is required.
+     *
+     * @param cloudAuthority Cloud authority might be null if there was an error in getting it.
      */
-    public void resetCloudSearchResults() {
-        final Data inputData =
-                new Data(Map.of(
-                        SYNC_WORKER_INPUT_SYNC_SOURCE, SYNC_CLOUD_ONLY,
-                        SYNC_WORKER_INPUT_RESET_TYPE, SEARCH_RESULTS_PARTIAL_CACHE_RESET));
+    public void resetCloudSearchCache(@Nullable String cloudAuthority) {
+        final Map<String, Object> inputMap = new HashMap<>();
+        inputMap.put(SYNC_WORKER_INPUT_SYNC_SOURCE, SYNC_CLOUD_ONLY);
+        inputMap.put(SYNC_WORKER_INPUT_RESET_TYPE, SEARCH_PARTIAL_CACHE_RESET);
+        if (cloudAuthority != null) {
+            inputMap.put(SYNC_WORKER_INPUT_AUTHORITY, cloudAuthority);
+        }
+        final Data inputData = new Data(inputMap);
 
         final OneTimeWorkRequest syncRequest =
                 buildOneTimeWorkerRequest(SearchResetWorker.class, inputData);
@@ -692,17 +696,17 @@ public class PickerSyncManager {
         }
     }
 
-    @NotNull
+    @NonNull
     private OneTimeWorkRequest buildOneTimeWorkerRequest(
-            @NotNull Class<? extends Worker> workerClass, @NonNull Data inputData) {
+            @NonNull Class<? extends Worker> workerClass, @NonNull Data inputData) {
         return new OneTimeWorkRequest.Builder(workerClass)
                 .setInputData(inputData)
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build();
     }
 
-    @NotNull
-    private PeriodicWorkRequest getPeriodicProactiveSyncRequest(@NotNull Data inputData) {
+    @NonNull
+    private PeriodicWorkRequest getPeriodicProactiveSyncRequest(@NonNull Data inputData) {
         return new PeriodicWorkRequest.Builder(
                 ProactiveSyncWorker.class, SYNC_MEDIA_PERIODIC_WORK_INTERVAL, TimeUnit.HOURS)
                 .setInputData(inputData)
@@ -710,8 +714,8 @@ public class PickerSyncManager {
                 .build();
     }
 
-    @NotNull
-    private PeriodicWorkRequest getPeriodicAlbumResetRequest(@NotNull Data inputData) {
+    @NonNull
+    private PeriodicWorkRequest getPeriodicAlbumResetRequest(@NonNull Data inputData) {
 
         return new PeriodicWorkRequest.Builder(
                         MediaResetWorker.class,
@@ -728,8 +732,8 @@ public class PickerSyncManager {
      * @return A PeriodicWorkRequest for periodically clearing expired search suggestions from
      * the database.
      */
-    @NotNull
-    private PeriodicWorkRequest getPeriodicSearchSuggestionsResetRequest(@NotNull Data inputData) {
+    @NonNull
+    private PeriodicWorkRequest getPeriodicSearchSuggestionsResetRequest(@NonNull Data inputData) {
 
         return new PeriodicWorkRequest.Builder(
                 SearchResetWorker.class,
@@ -744,8 +748,8 @@ public class PickerSyncManager {
      * @param inputData Input data required by the Worker.
      * @return A OneTimeWorkRequest for clearing all search results cache after an initial delay.
      */
-    @NotNull
-    private OneTimeWorkRequest getDelayedSearchResetRequest(@NotNull Data inputData) {
+    @NonNull
+    private OneTimeWorkRequest getDelayedSearchResetRequest(@NonNull Data inputData) {
         Constraints constraints =  new Constraints.Builder()
                 .setRequiresDeviceIdle(true)
                 .build();
@@ -758,8 +762,8 @@ public class PickerSyncManager {
                 .build();
     }
 
-    @NotNull
-    private OneTimeWorkRequest getOneTimeProactiveSyncRequest(@NotNull Data inputData) {
+    @NonNull
+    private OneTimeWorkRequest getOneTimeProactiveSyncRequest(@NonNull Data inputData) {
         Constraints constraints =  new Constraints.Builder()
                 .setRequiresBatteryNotLow(true)
                 .build();
@@ -771,7 +775,7 @@ public class PickerSyncManager {
                 .build();
     }
 
-    @NotNull
+    @NonNull
     private static Constraints getRequiresChargingAndIdleConstraints() {
         return new Constraints.Builder()
                 .setRequiresCharging(true)

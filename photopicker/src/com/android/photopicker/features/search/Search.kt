@@ -754,14 +754,19 @@ fun SuggestionItem(suggestion: SearchSuggestion) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(MEASUREMENT_SUGGESTION_ITEM_PADDING),
     ) {
-        Box(
-            modifier =
-                Modifier.background(MaterialTheme.colorScheme.surface, CircleShape).padding(6.dp)
-        ) {
-            Icon(
-                imageVector = getImageVector(suggestion.type),
-                contentDescription = suggestion.displayText ?: "",
-            )
+        if (suggestion.type == SearchSuggestionType.FACE) {
+            ShowSuggestionIcon(suggestion, Modifier.size(MEASUREMENT_OTHER_ICON).clip(CircleShape))
+        } else {
+            Box(
+                modifier =
+                    Modifier.background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .padding(6.dp)
+            ) {
+                Icon(
+                    imageVector = getImageVector(suggestion.type),
+                    contentDescription = suggestion.displayText ?: "",
+                )
+            }
         }
         val text = suggestion.displayText ?: ""
         Text(text = text, modifier = Modifier.padding(start = MEASUREMENT_LARGE_PADDING).weight(1f))

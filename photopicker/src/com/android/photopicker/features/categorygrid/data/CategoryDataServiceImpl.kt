@@ -260,7 +260,6 @@ class CategoryDataServiceImpl(
                 val pagingSource =
                     MediaSetContentsPagingSource(
                         contentResolver = contentResolver,
-                        availableProviders = availableProviders,
                         parentMediaSet = mediaSet,
                         mediaProviderClient = mediaProviderClient,
                         dispatcher = dispatcher,

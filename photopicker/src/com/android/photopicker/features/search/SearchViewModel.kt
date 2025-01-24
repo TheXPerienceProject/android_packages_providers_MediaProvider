@@ -75,11 +75,11 @@ constructor(
 ) : ViewModel() {
 
     companion object {
+        private const val SEARCH_RESULT_GRID_PAGE_SIZE = 50
+        private const val SEARCH_RESULT_GRID_MAX_ITEMS_IN_MEMORY = SEARCH_RESULT_GRID_PAGE_SIZE * 10
         const val HISTORY_SUGGESTION_MAX_LIMIT = 3
         const val FACE_SUGGESTION_MAX_LIMIT = 6
         const val ALL_SUGGESTION_MAX_LIMIT = 6
-        const val SEARCH_RESULT_GRID_PAGE_SIZE = 50
-        const val SEARCH_RESULT_GRID_MAX_ITEMS_IN_MEMORY = SEARCH_RESULT_GRID_PAGE_SIZE * 10
     }
 
     // Check if a scope override was injected before using the default [viewModelScope]

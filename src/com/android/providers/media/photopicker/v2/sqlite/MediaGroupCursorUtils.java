@@ -249,7 +249,6 @@ public class MediaGroupCursorUtils {
 
         // Get list of local ids if local copy exists for corresponding cloud ids.
         final Map<String, String> cloudToLocalIdMap = getLocalIds(uris);
-
         if (cursor.moveToFirst()) {
             if (cursor.getCount() > 1) {
                 Log.e(TAG, "Only one category of type PEOPLE AND PETS is expected but received "

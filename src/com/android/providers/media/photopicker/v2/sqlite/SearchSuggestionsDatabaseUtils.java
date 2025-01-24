@@ -387,6 +387,45 @@ public class SearchSuggestionsDatabaseUtils {
     }
 
     /**
+     * Clear all cached search suggestions for the given authority.
+     *
+     * @param database SQLiteDatabase object that holds DB connections.
+     * @param providerAuthority The provider authority for which all suggestions need to be cleared.
+     *                         If the authority is null, all cached suggestions will be cleared to
+     *                         be on the safer side.
+     * @return the number of items deleted from the database.
+     */
+    public static int clearCachedSearchSuggestionsForAuthority(
+            @NonNull SQLiteDatabase database,
+            @Nullable String providerAuthority) {
+        requireNonNull(database);
+
+        String whereClause = null;
+        String[] whereArgs = null;
+        if (providerAuthority != null) {
+            whereClause = String.format(
+                    Locale.ROOT,
+                    " %s = ? ",
+                    PickerSQLConstants.SearchSuggestionsTableColumns.AUTHORITY);
+
+            whereArgs = List.of(providerAuthority).toArray(new String[0]);
+        }
+
+        int suggestionsDeletionCount =
+                database.delete(
+                        PickerSQLConstants.Table.SEARCH_SUGGESTION.name(),
+                        whereClause,
+                        whereArgs);
+
+        Log.d(TAG, String.format(
+                Locale.ROOT,
+                "Deleted %s rows in search suggestions table",
+                suggestionsDeletionCount));
+
+        return suggestionsDeletionCount;
+    }
+
+    /**
      * Clear all expired history search suggestions from the database.
      *
      * @param database SQLiteDatabase object that holds DB connections.
@@ -404,6 +443,52 @@ public class SearchSuggestionsDatabaseUtils {
                 PickerSQLConstants.SearchHistoryTableColumns.CREATION_TIME_MS);
 
         final String[] whereArgs = List.of(creationThreshold.toString()).toArray(new String[0]);
+
+        int historyDeletionCount =
+                database.delete(
+                        PickerSQLConstants.Table.SEARCH_HISTORY.name(),
+                        whereClause,
+                        whereArgs);
+
+        Log.d(TAG, String.format(
+                Locale.ROOT,
+                "Deleted %s rows in search history table",
+                historyDeletionCount));
+        return historyDeletionCount;
+    }
+
+    /**
+     * Clear all expired history search suggestions from the database that were sourced from the
+     * given authority.
+     *
+     * @param database SQLiteDatabase object that holds DB connections.
+     * @param providerAuthority The provider authority for which all suggestions need to be cleared.
+     *                          If the authority is null, all suggestion search requests stored in
+     *                          the history table will be cleared to  be on the safer side.
+     * @return the number of items deleted from the database.
+     */
+    public static int clearHistorySearchSuggestionsForAuthority(
+            @NonNull SQLiteDatabase database,
+            @Nullable String providerAuthority) {
+        requireNonNull(database);
+
+        final String whereClause;
+        final String[] whereArgs;
+        if (providerAuthority != null) {
+            whereClause = String.format(
+                    Locale.ROOT,
+                    " %s = ? ",
+                    PickerSQLConstants.SearchHistoryTableColumns.AUTHORITY);
+
+            whereArgs = List.of(providerAuthority).toArray(new String[0]);
+        } else {
+            whereClause = String.format(
+                    Locale.ROOT,
+                    " %s IS NOT NULL ",
+                    PickerSQLConstants.SearchHistoryTableColumns.AUTHORITY);
+
+            whereArgs = null;
+        }
 
         int historyDeletionCount =
                 database.delete(

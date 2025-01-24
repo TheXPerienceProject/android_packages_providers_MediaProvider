@@ -600,7 +600,6 @@ class MediaProviderClientTest {
                 pageKey = MediaPageKey(),
                 pageSize = 5,
                 contentResolver = testContentResolver,
-                availableProviders = testContentProvider.providers,
                 parentMediaSet = testContentProvider.mediaSets[0],
                 config =
                     PhotopickerConfiguration(

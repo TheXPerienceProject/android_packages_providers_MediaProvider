@@ -16,6 +16,7 @@
 
 package com.android.photopicker.features.search
 
+import android.util.Log
 import com.android.photopicker.features.search.model.SearchSuggestion
 
 /**
@@ -23,6 +24,7 @@ import com.android.photopicker.features.search.model.SearchSuggestion
  * prefix
  */
 class SearchSuggestionCache {
+    private val TAG = "SearchSuggestionCache"
     private var cacheSuggestion: HashMap<String, List<SearchSuggestion>> = java.util.HashMap()
 
     /**
@@ -47,6 +49,7 @@ class SearchSuggestionCache {
 
     /** Clears the cached suggestions from the map. */
     fun clearSuggestions() {
+        Log.d(TAG, "Clearing search suggestions cache.")
         cacheSuggestion.clear()
     }
 }

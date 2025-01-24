@@ -752,6 +752,88 @@ public class SearchSuggestionsDatabaseUtilTest {
     }
 
     @Test
+    public void testClearCachedSuggestionsForAuthority() {
+        final String authority1 = "com.random.authority1";
+        final String authority2 = "com.random.authority2";
+        SearchSuggestion searchSuggestion1 = new SearchSuggestion(
+                /* searchText */ null,
+                "media-set-id1",
+                authority1,
+                SEARCH_SUGGESTION_ALBUM,
+                /* coverMediaId */ null
+        );
+        SearchSuggestion searchSuggestion2 = new SearchSuggestion(
+                /* searchText */ "test",
+                "media-set-id2",
+                authority2,
+                SEARCH_SUGGESTION_ALBUM,
+                /* coverMediaId */ null
+        );
+
+        SearchSuggestionsDatabaseUtils.cacheSearchSuggestions(
+                mDatabase, authority1, List.of(searchSuggestion1));
+        SearchSuggestionsDatabaseUtils.cacheSearchSuggestions(
+                mDatabase, authority2, List.of(searchSuggestion2));
+
+        int rowsDeletedCount =
+                SearchSuggestionsDatabaseUtils.clearCachedSearchSuggestionsForAuthority(
+                        mDatabase, authority1);
+        assertWithMessage("Unexpected number of cached suggestions deleted.")
+                .that(rowsDeletedCount)
+                .isEqualTo(1);
+
+        rowsDeletedCount =
+                SearchSuggestionsDatabaseUtils.clearCachedSearchSuggestionsForAuthority(
+                        mDatabase, null);
+        assertWithMessage("Unexpected number of cached suggestions deleted.")
+                .that(rowsDeletedCount)
+                .isEqualTo(1);
+    }
+
+    @Test
+    public void testClearHistorySuggestionsForAuthority() {
+        final String authority1 = "com.random.authority1";
+        final String authority2 = "com.random.authority2";
+
+        SearchRequest searchRequest1 = new SearchTextRequest(
+                /* mimeTypes */ null,
+                "summer"
+        );
+        SearchRequest searchRequest2 = new SearchSuggestionRequest(
+                /* mimeTypes */ null,
+                /* searchText */ null,
+                "media-set-id1",
+                authority1,
+                SEARCH_SUGGESTION_ALBUM
+        );
+        SearchRequest searchRequest3 = new SearchSuggestionRequest(
+                /* mimeTypes */ null,
+                /* searchText */ "test",
+                "media-set-id2",
+                authority2,
+                SEARCH_SUGGESTION_ALBUM
+        );
+
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest1);
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest2);
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest3);
+
+        int rowsDeletedCount =
+                SearchSuggestionsDatabaseUtils.clearHistorySearchSuggestionsForAuthority(
+                        mDatabase, authority1);
+        assertWithMessage("Unexpected number of history suggestions deleted.")
+                .that(rowsDeletedCount)
+                .isEqualTo(1);
+
+        rowsDeletedCount =
+                SearchSuggestionsDatabaseUtils.clearHistorySearchSuggestionsForAuthority(
+                        mDatabase, null);
+        assertWithMessage("Unexpected number of history suggestions deleted.")
+                .that(rowsDeletedCount)
+                .isEqualTo(1);
+    }
+
+    @Test
     public void testSaveDuplicateSearchHistorySuggestion() {
         final String searchText = "mountains";
         final SearchTextRequest searchRequest = new SearchTextRequest(

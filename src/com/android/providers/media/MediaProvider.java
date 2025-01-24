@@ -1301,12 +1301,24 @@ public class MediaProvider extends ContentProvider {
         }
     }
 
+    @VisibleForTesting
+    protected String[] getDefaultFolderNames() {
+        return DEFAULT_FOLDER_NAMES;
+    }
+
+    @VisibleForTesting
+    protected List<String> getFoldersToSkipInDefaultCreation() {
+        return StringUtils.getStringArrayConfig(getContext(),
+                R.array.config_foldersToSkipInDefaultCreation);
+    }
+
     /**
      * Ensure that default folders are created on mounted storage devices.
      * We only do this once per volume so we don't annoy the user if deleted
-     * manually.
+     * manually. Folders in the exclusion list are not created.
      */
-    private void ensureDefaultFolders(@NonNull MediaVolume volume, @NonNull SQLiteDatabase db) {
+    @VisibleForTesting
+    protected void ensureDefaultFolders(@NonNull MediaVolume volume, @NonNull SQLiteDatabase db) {
         if (volume.shouldSkipDefaultDirCreation()) {
             // Default folders should not be automatically created inside volumes managed from
             // outside Android.
@@ -1326,13 +1338,26 @@ public class MediaProvider extends ContentProvider {
         }
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+        // Get case insensitive exclusion list.
+        List<String> exclusionList =
+                Flags.enableExclusionListForDefaultFolders()
+                        ? getFoldersToSkipInDefaultCreation().stream().map(
+                        String::toLowerCase).collect(Collectors.toList())
+                        : List.of();
         if (prefs.getInt(key, 0) == 0) {
-            for (String folderName : DEFAULT_FOLDER_NAMES) {
+            for (String folderName : getDefaultFolderNames()) {
                 final File folder = new File(volume.getPath(), folderName);
-                if (!folder.exists()) {
-                    folder.mkdirs();
-                    insertDirectory(db, folder.getAbsolutePath());
+                if (folder.exists()) {
+                    continue;
                 }
+                if (Flags.enableExclusionListForDefaultFolders() && exclusionList.contains(
+                        folderName.toLowerCase(Locale.ROOT))) {
+                    // Do not create mobile-centric folders for PC.
+                    Log.d(TAG, "Excluding " + folder + " from default creation");
+                    continue;
+                }
+                folder.mkdirs();
+                insertDirectory(db, folder.getAbsolutePath());
             }
 
             SharedPreferences.Editor editor = prefs.edit();
