@@ -119,6 +119,7 @@ class SearchViewModelTest {
                     events,
                     configurationManager,
                 )
+            advanceTimeBy(1000)
             viewModel.fetchSuggestions("abc")
             advanceTimeBy(1000)
             val suggestionLists = viewModel.suggestionLists.value
@@ -253,6 +254,7 @@ class SearchViewModelTest {
                 events,
                 configurationManager,
             )
+        advanceTimeBy(1000)
         val query = "test query"
         assertWithMessage("Initial Cached suggestions is not empty")
             .that(viewModel.getCachedSuggestions().getSuggestions(query))
@@ -287,6 +289,8 @@ class SearchViewModelTest {
                 events,
                 configurationManager,
             )
+
+        advanceTimeBy(1000)
         val query = "test query"
         viewModel.fetchSuggestions(query)
         advanceTimeBy(1000)

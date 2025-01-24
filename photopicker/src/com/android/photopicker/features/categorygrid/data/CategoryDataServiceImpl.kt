@@ -17,12 +17,15 @@
 package com.android.photopicker.features.categorygrid.data
 
 import android.content.ContentResolver
+import android.database.ContentObserver
+import android.net.Uri
 import android.os.CancellationSignal
 import android.util.Log
 import androidx.paging.PagingSource
 import com.android.photopicker.core.configuration.PhotopickerConfiguration
 import com.android.photopicker.core.events.Events
 import com.android.photopicker.data.DataService
+import com.android.photopicker.data.MEDIA_SETS_UPDATE_URI
 import com.android.photopicker.data.MediaProviderClient
 import com.android.photopicker.data.NotificationService
 import com.android.photopicker.data.model.Group
@@ -35,7 +38,11 @@ import com.android.photopicker.features.categorygrid.paging.MediaSetContentsPagi
 import com.android.photopicker.features.categorygrid.paging.MediaSetsPagingSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -80,6 +87,14 @@ class CategoryDataServiceImpl(
         MutableMap<Group.MediaSet, PagingSource<MediaPageKey, Media>> =
         mutableMapOf()
 
+    // Callback flow that listens to changes in media sets and emits the category id when
+    // a change is observed.
+    private var mediaSetsUpdateCallbackFlow: Flow<String>? = null
+
+    // Saves the current job that collects the [mediaSetsUpdateCallbackFlow].
+    // Cancel this job when there is a change in the current profile's content resolver.
+    private var mediaSetsUpdateCollectJob: Job? = null
+
     init {
         // Listen to available provider changes and clear category cache when required.
         scope.launch(dispatcher) {
@@ -109,6 +124,66 @@ class CategoryDataServiceImpl(
                 }
             }
         }
+
+        scope.launch(dispatcher) {
+            dataService.activeContentResolver.collect { activeContentResolver: ContentResolver ->
+                Log.d(CategoryDataService.TAG, "Active content resolver has changed")
+
+                // Stop collecting media sets from previously initialised callback flow
+                mediaSetsUpdateCollectJob?.cancel()
+                mediaSetsUpdateCallbackFlow = initMediaSetsCallbackFlow(activeContentResolver)
+
+                mediaSetsUpdateCollectJob =
+                    scope.launch(dispatcher) {
+                        mediaSetsUpdateCallbackFlow?.collect { categoryId: String ->
+                            Log.d(
+                                CategoryDataService.TAG,
+                                "MediaSets update notification " +
+                                    "received for category id " +
+                                    categoryId,
+                            )
+                            cachedPagingSourceMutex.withLock {
+                                getMediaSetPagingSourceForCategoryId(categoryId)?.invalidate()
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
+    private fun initMediaSetsCallbackFlow(resolver: ContentResolver): Flow<String> = callbackFlow {
+        val observer =
+            object : ContentObserver(/* handler */ null) {
+                override fun onChange(selfChange: Boolean, uri: Uri?) {
+                    // Verify that the categoryId is present in the uri
+                    if (uri?.pathSegments?.size == (MEDIA_SETS_UPDATE_URI.pathSegments.size + 1)) {
+                        val categoryId: String = uri.lastPathSegment ?: "-1"
+                        trySend(categoryId)
+                    }
+                }
+            }
+
+        // Register the content observer callback.
+        notificationService.registerContentObserverCallback(
+            resolver,
+            MEDIA_SETS_UPDATE_URI,
+            /*notifyForDescendants*/ true,
+            observer,
+        )
+
+        // Unregister when the flow is closed.
+        awaitClose { notificationService.unregisterContentObserverCallback(resolver, observer) }
+    }
+
+    private fun getMediaSetPagingSourceForCategoryId(
+        categoryId: String
+    ): PagingSource<GroupPageKey, Group.MediaSet>? {
+        for (category in mediaSetPagingSources.keys) {
+            if (category.id == categoryId) {
+                return mediaSetPagingSources[category]
+            }
+        }
+        return null
     }
 
     override fun getCategories(

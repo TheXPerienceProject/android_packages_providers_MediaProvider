@@ -120,7 +120,10 @@ constructor(
         fetchSuggestions("")
         // Listen to available provider changes and clear search suggestions cache.
         scope.launch(backgroundDispatcher) {
-            dataService.availableProviders.collect { suggestionCache.clearSuggestions() }
+            dataService.availableProviders.collect {
+                suggestionCache.clearSuggestions()
+                fetchSuggestions("")
+            }
         }
     }
 
