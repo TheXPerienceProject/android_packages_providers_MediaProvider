@@ -27,8 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -45,6 +47,10 @@ import com.android.photopicker.core.components.mediaGrid
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
 import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
 import com.android.photopicker.core.embedded.LocalEmbeddedState
+import com.android.photopicker.core.events.Event
+import com.android.photopicker.core.events.LocalEvents
+import com.android.photopicker.core.events.Telemetry
+import com.android.photopicker.core.features.FeatureToken
 import com.android.photopicker.core.navigation.LocalNavController
 import com.android.photopicker.core.navigation.PhotopickerDestinations
 import com.android.photopicker.core.obtainViewModel
@@ -52,6 +58,7 @@ import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.data.model.Group
 import com.android.photopicker.extensions.navigateToMediaSetContentGrid
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 /** The number of grid cells per row for Phone / narrow layouts */
 private val CELLS_PER_ROW_FOR_MEDIASET_GRID = 3
@@ -79,6 +86,9 @@ fun MediaSetGrid(
             val items = remember(category) { viewModel.getMediaSets(category) }
             val state = rememberLazyGridState()
             val navController = LocalNavController.current
+            val scope = rememberCoroutineScope()
+            val events = LocalEvents.current
+            val configuration = LocalPhotopickerConfiguration.current
 
             val isEmbedded =
                 LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
@@ -127,10 +137,30 @@ fun MediaSetGrid(
                             items = mediaSetItems,
                             onItemClick = { item ->
                                 if (item is MediaGridItem.PersonMediaSetItem) {
+                                    scope.launch {
+                                        events.dispatch(
+                                            Event.LogPhotopickerUIEvent(
+                                                FeatureToken.CATEGORY_GRID.token,
+                                                configuration.sessionId,
+                                                configuration.callingPackageUid ?: -1,
+                                                Telemetry.UiEvent.CATEGORY_PEOPLEPET_OPEN,
+                                            )
+                                        )
+                                    }
                                     navController.navigateToMediaSetContentGrid(
                                         mediaSet = item.mediaSet
                                     )
                                 } else if (item is MediaGridItem.MediaSetItem) {
+                                    scope.launch {
+                                        events.dispatch(
+                                            Event.LogPhotopickerUIEvent(
+                                                FeatureToken.CATEGORY_GRID.token,
+                                                configuration.sessionId,
+                                                configuration.callingPackageUid ?: -1,
+                                                Telemetry.UiEvent.PICKER_CATEGORIES_INTERACTION,
+                                            )
+                                        )
+                                    }
                                     navController.navigateToMediaSetContentGrid(
                                         mediaSet = item.mediaSet
                                     )
@@ -149,6 +179,17 @@ fun MediaSetGrid(
                                 PaddingValues(MEASUREMENT_HORIZONTAL_CELL_SPACING_MEDIASET_GRID),
                             state = state,
                         )
+                        LaunchedEffect(Unit) {
+                            // Dispatch UI event to log loading of category contents
+                            events.dispatch(
+                                Event.LogPhotopickerUIEvent(
+                                    FeatureToken.CATEGORY_GRID.token,
+                                    configuration.sessionId,
+                                    configuration.callingPackageUid ?: -1,
+                                    Telemetry.UiEvent.UI_LOADED_MEDIA_SETS,
+                                )
+                            )
+                        }
                     }
                 }
             }

@@ -629,6 +629,8 @@ private fun ShowSuggestions(
         LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
     val host = LocalEmbeddedState.current?.host
     val isExpanded = rememberUpdatedState(LocalEmbeddedState.current?.isExpanded ?: false)
+    val events = LocalEvents.current
+    val configuration = LocalPhotopickerConfiguration.current
 
     val historySuggestions = suggestionLists.history
     val faceSuggestions = suggestionLists.face
@@ -684,6 +686,16 @@ private fun ShowSuggestions(
                     isZeroSearchState,
                 )
             }
+        }
+        LaunchedEffect(Unit) {
+            events.dispatch(
+                Event.LogPhotopickerUIEvent(
+                    FeatureToken.SEARCH.token,
+                    configuration.sessionId,
+                    configuration.callingPackageUid ?: -1,
+                    Telemetry.UiEvent.UI_LOADED_SEARCH_SUGGESTIONS,
+                )
+            )
         }
     }
 }
@@ -953,6 +965,17 @@ private fun ResultMediaGrid(
                         }
                     },
                     state = state,
+                )
+            }
+            LaunchedEffect(Unit) {
+                // Dispatch UI event to log loading of search result contents
+                events.dispatch(
+                    Event.LogPhotopickerUIEvent(
+                        FeatureToken.SEARCH.token,
+                        configuration.sessionId,
+                        configuration.callingPackageUid ?: -1,
+                        Telemetry.UiEvent.UI_LOADED_SEARCH_RESULTS,
+                    )
                 )
             }
         }

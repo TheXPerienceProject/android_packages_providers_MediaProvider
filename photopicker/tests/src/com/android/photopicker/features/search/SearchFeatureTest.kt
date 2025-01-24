@@ -361,7 +361,7 @@ class SearchFeatureTest : PhotopickerFeatureBaseTest() {
                 .assertIsDisplayed()
                 .performClick()
             composeTestRule.waitForIdle()
-            advanceTimeBy(100)
+            advanceTimeBy(1000)
 
             // Asserts search view page with its placeholder text displayed
             composeTestRule
@@ -380,7 +380,7 @@ class SearchFeatureTest : PhotopickerFeatureBaseTest() {
                 .assert(hasClickAction())
                 .performClick()
             composeTestRule.waitForIdle()
-            advanceTimeBy(100)
+            advanceTimeBy(1000)
 
             // Search bar with Search text placeholder is displayed
             composeTestRule
@@ -406,7 +406,7 @@ class SearchFeatureTest : PhotopickerFeatureBaseTest() {
                 .onNode(hasText(resources.getString(R.string.photopicker_search_placeholder_text)))
                 .performClick()
             composeTestRule.waitForIdle()
-            advanceTimeBy(100)
+            advanceTimeBy(1000)
 
             // Input test query in search bar and verify it is displayed
             val testQuery = "testquery"
@@ -427,7 +427,7 @@ class SearchFeatureTest : PhotopickerFeatureBaseTest() {
                 )
                 .performClick()
             composeTestRule.waitForIdle()
-            advanceTimeBy(100)
+            advanceTimeBy(1000)
 
             // Make sure test query is cleared and Search text placeholder is displayed
             composeTestRule.onNodeWithText(testQuery).assertIsNotDisplayed()
