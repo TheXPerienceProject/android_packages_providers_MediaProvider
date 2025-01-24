@@ -24,11 +24,13 @@
 
 using pdfClient::Color;
 using pdfClient::Document;
+using pdfClient::ICoordinateConverter;
 using pdfClient::ImageObject;
 using pdfClient::LinuxFileOps;
 using pdfClient::Matrix;
 using pdfClient::PageObject;
 using pdfClient::PathObject;
+using pdfClient::Point_f;
 using pdfClient::Rectangle_i;
 using pdfClient::SelectionBoundary;
 using std::string;
@@ -136,15 +138,16 @@ jobject ToJavaList(JNIEnv* env, const vector<T>& input,
 
 // Copy a C++ vector to a java ArrayList, using the given function to convert.
 template <class T>
-jobject ToJavaList(JNIEnv* env, const vector<T*>& input,
-                   jobject (*ToJavaObject)(JNIEnv* env, const T*)) {
+jobject ToJavaList(JNIEnv* env, const vector<T*>& input, ICoordinateConverter* converter,
+                   jobject (*ToJavaObject)(JNIEnv* env, const T*,
+                                           ICoordinateConverter* converter)) {
     static jclass arraylist_class = GetPermClassRef(env, kArrayList);
     static jmethodID init = env->GetMethodID(arraylist_class, "<init>", "(I)V");
     static jmethodID add = env->GetMethodID(arraylist_class, "add", funcsig("Z", kObject).c_str());
 
     jobject java_list = env->NewObject(arraylist_class, init, input.size());
     for (size_t i = 0; i < input.size(); i++) {
-        jobject java_object = ToJavaObject(env, input[i]);
+        jobject java_object = ToJavaObject(env, input[i], converter);
         env->CallBooleanMethod(java_list, add, java_object);
         env->DeleteLocalRef(java_object);
     }
@@ -448,7 +451,8 @@ jobject ToJavaMatrix(JNIEnv* env, const Matrix matrix) {
     return java_matrix;
 }
 
-jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments) {
+jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments,
+                   ICoordinateConverter* converter) {
     // Find Java Path class.
     static jclass path_class = GetPermClassRef(env, kPath);
     // Get the constructor methodID.
@@ -459,19 +463,21 @@ jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments
 
     // Set Path Segments in Java.
     for (auto& segment : segments) {
+        // Get PageToDevice Coordinates
+        Point_f output = converter->PageToDevice({segment.x, segment.y});
         switch (segment.command) {
             case PathObject::Segment::Command::Move: {
                 static jmethodID move_to =
                         env->GetMethodID(path_class, "moveTo", funcsig("V", "F", "F").c_str());
 
-                env->CallVoidMethod(java_path, move_to, segment.x, segment.y);
+                env->CallVoidMethod(java_path, move_to, output.x, output.y);
                 break;
             }
             case PathObject::Segment::Command::Line: {
                 static jmethodID line_to =
                         env->GetMethodID(path_class, "lineTo", funcsig("V", "F", "F").c_str());
 
-                env->CallVoidMethod(java_path, line_to, segment.x, segment.y);
+                env->CallVoidMethod(java_path, line_to, output.x, output.y);
                 break;
             }
             default:
@@ -488,7 +494,8 @@ jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments
     return java_path;
 }
 
-jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object) {
+jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object,
+                            ICoordinateConverter* converter) {
     // Check for Native Supported Object.
     if (!page_object) {
         return NULL;
@@ -508,7 +515,7 @@ jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object) {
                     env->GetMethodID(path_object_class, "<init>", funcsig("V", kPath).c_str());
 
             // Create Java Path from Native PathSegments.
-            jobject java_path = ToJavaPath(env, path_object->segments);
+            jobject java_path = ToJavaPath(env, path_object->segments, converter);
 
             // Create Java PathObject Instance.
             java_page_object = env->NewObject(path_object_class, init_path, java_path);
@@ -580,8 +587,9 @@ jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object) {
     return java_page_object;
 }
 
-jobject ToJavaPdfPageObjects(JNIEnv* env, const vector<PageObject*>& page_objects) {
-    return ToJavaList(env, page_objects, &ToJavaPdfPageObject);
+jobject ToJavaPdfPageObjects(JNIEnv* env, const vector<PageObject*>& page_objects,
+                             ICoordinateConverter* converter) {
+    return ToJavaList(env, page_objects, converter, &ToJavaPdfPageObject);
 }
 
 Color ToNativeColor(JNIEnv* env, jobject java_color) {
@@ -601,7 +609,8 @@ Color ToNativeColor(JNIEnv* env, jobject java_color) {
     return Color(red, green, blue, alpha);
 }
 
-std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object) {
+std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object,
+                                               ICoordinateConverter* converter) {
     // Find Java PageObject class and GetType
     static jclass page_object_class = GetPermClassRef(env, kPageObject);
     static jmethodID get_type = env->GetMethodID(page_object_class, "getPdfObjectType", "()I");
@@ -641,12 +650,13 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
             // Set PathObject Data PathSegments.
             auto& segments = path_object->segments;
             for (int i = 0; i < size; i += 3) {
+                // Get DeviceToPage Coordinates
+                Point_f output =
+                        converter->DeviceToPage({path_approximate[i + 1], path_approximate[i + 2]});
                 if (i == 0 || path_approximate[i] == path_approximate[i - 3]) {
-                    segments.emplace_back(PathObject::Segment::Command::Move,
-                                          path_approximate[i + 1], path_approximate[i + 2]);
+                    segments.emplace_back(PathObject::Segment::Command::Move, output.x, output.y);
                 } else {
-                    segments.emplace_back(PathObject::Segment::Command::Line,
-                                          path_approximate[i + 1], path_approximate[i + 2]);
+                    segments.emplace_back(PathObject::Segment::Command::Line, output.x, output.y);
                 }
             }
 

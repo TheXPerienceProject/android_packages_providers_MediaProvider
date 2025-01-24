@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -67,6 +68,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,11 +89,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.android.modules.utils.build.SdkLevel
 import com.android.photopicker.R
 import com.android.photopicker.core.components.EmptyState
 import com.android.photopicker.core.components.MediaGridItem
 import com.android.photopicker.core.components.mediaGrid
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
+import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
+import com.android.photopicker.core.embedded.LocalEmbeddedState
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.LocalEvents
 import com.android.photopicker.core.events.Telemetry
@@ -105,6 +110,7 @@ import com.android.photopicker.core.obtainViewModel
 import com.android.photopicker.core.selection.LocalSelection
 import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.extensions.navigateToPreviewMedia
+import com.android.photopicker.extensions.transferScrollableTouchesToHostInEmbedded
 import com.android.photopicker.features.preview.PreviewFeature
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
@@ -612,11 +618,26 @@ private fun ShowSuggestions(
     modifier: Modifier,
     onSuggestionClick: (SearchSuggestion) -> Unit,
 ) {
+    val isEmbedded =
+        LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
+    val host = LocalEmbeddedState.current?.host
+    val isExpanded = rememberUpdatedState(LocalEmbeddedState.current?.isExpanded ?: false)
+
     val historySuggestions = suggestionLists.history
     val faceSuggestions = suggestionLists.face
     val otherSuggestions = suggestionLists.other
+
+    val state = rememberLazyListState()
     Box(modifier = modifier.padding(MEASUREMENT_LARGE_PADDING)) {
-        LazyColumn {
+        LazyColumn(
+            modifier =
+                if (SdkLevel.isAtLeastU() && isEmbedded && host != null) {
+                    modifier.transferScrollableTouchesToHostInEmbedded(state, isExpanded, host)
+                } else {
+                    modifier
+                },
+            state = state,
+        ) {
             item { Spacer(modifier = Modifier.height(MEASUREMENT_MEDIUM_PADDING)) }
             items(historySuggestions.take(SearchViewModel.HISTORY_SUGGESTION_MAX_LIMIT)) {
                 suggestion ->

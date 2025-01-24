@@ -10454,15 +10454,17 @@ public class MediaProvider extends ContentProvider {
         // Hence, we check the mPendingOpenInfo object (populated when opens are initiated from
         // MediaProvider) if there's a pending open from MediaProvider with matching tid and uid and
         // use the shouldRedact decision there if there's one.
+        PendingOpenInfo info;
         synchronized (mPendingOpenInfo) {
-            PendingOpenInfo info = mPendingOpenInfo.get(tid);
-            if (info != null && info.uid == original_uid) {
-                boolean shouldRedact = info.shouldRedact;
-                if (shouldRedact) {
-                    return RedactionUtils.getRedactionRanges(file);
-                } else {
-                    return new long[0];
-                }
+            info = mPendingOpenInfo.get(tid);
+        }
+
+        if (info != null && info.uid == original_uid) {
+            boolean shouldRedact = info.shouldRedact;
+            if (shouldRedact) {
+                return RedactionUtils.getRedactionRanges(file);
+            } else {
+                return new long[0];
             }
         }
 

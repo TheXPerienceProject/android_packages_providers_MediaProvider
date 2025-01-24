@@ -190,7 +190,7 @@ TEST(Test, InvalidPageNumberTest) {
     // The above call succeeds and returns a non-null ptr.
     ASSERT_NE(nullptr, page);
     // Even though the underlying pointer is null.
-    ASSERT_EQ(nullptr, page->page());
+    ASSERT_EQ(nullptr, page->Get());
 
     // Rest of the calls should give some default values.
     EXPECT_EQ(-1, page->NumChars());
