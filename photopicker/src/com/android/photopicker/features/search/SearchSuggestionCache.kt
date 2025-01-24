@@ -44,4 +44,9 @@ class SearchSuggestionCache {
     fun addSuggestions(query: String, suggestions: List<SearchSuggestion>) {
         cacheSuggestion.put(query, suggestions)
     }
+
+    /** Clears the cached suggestions from the map. */
+    fun clearSuggestions() {
+        cacheSuggestion.clear()
+    }
 }

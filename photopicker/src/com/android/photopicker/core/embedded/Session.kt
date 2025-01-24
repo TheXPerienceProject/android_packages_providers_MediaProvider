@@ -207,7 +207,7 @@ open class Session(
     private val _stateManager: EmbeddedStateManager
     private val _onBackInvokedCallback: OnBackInvokedCallback
 
-    fun getView() = _view
+    fun getView(): ComposeView = _view
 
     open val surfacePackage: SurfaceControlViewHost.SurfacePackage
         get() {
@@ -269,6 +269,7 @@ open class Session(
         startListeningToTelemetryEvents()
 
         _view = createPhotopickerComposeView(context)
+        _onBackInvokedCallback = setupBackInvokedCallback()
         _host = createSurfaceControlViewHost(context, displayId, hostToken)
         // This initialization should happen only after receiving the [_host]
         _stateManager =
@@ -292,8 +293,6 @@ open class Session(
         } catch (e: RemoteException) {
             this.binderDied()
         }
-
-        _onBackInvokedCallback = setupBackInvokedCallback()
     }
 
     override fun close() {

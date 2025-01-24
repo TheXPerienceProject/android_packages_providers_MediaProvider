@@ -17,6 +17,7 @@
 package com.android.photopicker.features.search
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -385,8 +386,14 @@ fun SearchInputContent(
     searchState: SearchState,
     modifier: Modifier,
 ) {
+    // BackHandler to intercept the system back button press when focused
+    BackHandler(enabled = focused) {
+        onFocused(false)
+        onSearchQueryChanged("")
+    }
     when (
-        searchState is SearchState.Active.SuggestionSearch &&
+        focused &&
+            searchState is SearchState.Active.SuggestionSearch &&
             searchState.suggestion.type == SearchSuggestionType.FACE
     ) {
         true -> {

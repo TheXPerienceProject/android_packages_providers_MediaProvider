@@ -31,6 +31,7 @@ import com.android.photopicker.core.events.Telemetry
 import com.android.photopicker.core.features.FeatureToken
 import com.android.photopicker.core.selection.Selection
 import com.android.photopicker.core.selection.SelectionModifiedResult
+import com.android.photopicker.data.DataService
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.extensions.insertMonthSeparators
 import com.android.photopicker.extensions.toMediaGridItemFromMedia
@@ -38,6 +39,7 @@ import com.android.photopicker.features.search.data.SearchDataService
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
 import com.android.photopicker.features.search.model.UserSearchStateInfo
+import com.google.common.annotations.VisibleForTesting
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -66,6 +68,7 @@ constructor(
     private val scopeOverride: CoroutineScope?,
     @Background val backgroundDispatcher: CoroutineDispatcher,
     private val searchDataService: SearchDataService,
+    private val dataService: DataService,
     private val selection: Selection<Media>,
     private val events: Events,
     private val configurationManager: ConfigurationManager,
@@ -115,6 +118,10 @@ constructor(
 
     init {
         fetchSuggestions("")
+        // Listen to available provider changes and clear search suggestions cache.
+        scope.launch(backgroundDispatcher) {
+            dataService.availableProviders.collect { suggestionCache.clearSuggestions() }
+        }
     }
 
     /**
@@ -310,6 +317,11 @@ constructor(
         }
         _suggestionLists.value = SuggestionLists(history, face, other)
         return result
+    }
+
+    @VisibleForTesting
+    fun getCachedSuggestions(): SearchSuggestionCache {
+        return suggestionCache
     }
 }
 

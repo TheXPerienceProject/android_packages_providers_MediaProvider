@@ -119,7 +119,7 @@ public class PickerSyncManager {
     private static final int SYNC_MEDIA_PERIODIC_WORK_INTERVAL = 4; // Time unit is hours.
     private static final int RESET_ALBUM_MEDIA_PERIODIC_WORK_INTERVAL = 12; // Time unit is hours.
     // Time unit is days.
-    private static final int RESET_SEARCH_SUGGESTIONS_PERIODIC_WORK_INTERVAL = 7;
+    private static final int RESET_SEARCH_SUGGESTIONS_PERIODIC_WORK_INTERVAL = 1;
     static final int SEARCH_RESULTS_RESET_DELAY = 30; // Time unit is minutes.
 
     public static final String PERIODIC_SYNC_WORK_NAME;

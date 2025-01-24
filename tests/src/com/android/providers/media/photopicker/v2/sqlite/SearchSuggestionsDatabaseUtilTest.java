@@ -751,6 +751,46 @@ public class SearchSuggestionsDatabaseUtilTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    public void testSaveDuplicateSearchHistorySuggestion() {
+        final String searchText = "mountains";
+        final SearchTextRequest searchRequest = new SearchTextRequest(
+                /* mimeTypes */ null,
+                searchText
+        );
+
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest);
+        SearchSuggestionsDatabaseUtils.saveSearchHistory(mDatabase, searchRequest);
+
+        final List<SearchSuggestion> searchSuggestions =
+                SearchSuggestionsDatabaseUtils.getHistorySuggestions(
+                        mDatabase,
+                        getSearchSuggestionQuery(
+                                /* providers */ List.of(),
+                                /* limit */ 10));
+
+        assertWithMessage("Search history suggestions cannot be null")
+                .that(searchSuggestions)
+                .isNotNull();
+        assertWithMessage("Unexpected number of search history suggestions.")
+                .that(searchSuggestions.size())
+                .isEqualTo(1);
+
+        final SearchSuggestion result = searchSuggestions.get(0);
+        assertWithMessage("Search history search text is not as expected")
+                .that(result.getSearchText())
+                .isEqualTo(searchText);
+        assertWithMessage("Search history media set id is not as expected")
+                .that(result.getMediaSetId())
+                .isNull();
+        assertWithMessage("Search history authority is not as expected")
+                .that(result.getAuthority())
+                .isNull();
+        assertWithMessage("Search history suggestion type is not as expected")
+                .that(result.getSearchSuggestionType())
+                .isEqualTo(SEARCH_SUGGESTION_HISTORY);
+    }
+
     private Cursor getCursor(@NonNull List<SearchSuggestion> searchSuggestions) {
         final MatrixCursor cursor = new MatrixCursor(
                 CloudMediaProviderContract.SearchSuggestionColumns.ALL_PROJECTION);

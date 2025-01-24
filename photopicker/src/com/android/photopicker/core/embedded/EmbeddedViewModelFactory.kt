@@ -125,6 +125,7 @@ class EmbeddedViewModelFactory(
                         null,
                         backgroundDispatcher,
                         searchDataService.get(),
+                        dataService.get(),
                         selection.get(),
                         events.get(),
                         configurationManager.get(),
