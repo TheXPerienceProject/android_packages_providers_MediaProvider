@@ -912,7 +912,16 @@ private fun ResultMediaGrid(
                                 item = item.media,
                                 selectionLimitExceededMessage = selectionLimitExceededMessage,
                             )
-                            // TODO: (b/381876944) Log Ui Event after adding search enum
+                            scope.launch {
+                                events.dispatch(
+                                    Event.LogPhotopickerUIEvent(
+                                        FeatureToken.SEARCH.token,
+                                        configuration.sessionId,
+                                        configuration.callingPackageUid ?: -1,
+                                        Telemetry.UiEvent.SELECT_SEARCH_RESULT,
+                                    )
+                                )
+                            }
                         }
                     },
                     onItemLongPress = { item ->
