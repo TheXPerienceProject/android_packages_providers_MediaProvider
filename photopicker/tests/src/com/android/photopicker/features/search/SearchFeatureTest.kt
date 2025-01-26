@@ -59,7 +59,7 @@ import com.android.photopicker.core.features.PrefetchResultKey
 import com.android.photopicker.core.selection.Selection
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.features.PhotopickerFeatureBaseTest
-import com.android.photopicker.features.search.model.SearchEnabledState
+import com.android.photopicker.features.search.model.GlobalSearchState
 import com.android.photopicker.inject.PhotopickerTestModule
 import com.android.photopicker.tests.HiltTestActivity
 import com.android.providers.media.flags.Flags
@@ -139,7 +139,7 @@ class SearchFeatureTest : PhotopickerFeatureBaseTest() {
             PrefetchResultKey.SEARCH_STATE to
                 runBlocking {
                     async {
-                        return@async SearchEnabledState.ENABLED
+                        return@async GlobalSearchState.ENABLED
                     }
                 }
         )

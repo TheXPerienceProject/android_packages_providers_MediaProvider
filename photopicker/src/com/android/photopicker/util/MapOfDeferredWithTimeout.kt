@@ -52,7 +52,7 @@ suspend fun <A, B> mapOfDeferredWithTimeout(
                             result
                         }
                     } catch (e: RuntimeException) {
-                        Log.e(TAG, "An error occurred in fetching result for key: $key")
+                        Log.e(TAG, "An error occurred in fetching result for key: $key", e)
                         null
                     }
                 }

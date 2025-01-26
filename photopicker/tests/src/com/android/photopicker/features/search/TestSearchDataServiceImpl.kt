@@ -23,9 +23,9 @@ import com.android.photopicker.data.model.Media
 import com.android.photopicker.data.model.MediaPageKey
 import com.android.photopicker.data.paging.FakeInMemoryMediaPagingSource
 import com.android.photopicker.features.search.data.SearchDataService
-import com.android.photopicker.features.search.model.SearchEnabledState
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
+import com.android.photopicker.features.search.model.UserSearchStateInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -37,8 +37,8 @@ class TestSearchDataServiceImpl() : SearchDataService {
     var mediaSetSize: Int = FakeInMemoryMediaPagingSource.DEFAULT_SIZE
     var mediaList: List<Media>? = null
 
-    override val isSearchEnabled: StateFlow<SearchEnabledState> =
-        MutableStateFlow(SearchEnabledState.ENABLED)
+    override val userSearchStateInfo: StateFlow<UserSearchStateInfo> =
+        MutableStateFlow(UserSearchStateInfo(listOf("test_provider")))
 
     override suspend fun getSearchSuggestions(
         prefix: String,

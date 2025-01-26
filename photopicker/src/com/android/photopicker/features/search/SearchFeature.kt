@@ -31,7 +31,7 @@ import com.android.photopicker.core.features.PhotopickerUiFeature
 import com.android.photopicker.core.features.PrefetchResultKey
 import com.android.photopicker.core.features.Priority
 import com.android.photopicker.data.PrefetchDataService
-import com.android.photopicker.features.search.model.SearchEnabledState
+import com.android.photopicker.features.search.model.GlobalSearchState
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 
@@ -51,7 +51,7 @@ class SearchFeature : PhotopickerUiFeature {
                 mapOf(
                     PrefetchResultKey.SEARCH_STATE to
                         { prefetchDataService ->
-                            prefetchDataService.getSearchState()
+                            prefetchDataService.getGlobalSearchState()
                         }
                 )
             } else {
@@ -72,7 +72,9 @@ class SearchFeature : PhotopickerUiFeature {
                 val searchStatus: Any? =
                     deferredPrefetchResultsMap[PrefetchResultKey.SEARCH_STATE]?.await()
                 when (searchStatus) {
-                    is SearchEnabledState -> searchStatus == SearchEnabledState.ENABLED
+                    is GlobalSearchState ->
+                        searchStatus == GlobalSearchState.ENABLED ||
+                            searchStatus == GlobalSearchState.ENABLED_IN_OTHER_PROFILES_ONLY
                     else -> false // prefetch may have timed out
                 }
             }

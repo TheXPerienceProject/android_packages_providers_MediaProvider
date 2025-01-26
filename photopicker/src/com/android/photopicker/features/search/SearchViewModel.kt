@@ -35,9 +35,9 @@ import com.android.photopicker.data.model.Media
 import com.android.photopicker.extensions.insertMonthSeparators
 import com.android.photopicker.extensions.toMediaGridItemFromMedia
 import com.android.photopicker.features.search.data.SearchDataService
-import com.android.photopicker.features.search.model.SearchEnabledState
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
+import com.android.photopicker.features.search.model.UserSearchStateInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -109,7 +109,7 @@ constructor(
      *
      * This `StateFlow` emits updates whenever the search enabled state of a profile changes.
      */
-    val searchEnabled: StateFlow<SearchEnabledState> = searchDataService.isSearchEnabled
+    val userSearchStateInfo: StateFlow<UserSearchStateInfo> = searchDataService.userSearchStateInfo
 
     private val suggestionCache = SearchSuggestionCache()
 

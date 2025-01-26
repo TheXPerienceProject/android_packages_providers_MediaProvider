@@ -16,13 +16,18 @@
 
 package com.android.photopicker.features.search.model
 
-/** This represents the search enabled states the current profile could have. */
-enum class SearchEnabledState {
+/**
+ * This represents valid global search states.
+ *
+ * Global search state refers to the search state of all user profiles available on the device.
+ */
+enum class GlobalSearchState() {
     /* Search is enabled for the current profile */
     ENABLED,
-    /* Search is disabled in the current profile but enabled in other profiles */
+    /* Search is disabled in the current profile but enabled in at least one of the
+     * other profiles */
     ENABLED_IN_OTHER_PROFILES_ONLY,
-    /* Search is disabled in all profiles */
+    /* Search is disabled in current profile and other profiles */
     DISABLED,
     /* Either the state of the current profile is unknown, or the current profile has search
      * disabled and the state of other profile(s) is unknown. */

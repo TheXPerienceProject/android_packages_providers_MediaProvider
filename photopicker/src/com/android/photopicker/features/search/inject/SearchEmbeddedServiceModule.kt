@@ -63,6 +63,7 @@ class SearchEmbeddedServiceModule {
         configurationManager: ConfigurationManager,
         @Background scope: CoroutineScope,
         @Background dispatcher: CoroutineDispatcher,
+        mediaProviderClient: MediaProviderClient,
         notificationService: NotificationService,
         events: Events,
     ): SearchDataService {
@@ -83,7 +84,7 @@ class SearchEmbeddedServiceModule {
                     scope,
                     dispatcher,
                     notificationService,
-                    MediaProviderClient(),
+                    mediaProviderClient,
                     events,
                 )
             return searchDataService
