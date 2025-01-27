@@ -64,6 +64,7 @@ import com.android.providers.media.photopicker.v2.sqlite.SelectSQLiteQueryBuilde
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mock;
 
@@ -209,8 +210,8 @@ public class MediaInMediaSetsSyncWorkerTest {
                             PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName()));
         }
 
-        final Cursor inputCursor = SearchProvider.DEFAULT_CLOUD_SEARCH_RESULTS;
-        SearchProvider.setSearchResults(inputCursor);
+        final Cursor inputCursor = SearchProvider.getDefaultCloudSearchResults();
+        SearchProvider.setMediaSetContents(inputCursor);
 
         final OneTimeWorkRequest request =
                 new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)
@@ -329,8 +330,8 @@ public class MediaInMediaSetsSyncWorkerTest {
                             PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName()));
         }
 
-        final Cursor inputCursor = SearchProvider.DEFAULT_LOCAL_SEARCH_RESULTS;
-        SearchProvider.setSearchResults(inputCursor);
+        final Cursor inputCursor = SearchProvider.getDefaultLocalSearchResults();
+        SearchProvider.setMediaSetContents(inputCursor);
 
         final OneTimeWorkRequest request =
                 new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)
@@ -403,6 +404,86 @@ public class MediaInMediaSetsSyncWorkerTest {
                 .markSyncCompleted(any());
     }
 
+    @Test
+    @Ignore("Enable when b/391639613 is fixed")
+    public void testMediaSetContentsSyncLoop() throws
+            ExecutionException, InterruptedException {
+
+        String categoryId = "categoryId";
+        String auth = String.valueOf(SYNC_CLOUD_ONLY);
+        long mediaSetPickerId = 1L;
+        Cursor c = getCursorForMediaSetInsertionTest();
+        List<String> mimeTypes = new ArrayList<>();
+        mimeTypes.add("img");
+
+        int mediaSetsInserted = MediaSetsDatabaseUtil.cacheMediaSets(
+                mDatabase, c, categoryId, auth, mimeTypes);
+        assertEquals("Count of inserted media sets should be equal to the cursor size",
+                /*expected*/ c.getCount(), /*actual*/ mediaSetsInserted);
+        Bundle extras = new Bundle();
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, auth);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, categoryId);
+        extras.putStringArrayList(
+                MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                new ArrayList<String>(mimeTypes));
+        MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
+        Cursor fetchMediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
+                mDatabase, requestParams);
+        if (fetchMediaSetCursor.moveToFirst()) {
+            mediaSetPickerId = fetchMediaSetCursor.getLong(
+                    fetchMediaSetCursor.getColumnIndexOrThrow(
+                            PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName()));
+        }
+
+        final Cursor inputCursor = SearchProvider.getDefaultCloudSearchResults();
+        final String repeatPageToken = "LOOP";
+        final Bundle bundle = new Bundle();
+        bundle.putString(CloudMediaProviderContract.EXTRA_PAGE_TOKEN, repeatPageToken);
+        inputCursor.setExtras(bundle);
+        SearchProvider.setMediaSetContents(inputCursor);
+
+        final OneTimeWorkRequest request =
+                new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)
+                        .setInputData(new Data(
+                                Map.of(
+                                        SYNC_WORKER_INPUT_SYNC_SOURCE, SYNC_CLOUD_ONLY,
+                                        SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID, mediaSetPickerId,
+                                        SYNC_WORKER_INPUT_AUTHORITY, SearchProvider.AUTHORITY)))
+                        .build();
+
+        // Test run
+        final WorkManager workManager = WorkManager.getInstance(mContext);
+        workManager.enqueue(request).getResult().get();
+
+        // Verify
+        final WorkInfo workInfo = workManager.getWorkInfoById(request.getId()).get();
+        assertThat(workInfo.getState()).isEqualTo(WorkInfo.State.SUCCEEDED);
+
+        try (Cursor mediaInMediaSetsTableCursor = mDatabase.rawQuery(
+                new SelectSQLiteQueryBuilder(mDatabase).setTables(
+                        PickerSQLConstants.Table.MEDIA_IN_MEDIA_SETS.name()
+                ).buildQuery(), null
+        )) {
+            assertWithMessage("Cursor should not be null")
+                    .that(mediaInMediaSetsTableCursor)
+                    .isNotNull();
+
+            assertWithMessage("Cursor count is not as expected")
+                    .that(mediaInMediaSetsTableCursor.getCount())
+                    .isEqualTo(inputCursor.getCount());
+        }
+
+        verify(mMockLocalMediaInMediaSetTracker, times(/* wantedNumberOfInvocations */ 0))
+                .createSyncFuture(any());
+        verify(mMockLocalMediaInMediaSetTracker, times(/* wantedNumberOfInvocations */ 0))
+                .markSyncCompleted(any());
+
+        verify(mMockCloudMediaInMediaSetTracker, times(/* wantedNumberOfInvocations */ 0))
+                .createSyncFuture(any());
+        verify(mMockCloudMediaInMediaSetTracker, times(/* wantedNumberOfInvocations */ 1))
+                .markSyncCompleted(any());
+    }
+
     private Cursor getCursorForMediaSetInsertionTest() {
         String[] columns = new String[]{
                 CloudMediaProviderContract.MediaSetColumns.ID,
@@ -450,8 +531,8 @@ public class MediaInMediaSetsSyncWorkerTest {
         MediaSetsDatabaseUtil.updateMediaInMediaSetSyncResumeKey(
                 mDatabase, mediaSetPickerId, SYNC_COMPLETE_RESUME_KEY);
 
-        final Cursor inputCursor = SearchProvider.DEFAULT_CLOUD_SEARCH_RESULTS;
-        SearchProvider.setSearchResults(inputCursor);
+        final Cursor inputCursor = SearchProvider.getDefaultCloudSearchResults();
+        SearchProvider.setMediaSetContents(inputCursor);
 
         final OneTimeWorkRequest request =
                 new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)

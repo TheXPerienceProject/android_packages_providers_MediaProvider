@@ -153,6 +153,16 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
                     }
                     navController.navigateToAlbumMediaGridForCategories(album = item.album)
                 } else if (item is MediaGridItem.CategoryItem) {
+                    scope.launch {
+                        events.dispatch(
+                            Event.LogPhotopickerUIEvent(
+                                FeatureToken.CATEGORY_GRID.token,
+                                configuration.sessionId,
+                                configuration.callingPackageUid ?: -1,
+                                Telemetry.UiEvent.CATEGORY_MEDIA_SETS_OPEN,
+                            )
+                        )
+                    }
                     navController.navigateToMediaSetGrid(category = item.category)
                 }
             },
@@ -168,14 +178,14 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
             state = state,
         )
         LaunchedEffect(Unit) {
-            // Dispatch UI event to denote loading of media albums
+            // Dispatch UI event to denote loading of media categories and albums
             scope.launch {
                 events.dispatch(
                     Event.LogPhotopickerUIEvent(
                         FeatureToken.CATEGORY_GRID.token,
                         configuration.sessionId,
                         configuration.callingPackageUid ?: -1,
-                        Telemetry.UiEvent.UI_LOADED_ALBUMS,
+                        Telemetry.UiEvent.UI_LOADED_CATEGORIES_AND_ALBUMS,
                     )
                 )
             }

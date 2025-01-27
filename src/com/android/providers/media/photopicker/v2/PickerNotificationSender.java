@@ -19,6 +19,7 @@ package com.android.providers.media.photopicker.v2;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.ALBUM_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.AVAILABLE_PROVIDERS_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.MEDIA_PATH_SEGMENT;
+import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.MEDIA_SETS_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.PICKER_INTERNAL_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.PICKER_V2_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.SEARCH_RESULT_MEDIA_PATH_SEGMENT;
@@ -79,6 +80,15 @@ public class PickerNotificationSender {
             .appendPath(PICKER_INTERNAL_PATH_SEGMENT)
             .appendPath(PICKER_V2_PATH_SEGMENT)
             .appendPath(SEARCH_RESULT_MEDIA_PATH_SEGMENT)
+            .appendPath(UPDATE_PATH_SEGMENT)
+            .build();
+
+    private static final Uri MEDIA_SETS_UPDATE_URI = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_CONTENT)
+            .authority(MediaStore.AUTHORITY)
+            .appendPath(PICKER_INTERNAL_PATH_SEGMENT)
+            .appendPath(PICKER_V2_PATH_SEGMENT)
+            .appendPath(MEDIA_SETS_PATH_SEGMENT)
             .appendPath(UPDATE_PATH_SEGMENT)
             .build();
 
@@ -150,6 +160,31 @@ public class PickerNotificationSender {
         context.getContentResolver().notifyChange(
                 getSearchResultsUpdateUri(searchRequestId),
                 /* observer= */ null);
+    }
+
+    /**
+     * Send media sets update notification to the registered
+     * {@link android.database.ContentObserver}-s.
+     * @param context The application context.
+     * @param categoryId Category ID for which the media sets have updated.
+     */
+    public static void notifyMediaSetsChange(
+            @NonNull Context context,
+            @NonNull String categoryId) {
+        requireNonNull(context);
+        requireNonNull(categoryId);
+        Log.d(TAG, "Sending notification for media sets update for the "
+                + "given categoryId " + categoryId);
+        context.getContentResolver().notifyChange(
+                getMediaSetsUpdateUri(categoryId), /* observer */ null
+        );
+    }
+
+    private static Uri getMediaSetsUpdateUri(@NonNull String categoryId) {
+        return MEDIA_SETS_UPDATE_URI
+                .buildUpon()
+                .appendPath(categoryId)
+                .build();
     }
 
     private static Uri getAlbumMediaUpdateUri(

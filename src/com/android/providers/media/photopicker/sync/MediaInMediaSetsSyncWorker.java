@@ -45,8 +45,10 @@ import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteEx
 import com.android.providers.media.photopicker.v2.sqlite.MediaInMediaSetsDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.MediaSetsDatabaseUtil;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * This is a {@link Worker} class responsible for syncing the media items of a media set with the
@@ -142,6 +144,11 @@ public class MediaInMediaSetsSyncWorker extends Worker {
             return;
         }
 
+        final Set<String> knownTokens = new HashSet<>();
+        if (resumePageToken != null) {
+            knownTokens.add(resumePageToken);
+        }
+
         try {
             for (int currentIteration = 0; currentIteration < SYNC_PAGE_COUNT; currentIteration++) {
                 checkIfWorkerHasStopped();
@@ -162,8 +169,16 @@ public class MediaInMediaSetsSyncWorker extends Worker {
                     resumePageToken = getResumePageToken(mediaInMediaSetsCursor.getExtras());
 
                     if (resumePageToken.equals(SYNC_COMPLETE_RESUME_KEY)) {
+                        Log.d(TAG, "Number of media set results pages synced: "
+                                + (currentIteration + 1));
+                        break;
+                    } else if (knownTokens.contains(resumePageToken)) {
+                        Log.e(TAG, "Loop detected! CMP has sent the same page token twice: "
+                                + resumePageToken);
                         break;
                     }
+                    knownTokens.add(resumePageToken);
+
                     // mark sync as complete
                     markMediaInMediaSetSyncAsComplete(syncSource, getId());
                 }

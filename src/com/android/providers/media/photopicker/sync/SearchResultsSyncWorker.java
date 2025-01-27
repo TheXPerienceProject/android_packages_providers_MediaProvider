@@ -53,8 +53,10 @@ import com.android.providers.media.photopicker.v2.model.SearchTextRequest;
 import com.android.providers.media.photopicker.v2.sqlite.SearchRequestDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.SearchResultsDatabaseUtil;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * This is a {@link Worker} class responsible for syncing search results media with the
@@ -128,7 +130,9 @@ public class SearchResultsSyncWorker extends Worker {
                     syncSource, searchRequestId), e);
             return ListenableWorker.Result.failure();
         } finally {
-            markSearchResultsSyncAsComplete(syncSource, getId());
+            if (!mMarkedSyncWorkAsComplete) {
+                markSearchResultsSyncAsComplete(syncSource, getId());
+            }
         }
     }
 
@@ -166,7 +170,12 @@ public class SearchResultsSyncWorker extends Worker {
             return;
         }
 
+        final Set<String> knownTokens = new HashSet<>();
         String nextPageToken = resumeKey.first;
+        if (nextPageToken != null) {
+            knownTokens.add(nextPageToken);
+        }
+
         try {
             for (int iteration = 0; iteration < SYNC_PAGE_COUNT; iteration++) {
                 throwIfWorkerStopped();
@@ -188,7 +197,12 @@ public class SearchResultsSyncWorker extends Worker {
                         Log.d(TAG, "Number of search results pages synced: " + (iteration + 1));
                         // Stop syncing if there are no more pages to sync.
                         break;
+                    } else if (knownTokens.contains(nextPageToken)) {
+                        Log.e(TAG, "Loop detected! CMP has sent the same page token twice: "
+                                + nextPageToken);
+                        break;
                     }
+                    knownTokens.add(nextPageToken);
 
                     // Mark sync as completed after getting the first page to start returning
                     // search results to the UI.
@@ -271,6 +285,7 @@ public class SearchResultsSyncWorker extends Worker {
         }
     }
 
+    @NonNull
     private Pair<String, String> getResumeKey(
             @NonNull SearchRequest searchRequest,
             @PickerSyncManager.SyncSource int syncSource) {

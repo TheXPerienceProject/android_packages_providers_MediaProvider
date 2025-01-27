@@ -218,7 +218,7 @@ constructor(
     fun handleMediaSetItemSelection(item: Media, selectionLimitExceededMessage: String) {
         // Update the selectable values in the received media item.
         val updatedMediaItem =
-            Media.withSelectable(item, /* selectionSource */ Telemetry.MediaLocation.ALBUM, null)
+            Media.withSelectable(item, /* selectionSource */ Telemetry.MediaLocation.CATEGORY, null)
         scope.launch {
             val result = selection.toggle(updatedMediaItem)
             if (result == FAILURE_SELECTION_LIMIT_EXCEEDED) {

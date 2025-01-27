@@ -171,6 +171,17 @@ fun PhotoGrid(viewModel: PhotoGridViewModel = obtainViewModel()) {
                         } else if (
                             featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
                         ) {
+                            // Dispatch UI event to indicate switching to collections tab
+                            scope.launch {
+                                events.dispatch(
+                                    Event.LogPhotopickerUIEvent(
+                                        FeatureToken.CATEGORY_GRID.token,
+                                        configuration.sessionId,
+                                        configuration.callingPackageUid ?: -1,
+                                        Telemetry.UiEvent.SWITCH_PICKER_TAB,
+                                    )
+                                )
+                            }
                             navController.navigateToCategoryGrid()
                         }
                     }

@@ -248,6 +248,15 @@ flag {
 }
 
 flag {
+    name: "enable_exclusion_list_for_default_folders"
+    is_exported: true
+    namespace: "mediaprovider"
+    description: "This flag will prevent folders on the exclusion list being created during default folder creation."
+    is_fixed_read_only: true
+    bug: "381310841"
+}
+
+flag {
     name: "enable_photopicker_expressive_theme"
     is_exported: false
     namespace: "mediaprovider"
