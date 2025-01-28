@@ -27,7 +27,6 @@ import com.android.photopicker.data.MediaProviderClient
 import com.android.photopicker.data.model.Group
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.data.model.MediaPageKey
-import com.android.photopicker.data.model.Provider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
@@ -38,7 +37,6 @@ import kotlinx.coroutines.withContext
  */
 class MediaSetContentsPagingSource(
     val contentResolver: ContentResolver,
-    private val availableProviders: List<Provider>,
     private val parentMediaSet: Group.MediaSet,
     private val mediaProviderClient: MediaProviderClient,
     private val dispatcher: CoroutineDispatcher,
@@ -57,15 +55,10 @@ class MediaSetContentsPagingSource(
         val result =
             withContext(dispatcher) {
                 try {
-                    if (availableProviders.isEmpty()) {
-                        throw IllegalArgumentException("No available providers found.")
-                    }
-
                     mediaProviderClient.fetchMediaSetContents(
                         pageKey,
                         pageSize,
                         contentResolver,
-                        availableProviders,
                         parentMediaSet,
                         configuration,
                         cancellationSignal,

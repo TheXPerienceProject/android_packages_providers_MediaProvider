@@ -888,7 +888,7 @@ public class PickerDataLayerV2 {
         if (cloudAuthority != null) {
             Log.d(TAG, "Waiting for cloud search results");
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudSearchSyncTracker(), /* timeoutInMillis */ 3000);
+                    SyncTrackerRegistry.getCloudSearchSyncTracker(), /* timeoutInMillis */ 5000);
         }
     }
 
@@ -903,12 +903,17 @@ public class PickerDataLayerV2 {
     private static void waitForOngoingMediaInMediaSetSync(
             @Nullable String localAuthority,
             @Nullable String cloudAuthority) {
+        if (localAuthority != null && cloudAuthority != null) {
+            Log.w(TAG, "Media sets sync can only happen with either the local provider or a "
+                    + "cloud provider for a parent category. Please check the input providers.");
+        }
         if (localAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
                     SyncTrackerRegistry.getLocalMediaInMediaSetTracker(), /*timeoutInMillis*/ 500);
-        } else if (cloudAuthority != null) {
+        }
+        if (cloudAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudMediaInMediaSetTracker(), /*timeoutInMillis*/ 500);
+                    SyncTrackerRegistry.getCloudMediaInMediaSetTracker(), /*timeoutInMillis*/ 2000);
         }
     }
 
@@ -923,12 +928,17 @@ public class PickerDataLayerV2 {
     private static void waitForOngoingMediaSetsSync(
             @Nullable String localAuthority,
             @Nullable String cloudAuthority) {
+        if (localAuthority != null && cloudAuthority != null) {
+            Log.w(TAG, "Media set contents sync can only happen with either the local provider or"
+                    + " a cloud provider for a parent category. Please check the input providers.");
+        }
         if (localAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
                     SyncTrackerRegistry.getLocalMediaSetsSyncTracker(), /*timeoutInMillis*/ 500);
-        } else if (cloudAuthority != null) {
+        }
+        if (cloudAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudMediaSetsSyncTracker(), /*timeoutInMillis*/ 500);
+                    SyncTrackerRegistry.getCloudMediaSetsSyncTracker(), /*timeoutInMillis*/ 2000);
         }
     }
 
@@ -1472,7 +1482,9 @@ public class PickerDataLayerV2 {
 
                 final PickerSyncManager syncManager =
                         new PickerSyncManager(getWorkManager(context), context);
-                syncManager.resetCloudSearchResults();
+                final String cloudAuthority = PickerSyncController.getInstanceOrThrow()
+                        .getCloudProviderOrDefault(null);
+                syncManager.resetCloudSearchCache(cloudAuthority);
             }
         } catch (Exception e) {
             Log.e(TAG, "Unexpected error occurred in handleCloudMediaReset", e);

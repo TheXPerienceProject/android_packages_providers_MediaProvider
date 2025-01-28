@@ -130,7 +130,6 @@ import com.android.providers.media.photopicker.v2.sqlite.SearchSuggestionsQuery;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import libcore.junit.util.compat.CoreCompatChangeRule;
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
 
 import org.junit.After;
@@ -1097,7 +1096,6 @@ public class PickerDataLayerV2Test {
 
     @Test
     @DisableFlags(Flags.FLAG_REVOKE_ACCESS_OWNED_PHOTOS)
-    @CoreCompatChangeRule.DisableCompatChanges({MediaProvider.ENABLE_OWNED_PHOTOS})
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
     public void testFetchMediaGrantsCount() {
         int testUid = 123;

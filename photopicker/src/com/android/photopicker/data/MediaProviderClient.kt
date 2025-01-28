@@ -699,10 +699,7 @@ open class MediaProviderClient {
             bundleOf(
                 MediaQuery.PICKER_ID.key to pageKey.pickerId,
                 MediaQuery.PAGE_SIZE.key to pageSize,
-                MediaQuery.PROVIDERS.key to
-                    ArrayList<String>().apply {
-                        availableProviders.forEach { provider -> add(provider.authority) }
-                    },
+                MediaQuery.PROVIDERS.key to arrayListOf(parentCategory.authority),
                 EXTRA_MIME_TYPES to config.mimeTypes,
                 EXTRA_INTENT_ACTION to config.action,
                 MediaSetsQuery.PARENT_CATEGORY_ID.key to parentCategory.id,
@@ -739,7 +736,6 @@ open class MediaProviderClient {
         pageKey: MediaPageKey,
         pageSize: Int,
         contentResolver: ContentResolver,
-        availableProviders: List<Provider>,
         parentMediaSet: Group.MediaSet,
         config: PhotopickerConfiguration,
         cancellationSignal: CancellationSignal?,
@@ -748,10 +744,7 @@ open class MediaProviderClient {
             bundleOf(
                 MediaQuery.PICKER_ID.key to pageKey.pickerId,
                 MediaQuery.PAGE_SIZE.key to pageSize,
-                MediaQuery.PROVIDERS.key to
-                    ArrayList<String>().apply {
-                        availableProviders.forEach { provider -> add(provider.authority) }
-                    },
+                MediaQuery.PROVIDERS.key to arrayListOf(parentMediaSet.authority),
                 EXTRA_MIME_TYPES to config.mimeTypes,
                 EXTRA_INTENT_ACTION to config.action,
                 MediaSetContentsQuery.PARENT_MEDIA_SET_PICKER_ID.key to parentMediaSet.pickerId,

@@ -17,6 +17,7 @@
 package com.android.photopicker.features.search
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -385,8 +386,14 @@ fun SearchInputContent(
     searchState: SearchState,
     modifier: Modifier,
 ) {
+    // BackHandler to intercept the system back button press when focused
+    BackHandler(enabled = focused) {
+        onFocused(false)
+        onSearchQueryChanged("")
+    }
     when (
-        searchState is SearchState.Active.SuggestionSearch &&
+        focused &&
+            searchState is SearchState.Active.SuggestionSearch &&
             searchState.suggestion.type == SearchSuggestionType.FACE
     ) {
         true -> {
@@ -622,6 +629,8 @@ private fun ShowSuggestions(
         LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
     val host = LocalEmbeddedState.current?.host
     val isExpanded = rememberUpdatedState(LocalEmbeddedState.current?.isExpanded ?: false)
+    val events = LocalEvents.current
+    val configuration = LocalPhotopickerConfiguration.current
 
     val historySuggestions = suggestionLists.history
     val faceSuggestions = suggestionLists.face
@@ -677,6 +686,16 @@ private fun ShowSuggestions(
                     isZeroSearchState,
                 )
             }
+        }
+        LaunchedEffect(Unit) {
+            events.dispatch(
+                Event.LogPhotopickerUIEvent(
+                    FeatureToken.SEARCH.token,
+                    configuration.sessionId,
+                    configuration.callingPackageUid ?: -1,
+                    Telemetry.UiEvent.UI_LOADED_SEARCH_SUGGESTIONS,
+                )
+            )
         }
     }
 }
@@ -735,14 +754,19 @@ fun SuggestionItem(suggestion: SearchSuggestion) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(MEASUREMENT_SUGGESTION_ITEM_PADDING),
     ) {
-        Box(
-            modifier =
-                Modifier.background(MaterialTheme.colorScheme.surface, CircleShape).padding(6.dp)
-        ) {
-            Icon(
-                imageVector = getImageVector(suggestion.type),
-                contentDescription = suggestion.displayText ?: "",
-            )
+        if (suggestion.type == SearchSuggestionType.FACE) {
+            ShowSuggestionIcon(suggestion, Modifier.size(MEASUREMENT_OTHER_ICON).clip(CircleShape))
+        } else {
+            Box(
+                modifier =
+                    Modifier.background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .padding(6.dp)
+            ) {
+                Icon(
+                    imageVector = getImageVector(suggestion.type),
+                    contentDescription = suggestion.displayText ?: "",
+                )
+            }
         }
         val text = suggestion.displayText ?: ""
         Text(text = text, modifier = Modifier.padding(start = MEASUREMENT_LARGE_PADDING).weight(1f))
@@ -905,7 +929,16 @@ private fun ResultMediaGrid(
                                 item = item.media,
                                 selectionLimitExceededMessage = selectionLimitExceededMessage,
                             )
-                            // TODO: (b/381876944) Log Ui Event after adding search enum
+                            scope.launch {
+                                events.dispatch(
+                                    Event.LogPhotopickerUIEvent(
+                                        FeatureToken.SEARCH.token,
+                                        configuration.sessionId,
+                                        configuration.callingPackageUid ?: -1,
+                                        Telemetry.UiEvent.SELECT_SEARCH_RESULT,
+                                    )
+                                )
+                            }
                         }
                     },
                     onItemLongPress = { item ->
@@ -937,6 +970,17 @@ private fun ResultMediaGrid(
                         }
                     },
                     state = state,
+                )
+            }
+            LaunchedEffect(Unit) {
+                // Dispatch UI event to log loading of search result contents
+                events.dispatch(
+                    Event.LogPhotopickerUIEvent(
+                        FeatureToken.SEARCH.token,
+                        configuration.sessionId,
+                        configuration.callingPackageUid ?: -1,
+                        Telemetry.UiEvent.UI_LOADED_SEARCH_RESULTS,
+                    )
                 )
             }
         }

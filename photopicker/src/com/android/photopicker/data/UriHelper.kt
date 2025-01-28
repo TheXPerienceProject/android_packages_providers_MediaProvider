@@ -143,6 +143,14 @@ fun getCategoryUri(parentCategoryId: String?): Uri {
 }
 
 val MEDIA_SETS_URI = pickerUri.buildUpon().appendPath(MEDIA_SETS_PATH_SEGMENT).build()
+val MEDIA_SETS_UPDATE_URI =
+    pickerUri
+        .buildUpon()
+        .apply {
+            appendPath(MEDIA_SETS_PATH_SEGMENT)
+            appendPath(UPDATE_PATH_SEGMENT)
+        }
+        .build()
 
 val MEDIA_SET_CONTENTS_URI =
     pickerUri.buildUpon().appendPath(MEDIA_SET_CONTENTS_PATH_SEGMENT).build()

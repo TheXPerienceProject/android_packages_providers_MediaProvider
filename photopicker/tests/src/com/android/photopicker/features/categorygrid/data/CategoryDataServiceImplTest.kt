@@ -19,6 +19,7 @@ package src.com.android.photopicker.features.categorygrid.data
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.CancellationSignal
 import android.os.Parcel
 import android.os.UserHandle
@@ -76,6 +77,9 @@ class CategoryDataServiceImplTest {
 
         private val userProfilePrimary: UserProfile =
             UserProfile(handle = createUserHandle(0), profileType = UserProfile.ProfileType.PRIMARY)
+
+        private val mediaSetsUpdateUri =
+            Uri.parse("content://media/picker_internal/v2/media_sets/update")
     }
 
     private lateinit var testFeatureManager: FeatureManager
@@ -199,6 +203,36 @@ class CategoryDataServiceImplTest {
 
         firstMediaSetsPagingSource.invalidate()
         assertThat(cancellationSignal.isCanceled()).isTrue()
+    }
+
+    @Test
+    fun testMediaSetsUpdateNotification() = runTest {
+        val dataService = getDataService(this)
+        val categoryDataService = getCategoryDataService(this, dataService)
+
+        advanceTimeBy(100)
+
+        val firstMediaSetsPagingSource: PagingSource<GroupPageKey, Group.MediaSet> =
+            categoryDataService.getMediaSets(testContentProvider.parentCategory)
+        assertThat(firstMediaSetsPagingSource.invalid).isFalse()
+
+        val updateUri: Uri =
+            mediaSetsUpdateUri
+                .buildUpon()
+                .apply { appendPath(testContentProvider.parentCategory.id) }
+                .build()
+
+        // Dispatch update notification
+        notificationService.dispatchChangeToObservers(updateUri)
+        advanceTimeBy(100)
+
+        // Check that the first media paging source was marked as invalid
+        assertThat(firstMediaSetsPagingSource.invalid).isTrue()
+
+        val secondMediaSetsPagingSource: PagingSource<GroupPageKey, Group.MediaSet> =
+            categoryDataService.getMediaSets(testContentProvider.parentCategory)
+        assertThat(secondMediaSetsPagingSource).isNotEqualTo(firstMediaSetsPagingSource)
+        assertThat(secondMediaSetsPagingSource.invalid).isFalse()
     }
 
     @Test
