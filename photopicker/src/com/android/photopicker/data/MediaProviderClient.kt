@@ -743,6 +743,7 @@ open class MediaProviderClient {
         val input: Bundle =
             bundleOf(
                 MediaQuery.PICKER_ID.key to pageKey.pickerId,
+                MediaQuery.DATE_TAKEN.key to pageKey.dateTakenMillis,
                 MediaQuery.PAGE_SIZE.key to pageSize,
                 MediaQuery.PROVIDERS.key to arrayListOf(parentMediaSet.authority),
                 EXTRA_MIME_TYPES to config.mimeTypes,

@@ -701,14 +701,17 @@ private fun defaultBuildPersonMediaSetItem(
         with(item.mediaSet) {
             val modifier = Modifier.fillMaxWidth().aspectRatio(1f)
             loadMedia(media = icon, resolution = Resolution.THUMBNAIL, modifier = modifier)
-            Text(
-                text = displayName ?: "",
-                overflow = TextOverflow.Ellipsis,
-                maxLines = 1,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
-            )
+            Surface(color = Color.Black.copy(alpha = 0.2f), contentColor = Color.White) {
+                Box(modifier = modifier) {
+                    Text(
+                        text = displayName ?: "",
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
+                    )
+                }
+            }
         }
     }
 }

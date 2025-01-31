@@ -18,4 +18,8 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="photopicker_categories_nav_button_label" msgid="988315710756227148">"Συλλογές"</string>
+    <!-- no translation found for photopicker_people_category_empty_state_title (3099829676185479658) -->
+    <skip />
+    <!-- no translation found for photopicker_people_category_empty_state_body (6240429033719283301) -->
+    <skip />
 </resources>

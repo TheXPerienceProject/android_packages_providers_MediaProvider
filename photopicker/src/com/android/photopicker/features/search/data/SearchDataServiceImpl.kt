@@ -104,6 +104,12 @@ class SearchDataServiceImpl(
     // Cancel this job when there is a change in the current profile's content resolver.
     private var searchResultsUpdateCollectJob: Job? = null
 
+    // Internal mutable flow of the current user's search state info.
+    private val _userSearchStateInfo: MutableStateFlow<UserSearchStateInfo> =
+        MutableStateFlow(UserSearchStateInfo(null))
+
+    override val userSearchStateInfo: StateFlow<UserSearchStateInfo> = _userSearchStateInfo
+
     init {
         // Listen to available provider changes and clear search cache when required.
         scope.launch(dispatcher) {
@@ -152,12 +158,6 @@ class SearchDataServiceImpl(
             }
         }
     }
-
-    // Internal mutable flow of the current user's search state info.
-    private val _userSearchStateInfo: MutableStateFlow<UserSearchStateInfo> =
-        MutableStateFlow(UserSearchStateInfo(null))
-
-    override val userSearchStateInfo: StateFlow<UserSearchStateInfo> = _userSearchStateInfo
 
     /**
      * Try to get a list fo search suggestions from Media Provider in the background thread with a

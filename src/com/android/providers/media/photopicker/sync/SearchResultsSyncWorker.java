@@ -182,7 +182,8 @@ public class SearchResultsSyncWorker extends Worker {
                 throwIfCloudProviderHasChanged(authority);
 
                 try (Cursor cursor = fetchSearchResultsFromCmp(
-                        searchClient, authority, searchRequest, nextPageToken)) {
+                        searchClient, authority, searchRequest, nextPageToken,
+                        searchRequest.getMimeTypes())) {
 
                     List<ContentValues> contentValues =
                             SearchResultsDatabaseUtil.extractContentValuesList(
@@ -321,7 +322,8 @@ public class SearchResultsSyncWorker extends Worker {
             @NonNull PickerSearchProviderClient searchClient,
             @NonNull String authority,
             @NonNull SearchRequest searchRequest,
-            @Nullable String resumePageToken) {
+            @Nullable String resumePageToken,
+            @Nullable List<String> mimeTypes) {
         final String suggestedMediaSetId;
         final String searchText;
         if (searchRequest instanceof SearchSuggestionRequest searchSuggestionRequest) {
@@ -344,6 +346,7 @@ public class SearchResultsSyncWorker extends Worker {
                 suggestedMediaSetId,
                 searchText,
                 CloudMediaProviderContract.SORT_ORDER_DESC_DATE_TAKEN,
+                mimeTypes,
                 PAGE_SIZE,
                 resumePageToken,
                 mCancellationSignal

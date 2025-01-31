@@ -22,8 +22,10 @@
 #include "logging.h"
 #include "rect.h"
 
+using pdfClient::Annotation;
 using pdfClient::Color;
 using pdfClient::Document;
+using pdfClient::HighlightAnnotation;
 using pdfClient::ICoordinateConverter;
 using pdfClient::ImageObject;
 using pdfClient::LinuxFileOps;
@@ -31,8 +33,10 @@ using pdfClient::Matrix;
 using pdfClient::PageObject;
 using pdfClient::PathObject;
 using pdfClient::Point_f;
+using pdfClient::Rectangle_f;
 using pdfClient::Rectangle_i;
 using pdfClient::SelectionBoundary;
+using pdfClient::StampAnnotation;
 using std::string;
 using std::vector;
 
@@ -56,6 +60,9 @@ static const char* kGotoLink = "android/graphics/pdf/content/PdfPageGotoLinkCont
 static const char* kPageObject = "android/graphics/pdf/component/PdfPageObject";
 static const char* kPathObject = "android/graphics/pdf/component/PdfPagePathObject";
 static const char* kImageObject = "android/graphics/pdf/component/PdfPageImageObject";
+static const char* kStampAnnotation = "android/graphics/pdf/component/StampAnnotation";
+static const char* kPdfAnnotation = "android/graphics/pdf/component/PdfAnnotation";
+static const char* kHighlightAnnotation = "android/graphics/pdf/component/HighlightAnnotation";
 
 static const char* kBitmap = "android/graphics/Bitmap";
 static const char* kBitmapConfig = "android/graphics/Bitmap$Config";
@@ -125,7 +132,8 @@ jobject ToJavaList(JNIEnv* env, const vector<T>& input,
                    jobject (*ToJavaObject)(JNIEnv* env, const T&)) {
     static jclass arraylist_class = GetPermClassRef(env, kArrayList);
     static jmethodID init = env->GetMethodID(arraylist_class, "<init>", "(I)V");
-    static jmethodID add = env->GetMethodID(arraylist_class, "add", funcsig("Z", kObject).c_str());
+    static jmethodID add = env->GetMethodID(arraylist_class, "add",
+                                                             funcsig("Z", kObject).c_str());
 
     jobject java_list = env->NewObject(arraylist_class, init, input.size());
     for (size_t i = 0; i < input.size(); i++) {
@@ -226,6 +234,35 @@ jobject ToJavaRectF(JNIEnv* env, const Rectangle_i& r) {
     static jmethodID init = env->GetMethodID(rectF_class, "<init>", "(FFFF)V");
     return env->NewObject(rectF_class, init, float(r.left), float(r.top), float(r.right),
                           float(r.bottom));
+}
+
+jobject ToJavaRectF(JNIEnv* env, const Rectangle_f& r, ICoordinateConverter* converter) {
+    static jclass rectF_class = GetPermClassRef(env, kRectF);
+    static jmethodID init = env->GetMethodID(rectF_class, "<init>", "(FFFF)V");
+
+    Point_f top_left_corner = converter->PageToDevice({r.left, r.top});
+    Point_f bottom_down_corner = converter->PageToDevice({r.right, r.bottom});
+    return env->NewObject(rectF_class, init, top_left_corner.x, top_left_corner.y,
+                          bottom_down_corner.x, bottom_down_corner.y);
+}
+
+Rectangle_f ToNativeRectF(JNIEnv* env, jobject java_rectF, ICoordinateConverter* converter) {
+    static jclass rectF_class = GetPermClassRef(env, kRectF);
+    static jfieldID left_field = env->GetFieldID(rectF_class, "left", "F");
+    static jfieldID top_field = env->GetFieldID(rectF_class, "top", "F");
+    static jfieldID right_field = env->GetFieldID(rectF_class, "right", "F");
+    static jfieldID bottom_field = env->GetFieldID(rectF_class, "bottom", "F");
+
+    float left = env->GetFloatField(java_rectF, left_field);
+    float top = env->GetFloatField(java_rectF, top_field);
+    float right = env->GetFloatField(java_rectF, right_field);
+    float bottom = env->GetFloatField(java_rectF, bottom_field);
+
+    Point_f top_left_corner = converter->DeviceToPage({left, top});
+    Point_f bottom_down_corner = converter->DeviceToPage({right, bottom});
+
+    return Rectangle_f{top_left_corner.x, top_left_corner.y, bottom_down_corner.x,
+                       bottom_down_corner.y};
 }
 
 jobject ToJavaRects(JNIEnv* env, const vector<Rectangle_i>& rects) {
@@ -395,14 +432,7 @@ jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height) {
     return java_bitmap;
 }
 
-jobject ToJavaColor(JNIEnv* env, Color color) {
-    // Find Java Color class
-    static jclass color_class = GetPermClassRef(env, kColor);
-
-    // Get valueOf method ID
-    static jmethodID value_of =
-            env->GetStaticMethodID(color_class, "valueOf", funcsig(kColor, "I").c_str());
-
+int ToJavaColorInt(Color color) {
     // Get ARGB values from Native Color
     uint A = color.a;
     uint R = color.r;
@@ -411,6 +441,20 @@ jobject ToJavaColor(JNIEnv* env, Color color) {
 
     // Make ARGB  java color int
     int java_color_int = (A & 0xFF) << 24 | (R & 0xFF) << 16 | (G & 0xFF) << 8 | (B & 0xFF);
+
+    return java_color_int;
+}
+
+jobject ToJavaColor(JNIEnv* env, Color color) {
+    // Find Java Color class
+    static jclass color_class = GetPermClassRef(env, kColor);
+
+    // Get valueOf method ID
+    static jmethodID value_of =
+            env->GetStaticMethodID(color_class, "valueOf", funcsig(kColor, "I").c_str());
+
+    // Make ARGB  java color int
+    int java_color_int = ToJavaColorInt(color);
 
     // Create a Java Color Object.
     jobject java_color = env->CallStaticObjectMethod(color_class, value_of, java_color_int);
@@ -592,6 +636,16 @@ jobject ToJavaPdfPageObjects(JNIEnv* env, const vector<PageObject*>& page_object
     return ToJavaList(env, page_objects, converter, &ToJavaPdfPageObject);
 }
 
+Color ToNativeColor(jint java_color_int) {
+    // Decoding RGBA components
+    unsigned int red = (java_color_int >> 16) & 0xFF;
+    unsigned int green = (java_color_int >> 8) & 0xFF;
+    unsigned int blue = java_color_int & 0xFF;
+    unsigned int alpha = (java_color_int >> 24) & 0xFF;
+
+    return Color(red, green, blue, alpha);
+}
+
 Color ToNativeColor(JNIEnv* env, jobject java_color) {
     // Find Java Color class
     static jclass color_class = GetPermClassRef(env, kColor);
@@ -600,13 +654,7 @@ Color ToNativeColor(JNIEnv* env, jobject java_color) {
     jmethodID get_color_int = env->GetMethodID(color_class, "toArgb", funcsig("I").c_str());
     jint java_color_int = env->CallIntMethod(java_color, get_color_int);
 
-    // Decoding RGBA components
-    unsigned int red = (java_color_int >> 16) & 0xFF;
-    unsigned int green = (java_color_int >> 8) & 0xFF;
-    unsigned int blue = java_color_int & 0xFF;
-    unsigned int alpha = (java_color_int >> 24) & 0xFF;
-
-    return Color(red, green, blue, alpha);
+    return ToNativeColor(java_color_int);
 }
 
 std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object,
@@ -736,7 +784,7 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
     // Get Matrix from Java PageObject.
     static jmethodID get_matrix = env->GetMethodID(page_object_class, "getMatrix", "()[F");
     jfloatArray java_matrix_array =
-            (jfloatArray)env->CallObjectMethod(java_page_object, get_matrix);
+                             (jfloatArray)env->CallObjectMethod(java_page_object, get_matrix);
 
     // Copy Java Array to Native Array
     float transform[9];
@@ -748,6 +796,170 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
                            transform[2 /*kMTransX*/], transform[5 /*kMTransY*/]};
 
     return page_object;
+}
+
+jobject ToJavaPageAnnotations(JNIEnv* env, const vector<Annotation*>& annotations,
+                              ICoordinateConverter* converter) {
+    return ToJavaList(env, annotations, converter, &ToJavaPageAnnotation);
+}
+
+jobject ToJavaStampAnnotation(JNIEnv* env, const Annotation* annotation,
+                              ICoordinateConverter* converter) {
+    jobject java_bounds = ToJavaRectF(env, annotation->GetBounds(), converter);
+    // Cast to StampAnnotation
+    const StampAnnotation* stamp_annotation = static_cast<const StampAnnotation*>(annotation);
+
+    // Find Java StampAnnotation Class.
+    static jclass stamp_annotation_class = GetPermClassRef(env, kStampAnnotation);
+    // Get Constructor Id.
+    static jmethodID init =
+            env->GetMethodID(stamp_annotation_class, "<init>", funcsig("V", kRectF).c_str());
+
+    // Create Java StampAnnotation Instance.
+    jobject java_annotation = env->NewObject(stamp_annotation_class, init, java_bounds);
+
+    // Add page objects to stamp annotation
+
+    // Get methodId for addObject
+    static jmethodID add_object = env->GetMethodID(stamp_annotation_class, "addObject",
+                                                   funcsig("V", kPageObject).c_str());
+
+    std::vector<PageObject*> page_objects = stamp_annotation->GetObjects();
+
+    for (const auto& page_object : page_objects) {
+        jobject java_page_object = ToJavaPdfPageObject(env, page_object, converter);
+        env->CallVoidMethod(java_annotation, add_object, java_page_object);
+    }
+    return java_annotation;
+}
+
+jobject ToJavaHighlightAnnotation(JNIEnv* env, const Annotation* annotation,
+                                  ICoordinateConverter* converter) {
+    jobject java_bounds = ToJavaRectF(env, annotation->GetBounds(), converter);
+    // Cast to HighlightAnnotation
+    const HighlightAnnotation* highlight_annotation =
+            static_cast<const HighlightAnnotation*>(annotation);
+
+    // Find Java HighlightAnnotation Class.
+    static jclass highlight_annotation_class = GetPermClassRef(env, kHighlightAnnotation);
+    // Get Constructor Id.
+    static jmethodID init =
+            env->GetMethodID(highlight_annotation_class, "<init>", funcsig("V", kRectF).c_str());
+
+    // Create Java HighlightAnnotation Instance.
+    jobject java_annotation = env->NewObject(highlight_annotation_class, init, java_bounds);
+
+    // Get and set highlight color
+    // Get method Id for setColor.
+    static jmethodID set_color =
+            env->GetMethodID(highlight_annotation_class, "setColor", funcsig("V", "I").c_str());
+    // call setColor
+    env->CallVoidMethod(java_annotation, set_color,
+                        ToJavaColorInt(highlight_annotation->GetColor()));
+
+    return java_annotation;
+}
+jobject ToJavaPageAnnotation(JNIEnv* env, const Annotation* annotation,
+                             ICoordinateConverter* converter) {
+    if (!annotation) {
+        return NULL;
+    }
+
+    jobject java_annotation = nullptr;
+
+    switch (annotation->GetType()) {
+        case Annotation::Type::Stamp: {
+            java_annotation = ToJavaStampAnnotation(env, annotation, converter);
+            break;
+        }
+        case Annotation::Type::Highlight: {
+            java_annotation = ToJavaHighlightAnnotation(env, annotation, converter);
+            break;
+        }
+        default:
+            break;
+    }
+
+    return java_annotation;
+}
+
+std::unique_ptr<Annotation> ToNativeStampAnnotation(JNIEnv* env, jobject java_annotation,
+                                                    Rectangle_f native_bounds,
+                                                    ICoordinateConverter* converter) {
+    // Create StampAnnotation Instance.
+    auto stamp_annotation = std::make_unique<StampAnnotation>(native_bounds);
+
+    // Get Ref to Java StampAnnotation Class.
+    static jclass stamp_annotation_class = GetPermClassRef(env, kStampAnnotation);
+
+    // Get PdfPageObjects from stamp annotation
+    static jmethodID get_objects =
+            env->GetMethodID(stamp_annotation_class, "getObjects", funcsig(kList).c_str());
+    jobject java_page_objects = env->CallObjectMethod(java_annotation, get_objects);
+
+    jclass list_class = env->FindClass(kList);
+    jmethodID size_method = env->GetMethodID(list_class, "size", funcsig("I").c_str());
+    jmethodID get_method = env->GetMethodID(list_class, "get", funcsig(kObject, "I").c_str());
+
+    jint listSize = env->CallIntMethod(java_page_objects, size_method);
+    for (int i = 0; i < listSize; i++) {
+        jobject java_page_object = env->CallObjectMethod(java_page_objects, get_method, i);
+        std::unique_ptr<PageObject> native_page_object =
+                ToNativePageObject(env, java_page_object, converter);
+        stamp_annotation->AddObject(std::move(native_page_object));
+    }
+    return stamp_annotation;
+}
+
+std::unique_ptr<Annotation> ToNativeHighlightAnnotation(JNIEnv* env, jobject java_annotation,
+                                                        Rectangle_f native_bounds) {
+    // Create HighlightAnnotation Instance.
+    auto highlight_annotation = std::make_unique<HighlightAnnotation>(native_bounds);
+
+    // Get Ref to Java HighlightAnnotation Class.
+    static jclass highlight_annotation_class = GetPermClassRef(env, kHighlightAnnotation);
+
+    // Get and set highlight color
+
+    // Get methodId for getColor
+    static jmethodID get_color =
+            env->GetMethodID(highlight_annotation_class, "getColor", funcsig("I").c_str());
+    jint java_color_int = env->CallIntMethod(java_annotation, get_color);
+
+    highlight_annotation->SetColor(ToNativeColor(java_color_int));
+
+    return highlight_annotation;
+}
+
+std::unique_ptr<Annotation> ToNativePageAnnotation(JNIEnv* env, jobject java_annotation,
+                                                   ICoordinateConverter* converter) {
+    // Find Java PdfAnnotation class and GetType
+    static jclass annotation_class = GetPermClassRef(env, kPdfAnnotation);
+    static jmethodID get_type =
+            env->GetMethodID(annotation_class, "getPdfAnnotationType", funcsig("I").c_str());
+    jint annotation_type = env->CallIntMethod(java_annotation, get_type);
+
+    // 2. Get bounds
+    jmethodID get_bounds = env->GetMethodID(annotation_class, "getBounds", funcsig(kRectF).c_str());
+    jobject java_bounds = env->CallObjectMethod(java_annotation, get_bounds);
+    Rectangle_f native_bounds = ToNativeRectF(env, java_bounds, converter);
+
+    std::unique_ptr<Annotation> annotation = nullptr;
+
+    switch (static_cast<Annotation::Type>(annotation_type)) {
+        case Annotation::Type::Stamp: {
+            annotation = ToNativeStampAnnotation(env, java_annotation, native_bounds, converter);
+            break;
+        }
+        case Annotation::Type::Highlight: {
+            annotation = ToNativeHighlightAnnotation(env, java_annotation, native_bounds);
+            break;
+        }
+        default:
+            break;
+    }
+
+    return annotation;
 }
 
 }  // namespace convert

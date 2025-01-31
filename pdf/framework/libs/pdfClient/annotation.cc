@@ -167,7 +167,7 @@ bool HighlightAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot)
     unsigned int B;
     unsigned int A;
 
-    if (FPDFAnnot_GetColor(fpdf_annot, FPDFANNOT_COLORTYPE_Color, &R, &G, &B, &A)) {
+    if (!FPDFAnnot_GetColor(fpdf_annot, FPDFANNOT_COLORTYPE_Color, &R, &G, &B, &A)) {
         LOGE("Couldn't get color of highlight annotation");
         return false;
     }
