@@ -52,6 +52,7 @@ class CategoryAndAlbumPagingSource(
     override suspend fun load(params: LoadParams<GroupPageKey>): LoadResult<GroupPageKey, Group> {
         val pageKey = params.key ?: GroupPageKey()
         val pageSize = params.loadSize
+
         // Switch to the background thread from the main thread using [withContext].
         val result =
             withContext(dispatcher) {

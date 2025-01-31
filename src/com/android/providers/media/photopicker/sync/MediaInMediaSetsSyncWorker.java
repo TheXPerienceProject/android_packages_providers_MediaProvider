@@ -66,6 +66,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
     private final Context mContext;
     private final CancellationSignal mCancellationSignal;
     private final SQLiteDatabase mDatabase;
+    private boolean mMarkedSyncWorkAsComplete = false;
 
     public MediaInMediaSetsSyncWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -118,7 +119,9 @@ public class MediaInMediaSetsSyncWorker extends Worker {
             return ListenableWorker.Result.failure();
         } finally {
             // mark sync as complete
-            markMediaInMediaSetSyncAsComplete(syncSource, getId());
+            if (!mMarkedSyncWorkAsComplete) {
+                markMediaInMediaSetSyncAsComplete(syncSource, getId());
+            }
         }
     }
 
@@ -164,7 +167,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
                                     mediaSetPickerId,
                                     isAuthorityLocal(mediaSetAuthority)
                             );
-                    MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
+                    int numberOfRowsInserted = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                             mDatabase, mediaItemsToInsert, mediaSetAuthority
                     );
                     resumePageToken = getResumePageToken(mediaInMediaSetsCursor.getExtras());
@@ -181,11 +184,17 @@ public class MediaInMediaSetsSyncWorker extends Worker {
 
                     knownTokens.add(resumePageToken);
 
-                    // Start showing results on the UI
-                    PickerNotificationSender.notifyMediaSetContentChange(mContext, mediaSetId);
-
-                    // mark sync as complete
-                    markMediaInMediaSetSyncAsComplete(syncSource, getId());
+                    // Mark sync as complete
+                    if (mMarkedSyncWorkAsComplete) {
+                        // Notify the UI that a change has been made in the DB
+                        if (numberOfRowsInserted > 0) {
+                            PickerNotificationSender
+                                    .notifyMediaSetContentChange(mContext, mediaSetId);
+                        }
+                    } else {
+                        markMediaInMediaSetSyncAsComplete(syncSource, getId());
+                        mMarkedSyncWorkAsComplete = true;
+                    }
                 }
             }
         } finally {

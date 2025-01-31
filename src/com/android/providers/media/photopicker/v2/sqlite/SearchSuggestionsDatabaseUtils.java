@@ -270,7 +270,7 @@ public class SearchSuggestionsDatabaseUtils {
             } while (cursor.moveToNext());
         }
 
-        Log.d(TAG, "Extracted suggestions from cursor: " + searchSuggestions);
+        Log.d(TAG, "Extracted suggestions from cursor: " + searchSuggestions.size());
         return searchSuggestions;
     }
 

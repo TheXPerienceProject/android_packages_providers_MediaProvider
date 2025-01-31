@@ -895,7 +895,7 @@ private fun ResultMediaGrid(
                 delay(1000)
                 if (items.itemCount == 0) {
                     resultsState = ResultsState.LOADING_WITH_INDICATOR
-                    delay(4000)
+                    delay(10000)
                     if (resultsState == ResultsState.LOADING_WITH_INDICATOR)
                         resultsState = ResultsState.EMPTY
                 }

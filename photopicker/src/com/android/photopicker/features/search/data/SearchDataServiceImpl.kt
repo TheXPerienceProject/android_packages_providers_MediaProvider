@@ -83,7 +83,7 @@ class SearchDataServiceImpl(
 ) : SearchDataService {
     companion object {
         // Timeout for receiving suggestions from the data source in milli seconds.
-        private const val SUGGESTIONS_TIMEOUT: Long = 1500
+        private const val SUGGESTIONS_TIMEOUT: Long = 3000
     }
 
     // An internal lock to allow thread-safe updates to the search request and results cache.
@@ -190,7 +190,7 @@ class SearchDataServiceImpl(
             } catch (e: RuntimeException) {
                 Log.w(
                     SearchDataService.TAG,
-                    "An error occurred while fetching " + "search suggestions for prefix $prefix",
+                    "An error occurred while fetching search suggestions for prefix $prefix",
                     e,
                 )
 
@@ -276,7 +276,7 @@ class SearchDataServiceImpl(
                     }
 
                     Log.d(
-                        DataService.TAG,
+                        SearchDataService.TAG,
                         "Created a search results paging source that queries $availableProviders " +
                             "for search request id $searchRequestId",
                     )
@@ -307,9 +307,12 @@ class SearchDataServiceImpl(
      * Checks if this is a new search request in the current session.
      * 1. If this is a new search requests, [MediaProvider] is notified with the new search request
      *    and it creates and returns a search request id.
-     * 2. If this is not a new search request, previously caches search request id is returned.
+     * 2. If this is not a new search request, previously cached search request id is returned.
+     *
+     * In both scenarios, this notifies the backend to refresh search results cache for the given
+     * search request id.
      */
-    private fun getSearchRequestId(
+    private suspend fun getSearchRequestId(
         searchRequest: SearchRequest,
         availableProviders: List<Provider>,
         contentResolver: ContentResolver,
@@ -322,14 +325,40 @@ class SearchDataServiceImpl(
                     "Search request id is available for search request $searchRequest. " +
                         "Not creating a new search request id.",
                 )
-                searchRequestIdMap[searchRequest]!!
+
+                val searchRequestId = searchRequestIdMap[searchRequest]!!
+
+                try {
+                    // Ensure search results data in data source is ready for the search query.
+                    mediaProviderClient.ensureSearchResults(
+                        searchRequest,
+                        searchRequestId,
+                        availableProviders,
+                        contentResolver,
+                        config,
+                    )
+                } catch (e: RuntimeException) {
+                    Log.e(SearchDataService.TAG, "Could not ensure search results", e)
+                }
+
+                searchRequestId
             } else {
-                mediaProviderClient.createSearchRequest(
-                    searchRequest,
-                    availableProviders,
-                    contentResolver,
-                    config,
+                Log.d(
+                    SearchDataService.TAG,
+                    "Search request id is not available for search request $searchRequest. " +
+                        "Creating a new search request id.",
                 )
+
+                val newSearchRequestId =
+                    mediaProviderClient.createSearchRequest(
+                        searchRequest,
+                        availableProviders,
+                        contentResolver,
+                        config,
+                    )
+
+                searchRequestIdMap[searchRequest] = newSearchRequestId
+                newSearchRequestId
             }
         }
     }

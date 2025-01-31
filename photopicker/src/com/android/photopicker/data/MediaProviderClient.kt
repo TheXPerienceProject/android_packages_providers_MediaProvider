@@ -907,6 +907,67 @@ open class MediaProviderClient {
         resolver: ContentResolver,
         config: PhotopickerConfiguration,
     ): Int {
+        val extras: Bundle =
+            prepareSearchResultsExtras(
+                searchRequest = searchRequest,
+                providers = providers,
+                config = config,
+            )
+
+        val result: Bundle? =
+            resolver.call(
+                MEDIA_PROVIDER_AUTHORITY,
+                SEARCH_REQUEST_INIT_CALL_METHOD,
+                /* arg */ null,
+                extras,
+            )
+        return checkNotNull(result?.getInt(SEARCH_REQUEST_ID)) {
+            "Search request ID cannot be null"
+        }
+    }
+
+    /**
+     * Notifies the Data Source that the previously known search query is performed again by the
+     * user in the same session.
+     *
+     * This call lets [MediaProvider] know that the user has triggered a known search request again
+     * and the backend should prepare to handle search results queries for the given search request.
+     */
+    suspend fun ensureSearchResults(
+        searchRequest: SearchRequest,
+        searchRequestId: Int,
+        providers: List<Provider>,
+        resolver: ContentResolver,
+        config: PhotopickerConfiguration,
+    ) {
+        val extras: Bundle =
+            prepareSearchResultsExtras(
+                searchRequest = searchRequest,
+                searchRequestId = searchRequestId,
+                providers = providers,
+                config = config,
+            )
+
+        resolver.call(
+            MEDIA_PROVIDER_AUTHORITY,
+            SEARCH_REQUEST_INIT_CALL_METHOD,
+            /* arg */ null,
+            extras,
+        )
+    }
+
+    /**
+     * Creates an extras [Bundle] with the required args for MediaProvider's
+     * [SEARCH_REQUEST_INIT_CALL_METHOD].
+     *
+     * See [createSearchRequest] and [ensureSearchResults].
+     */
+    private fun prepareSearchResultsExtras(
+        searchRequest: SearchRequest,
+        searchRequestId: Int? = null,
+        providers: List<Provider>,
+        config: PhotopickerConfiguration,
+    ): Bundle {
         val extras =
             bundleOf(
                 EXTRA_MIME_TYPES to config.mimeTypes,
@@ -916,6 +977,10 @@ open class MediaProviderClient {
                         providers.forEach { provider -> add(provider.authority) }
                     },
             )
+
+        if (searchRequestId != null) {
+            extras.putInt(SEARCH_REQUEST_ID, searchRequestId)
+        }
 
         when (searchRequest) {
             is SearchRequest.SearchTextRequest ->
@@ -940,16 +1005,7 @@ open class MediaProviderClient {
             }
         }
 
-        val result: Bundle? =
-            resolver.call(
-                MEDIA_PROVIDER_AUTHORITY,
-                SEARCH_REQUEST_INIT_CALL_METHOD,
-                /* arg */ null,
-                extras,
-            )
-        return checkNotNull(result?.getInt(SEARCH_REQUEST_ID)) {
-            "Search request ID cannot be null"
-        }
+        return extras
     }
 
     /**

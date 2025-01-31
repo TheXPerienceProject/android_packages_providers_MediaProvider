@@ -304,8 +304,7 @@ class CategoryDataServiceImpl(
                             cancellationSignal = cancellationSignal,
                         )
                     // Ensure that cancellation get propagated to the data source when the paging
-                    // source
-                    // is invalidated.
+                    // source is invalidated.
                     pagingSource.registerInvalidatedCallback { cancellationSignal?.cancel() }
 
                     Log.v(
