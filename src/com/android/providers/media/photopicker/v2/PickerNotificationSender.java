@@ -20,6 +20,7 @@ import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.ALB
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.AVAILABLE_PROVIDERS_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.MEDIA_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.MEDIA_SETS_PATH_SEGMENT;
+import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.MEDIA_SET_CONTENTS_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.PICKER_INTERNAL_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.PICKER_V2_PATH_SEGMENT;
 import static com.android.providers.media.photopicker.v2.PickerUriResolverV2.SEARCH_RESULT_MEDIA_PATH_SEGMENT;
@@ -89,6 +90,15 @@ public class PickerNotificationSender {
             .appendPath(PICKER_INTERNAL_PATH_SEGMENT)
             .appendPath(PICKER_V2_PATH_SEGMENT)
             .appendPath(MEDIA_SETS_PATH_SEGMENT)
+            .appendPath(UPDATE_PATH_SEGMENT)
+            .build();
+
+    private static final Uri MEDIA_SET_CONTENT_UPDATE_URI = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_CONTENT)
+            .authority(MediaStore.AUTHORITY)
+            .appendPath(PICKER_INTERNAL_PATH_SEGMENT)
+            .appendPath(PICKER_V2_PATH_SEGMENT)
+            .appendPath(MEDIA_SET_CONTENTS_PATH_SEGMENT)
             .appendPath(UPDATE_PATH_SEGMENT)
             .build();
 
@@ -187,6 +197,23 @@ public class PickerNotificationSender {
                 .build();
     }
 
+    /**
+     * Send media set content update notification to the registered
+     * {@link android.database.ContentObserver}-s.
+     * @param context The application context.
+     * @param mediaSetId MediaSet ID for which the media content has updated.
+     */
+    public static void notifyMediaSetContentChange(
+            @NonNull Context context, @NonNull String mediaSetId) {
+        requireNonNull(context);
+        requireNonNull(mediaSetId);
+        Log.d(TAG, "Sending notification for media set content update for the "
+                + "given mediaSet " + mediaSetId);
+        context.getContentResolver().notifyChange(
+                getMediaSetContentUpdateUri(mediaSetId), /* observer */ null
+        );
+    }
+
     private static Uri getAlbumMediaUpdateUri(
             @NonNull String albumAuthority,
             @NonNull String albumId) {
@@ -201,6 +228,13 @@ public class PickerNotificationSender {
         return SEARCH_RESULTS_UPDATE_URI
                 .buildUpon()
                 .appendPath(Integer.toString(searchRequestId))
+                .build();
+    }
+
+    private static Uri getMediaSetContentUpdateUri(@NonNull String mediaSetId) {
+        return MEDIA_SET_CONTENT_UPDATE_URI
+                .buildUpon()
+                .appendPath(mediaSetId)
                 .build();
     }
 }

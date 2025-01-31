@@ -868,4 +868,154 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
                 .assertIsDisplayed()
         }
     }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testEmptyStateContentForPeoplePetsCategory() {
+        val testCategoryDataService = categoryDataService as? TestCategoryDataServiceImpl
+        checkNotNull(testCategoryDataService) { "Expected a TestCategoryDataServiceImpl" }
+
+        val testCategoryDisplayName = "People & Pets"
+
+        val resources = getTestableContext().getResources()
+
+        testCategoryDataService.mediaSetSize = 0
+        // Force the data service to return no data for all test sources during this test.
+        testCategoryDataService.mediaSetList = emptyList()
+
+        testCategoryDataService.categoryAlbumList =
+            listOf(
+                Group.Category(
+                    id = testCategoryDisplayName,
+                    pickerId = 1234L,
+                    authority = "a",
+                    displayName = testCategoryDisplayName,
+                    categoryType = CategoryType.PEOPLE_AND_PETS,
+                    icons = emptyList(),
+                    isLeafCategory = true,
+                )
+            )
+
+        testScope.runTest {
+            composeTestRule.setContent {
+                // Set an explicit size to prevent errors in glide being unable to measure
+                callPhotopickerMain(
+                    featureManager = featureManager,
+                    selection = selection,
+                    events = events,
+                )
+            }
+
+            advanceTimeBy(100)
+
+            // Navigate on the UI thread (similar to a click handler)
+            composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
+
+            assertWithMessage("Expected route to be categorygrid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+
+            advanceTimeBy(100)
+            composeTestRule.waitForIdle()
+
+            advanceTimeBy(100)
+
+            composeTestRule.onNode(hasText(testCategoryDisplayName)).performClick()
+
+            composeTestRule.waitForIdle()
+
+            advanceTimeBy(100)
+
+            assertWithMessage("Expected route to be media set grid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.MEDIA_SET_GRID.route)
+
+            composeTestRule
+                .onNode(
+                    hasText(
+                        resources.getString(R.string.photopicker_people_category_empty_state_title)
+                    )
+                )
+                .assertIsDisplayed()
+
+            composeTestRule
+                .onNode(
+                    hasText(
+                        resources.getString(R.string.photopicker_people_category_empty_state_body)
+                    )
+                )
+                .assertIsDisplayed()
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testEmptyStateContentForOtherCategory() {
+        val testCategoryDataService = categoryDataService as? TestCategoryDataServiceImpl
+        checkNotNull(testCategoryDataService) { "Expected a TestCategoryDataServiceImpl" }
+
+        val testCategoryDisplayName = "Other Categoreis"
+
+        val resources = getTestableContext().getResources()
+
+        testCategoryDataService.mediaSetSize = 0
+        // Force the data service to return no data for all test sources during this test.
+        testCategoryDataService.mediaSetList = emptyList()
+
+        testCategoryDataService.categoryAlbumList =
+            listOf(
+                Group.Category(
+                    id = testCategoryDisplayName,
+                    pickerId = 1234L,
+                    authority = "a",
+                    displayName = testCategoryDisplayName,
+                    categoryType = CategoryType.USER_ABLUMS,
+                    icons = emptyList(),
+                    isLeafCategory = true,
+                )
+            )
+
+        testScope.runTest {
+            composeTestRule.setContent {
+                // Set an explicit size to prevent errors in glide being unable to measure
+                callPhotopickerMain(
+                    featureManager = featureManager,
+                    selection = selection,
+                    events = events,
+                )
+            }
+
+            advanceTimeBy(100)
+
+            // Navigate on the UI thread (similar to a click handler)
+            composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
+
+            assertWithMessage("Expected route to be categorygrid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+
+            advanceTimeBy(100)
+            composeTestRule.waitForIdle()
+
+            advanceTimeBy(100)
+
+            composeTestRule.onNode(hasText(testCategoryDisplayName)).performClick()
+
+            composeTestRule.waitForIdle()
+
+            advanceTimeBy(100)
+
+            assertWithMessage("Expected route to be media set grid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.MEDIA_SET_GRID.route)
+
+            composeTestRule
+                .onNode(hasText(resources.getString(R.string.photopicker_photos_empty_state_title)))
+                .assertIsDisplayed()
+
+            composeTestRule
+                .onNode(hasText(resources.getString(R.string.photopicker_photos_empty_state_body)))
+                .assertIsDisplayed()
+        }
+    }
 }

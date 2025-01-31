@@ -122,7 +122,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val MEASUREMENT_SEARCH_BAR_HEIGHT = 56.dp
 private val MEASUREMENT_SEARCH_BAR_PADDING =
     PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 16.dp)
 
@@ -340,10 +339,7 @@ fun SearchBarWithTooltip(modifier: Modifier) {
                         expanded = false,
                         onExpandedChange = {},
                         leadingIcon = { SearchBarIcon(false, {}, {}, searchDisabled = true) },
-                        modifier =
-                            Modifier.height(MEASUREMENT_SEARCH_BAR_HEIGHT).clickable {
-                                scope.launch { tooltipState.show() }
-                            },
+                        modifier = Modifier.clickable { scope.launch { tooltipState.show() } },
                     )
                 },
                 expanded = false,
@@ -470,7 +466,7 @@ private fun SearchInput(
         expanded = focused,
         onExpandedChange = onFocused,
         leadingIcon = { SearchBarIcon(focused, onFocused, onSearchQueryChanged) },
-        modifier = modifier.height(MEASUREMENT_SEARCH_BAR_HEIGHT),
+        modifier = modifier,
     )
 }
 

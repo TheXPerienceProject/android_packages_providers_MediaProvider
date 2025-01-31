@@ -812,17 +812,29 @@ fun IconGrid(
             val paddedIcons = (icons + List(maxIcon) { null }).take(maxIcon)
             val iconsInRow = paddedIcons.chunked(iconPerRow)
 
-            iconsInRow.forEach { rowItem ->
+            iconsInRow.forEachIndexed { rowIndex, rowItem ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    rowItem.forEach { icon ->
+                    rowItem.forEachIndexed { colIndex, icon ->
                         Box(modifier = Modifier.weight(1f).aspectRatio(1f)) {
-                            if (icon is ParcelableGlideLoadable) {
+                            if (icons.isNotEmpty() && icon is ParcelableGlideLoadable) {
                                 CategoryIcon(icon, Modifier.fillMaxSize(), categoryType)
                             } else {
-                                CategoryIconPlaceholder(Modifier.fillMaxSize(), categoryType)
+                                if (
+                                    icons.isEmpty() &&
+                                        !(rowIndex == iconsInRow.lastIndex &&
+                                            colIndex == rowItem.lastIndex)
+                                ) {
+                                    CategoryIconPlaceholder(Modifier.fillMaxSize(), categoryType)
+                                } else {
+                                    CategoryIconPlaceholder(
+                                        Modifier.fillMaxSize(),
+                                        categoryType,
+                                        false,
+                                    )
+                                }
                             }
                         }
                     }
@@ -833,11 +845,22 @@ fun IconGrid(
 }
 
 @Composable
-fun CategoryIconPlaceholder(modifier: Modifier, categoryType: CategoryType) {
+fun CategoryIconPlaceholder(
+    modifier: Modifier,
+    categoryType: CategoryType,
+    showPlaceholder: Boolean = true,
+) {
     Box(
         modifier =
             if (categoryType == CategoryType.PEOPLE_AND_PETS) {
-                modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+                when (showPlaceholder) {
+                    true ->
+                        modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                    false -> modifier.size(48.dp)
+                }
             } else {
                 modifier
                     .size(48.dp)

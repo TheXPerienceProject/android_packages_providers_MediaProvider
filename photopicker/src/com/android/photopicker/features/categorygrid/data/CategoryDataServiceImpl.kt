@@ -26,6 +26,7 @@ import com.android.photopicker.core.configuration.PhotopickerConfiguration
 import com.android.photopicker.core.events.Events
 import com.android.photopicker.data.DataService
 import com.android.photopicker.data.MEDIA_SETS_UPDATE_URI
+import com.android.photopicker.data.MEDIA_SET_CONTENT_UPDATE_URI
 import com.android.photopicker.data.MediaProviderClient
 import com.android.photopicker.data.NotificationService
 import com.android.photopicker.data.model.Group
@@ -86,6 +87,13 @@ class CategoryDataServiceImpl(
     private val mediaSetContentPagingSources:
         MutableMap<Group.MediaSet, PagingSource<MediaPageKey, Media>> =
         mutableMapOf()
+    // Callback flow that listens to changes in media set content changes and emits the mediaset id
+    // when a change is observed.
+    private var mediaSetContentUpdateCallbackFlow: Flow<String>? = null
+
+    // Saves the current job that collects the [mediaSetContentUpdateCallbackFlow].
+    // Cancel this job when there is a change in the current profile's content resolver.
+    private var mediaSetContentUpdateCollectJob: Job? = null
 
     // Callback flow that listens to changes in media sets and emits the category id when
     // a change is observed.
@@ -147,6 +155,27 @@ class CategoryDataServiceImpl(
                             }
                         }
                     }
+                scope.launch(dispatcher) {
+                    // Stop collecting media set content from previously initialised callback flow
+                    mediaSetContentUpdateCollectJob?.cancel()
+                    mediaSetContentUpdateCallbackFlow =
+                        initMediaSetContentCallbackFlow(activeContentResolver)
+
+                    mediaSetContentUpdateCollectJob =
+                        scope.launch(dispatcher) {
+                            mediaSetContentUpdateCallbackFlow?.collect { mediaSetId ->
+                                Log.d(
+                                    CategoryDataService.TAG,
+                                    "MediaSet content update notification " +
+                                        "received for mediaset id " +
+                                        mediaSetId,
+                                )
+                                cachedPagingSourceMutex.withLock {
+                                    getMediaSetPagingSourceForMediaSetId(mediaSetId)?.invalidate()
+                                }
+                            }
+                        }
+                }
             }
         }
     }
@@ -181,6 +210,44 @@ class CategoryDataServiceImpl(
         for (category in mediaSetPagingSources.keys) {
             if (category.id == categoryId) {
                 return mediaSetPagingSources[category]
+            }
+        }
+        return null
+    }
+
+    private fun initMediaSetContentCallbackFlow(resolver: ContentResolver): Flow<String> =
+        callbackFlow {
+            val observer =
+                object : ContentObserver(/*handler*/ null) {
+                    override fun onChange(selfChange: Boolean, uri: Uri?) {
+                        // Verify that the mediaSetId is present in the uri
+                        if (
+                            uri?.pathSegments?.size ==
+                                (MEDIA_SET_CONTENT_UPDATE_URI.pathSegments.size + 1)
+                        ) {
+                            val mediaSetId: String = uri.lastPathSegment ?: "-1"
+                            trySend(mediaSetId)
+                        }
+                    }
+                }
+            // Register the content observer callback.
+            notificationService.registerContentObserverCallback(
+                resolver,
+                MEDIA_SET_CONTENT_UPDATE_URI,
+                /*notifyForDescendants*/ true,
+                observer,
+            )
+
+            // Unregister when the flow is closed.
+            awaitClose { notificationService.unregisterContentObserverCallback(resolver, observer) }
+        }
+
+    private fun getMediaSetPagingSourceForMediaSetId(
+        mediaSetId: String
+    ): PagingSource<MediaPageKey, Media>? {
+        for (mediaSet in mediaSetContentPagingSources.keys) {
+            if (mediaSet.id == mediaSetId) {
+                return mediaSetContentPagingSources[mediaSet]
             }
         }
         return null

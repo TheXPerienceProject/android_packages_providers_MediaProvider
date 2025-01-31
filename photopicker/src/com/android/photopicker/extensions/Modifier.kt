@@ -195,9 +195,7 @@ private fun Modifier.transferTouchesToSurfaceControlViewHost(
                     if (canceled) break
 
                     val postSlopOffset =
-                        if (dragEvent != null)
-                            touchSlopDetector.addPointerInputChange(dragEvent, touchSlop)
-                        else Offset.Unspecified
+                        touchSlopDetector.addPointerInputChange(dragEvent, touchSlop)
 
                     // Once pastTouchSlop check to see if the touch meets the conditions to be
                     // transferred to the host.

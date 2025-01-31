@@ -42,6 +42,7 @@ import androidx.work.WorkerParameters;
 
 import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
+import com.android.providers.media.photopicker.v2.PickerNotificationSender;
 import com.android.providers.media.photopicker.v2.sqlite.MediaInMediaSetsDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.MediaSetsDatabaseUtil;
 
@@ -177,7 +178,11 @@ public class MediaInMediaSetsSyncWorker extends Worker {
                                 + resumePageToken);
                         break;
                     }
+
                     knownTokens.add(resumePageToken);
+
+                    // Start showing results on the UI
+                    PickerNotificationSender.notifyMediaSetContentChange(mContext, mediaSetId);
 
                     // mark sync as complete
                     markMediaInMediaSetSyncAsComplete(syncSource, getId());

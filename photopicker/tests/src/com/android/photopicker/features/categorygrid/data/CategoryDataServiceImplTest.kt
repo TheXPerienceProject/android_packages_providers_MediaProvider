@@ -80,6 +80,9 @@ class CategoryDataServiceImplTest {
 
         private val mediaSetsUpdateUri =
             Uri.parse("content://media/picker_internal/v2/media_sets/update")
+
+        private val mediaSetContentUpdateUri =
+            Uri.parse("content://media/picker_internal/v2/media_set_contents/update")
     }
 
     private lateinit var testFeatureManager: FeatureManager
@@ -294,6 +297,35 @@ class CategoryDataServiceImplTest {
 
         firstMediaSetContentsPagingSource.invalidate()
         assertThat(cancellationSignal.isCanceled()).isTrue()
+    }
+
+    @Test
+    fun testMediaSetContentUpdateNotification() = runTest {
+        val dataService = getDataService(this)
+        val categoryDataService = getCategoryDataService(this, dataService)
+
+        advanceTimeBy(100)
+
+        val firstMediaSetContentsPagingSource: PagingSource<MediaPageKey, Media> =
+            categoryDataService.getMediaSetContents(testContentProvider.mediaSets[0])
+        assertThat(firstMediaSetContentsPagingSource.invalid).isFalse()
+
+        val updateUri: Uri =
+            mediaSetContentUpdateUri
+                .buildUpon()
+                .apply { appendPath(testContentProvider.mediaSets[0].id) }
+                .build()
+        // Dispatch update notification
+        notificationService.dispatchChangeToObservers(updateUri)
+        advanceTimeBy(100)
+
+        // Check that the first media paging source was marked as invalid
+        assertThat(firstMediaSetContentsPagingSource.invalid).isTrue()
+
+        // Check that the new PagingSource instance is valid.
+        val secondMediaSetContentsPagingSource: PagingSource<MediaPageKey, Media> =
+            categoryDataService.getMediaSetContents(testContentProvider.mediaSets[0])
+        assertThat(secondMediaSetContentsPagingSource.invalid).isFalse()
     }
 
     @Test
