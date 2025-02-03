@@ -34,6 +34,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.List;
+
 /**
  * A client class responsible for fetching search results from
  * cloud media provider and local search provider.
@@ -70,6 +72,7 @@ public class PickerSearchProviderClient {
             @Nullable String suggestedMediaSetId,
             @Nullable String searchText,
             @SortOrder int sortOrder,
+            @Nullable List<String> mimeTypes,
             int pageSize,
             @Nullable String resumePageToken,
             @Nullable CancellationSignal cancellationSignal) {
@@ -83,6 +86,11 @@ public class PickerSearchProviderClient {
         queryArgs.putInt(CloudMediaProviderContract.EXTRA_PAGE_SIZE, pageSize);
         queryArgs.putString(CloudMediaProviderContract.EXTRA_PAGE_TOKEN, resumePageToken);
         queryArgs.putInt(CloudMediaProviderContract.EXTRA_SORT_ORDER, sortOrder);
+        if (mimeTypes != null) {
+            queryArgs.putStringArray(
+                    Intent.EXTRA_MIME_TYPES,
+                    mimeTypes.toArray(new String[mimeTypes.size()]));
+        }
 
         Log.d(TAG, "Search results query sent to CMP: " + queryArgs);
 

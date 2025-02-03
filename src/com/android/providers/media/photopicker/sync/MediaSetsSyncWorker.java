@@ -58,6 +58,8 @@ public class MediaSetsSyncWorker extends Worker {
     private final int PAGE_SIZE = 500;
     private final Context mContext;
     private final CancellationSignal mCancellationSignal;
+    private boolean mMarkedSyncWorkAsComplete = false;
+
 
     public MediaSetsSyncWorker(@NonNull Context context, @NonNull WorkerParameters parameters) {
         super(context, parameters);
@@ -156,13 +158,22 @@ public class MediaSetsSyncWorker extends Worker {
                     }
                     knownTokens.add(nextPageToken);
 
-                    // Notify the UI to start displaying the results after fetching each page
-                    PickerNotificationSender.notifyMediaSetsChange(mContext, categoryId);
+                    // Mark sync as complete
+                    if (mMarkedSyncWorkAsComplete) {
+                        // Notify the UI that a change has been made in the DB
+                        if (numberOfRowsInserted > 0) {
+                            PickerNotificationSender.notifyMediaSetsChange(mContext, categoryId);
+                        }
+                    } else {
+                        markMediaSetsSyncAsComplete(syncSource, getId());
+                        mMarkedSyncWorkAsComplete = true;
+                    }
                 }
             }
         } finally {
-            markMediaSetsSyncAsComplete(syncSource, getId());
-            PickerNotificationSender.notifyMediaSetsChange(mContext, categoryId);
+            if (!mMarkedSyncWorkAsComplete) {
+                markMediaSetsSyncAsComplete(syncSource, getId());
+            }
         }
     }
 

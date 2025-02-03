@@ -940,7 +940,7 @@ bool Page::UpdatePageAnnotation(int index, std::unique_ptr<Annotation> annotatio
         return false;
     }
 
-    if (annotation->UpdatePdfiumInstance(scoped_annot.get(), document_)) {
+    if (!annotation->UpdatePdfiumInstance(scoped_annot.get(), document_)) {
         LOGE("Failed to update pdfium annotation");
         return false;
     }

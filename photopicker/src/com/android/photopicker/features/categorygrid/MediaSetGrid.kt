@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +55,7 @@ import com.android.photopicker.core.navigation.LocalNavController
 import com.android.photopicker.core.navigation.PhotopickerDestinations
 import com.android.photopicker.core.obtainViewModel
 import com.android.photopicker.core.theme.LocalWindowSizeClass
+import com.android.photopicker.data.model.CategoryType
 import com.android.photopicker.data.model.Group
 import com.android.photopicker.extensions.navigateToMediaSetContentGrid
 import kotlinx.coroutines.flow.StateFlow
@@ -111,7 +112,8 @@ fun MediaSetGrid(
                         val localConfig = LocalConfiguration.current
                         val emptyStatePadding =
                             remember(localConfig) { (localConfig.screenHeightDp * .20).dp }
-                        val (title, body, icon) = getEmptyStateContentForMediaset()
+                        val (title, body, icon) =
+                            getEmptyStateContentForMediaset(category.categoryType)
                         EmptyState(
                             modifier =
                                 if (SdkLevel.isAtLeastU() && isEmbedded && host != null) {
@@ -203,10 +205,20 @@ fun MediaSetGrid(
  * @return a [Triple] that contains the [Title, Body, Icon] for the empty state.
  */
 @Composable
-private fun getEmptyStateContentForMediaset(): Triple<String, String, ImageVector> {
-    return Triple(
-        stringResource(R.string.photopicker_photos_empty_state_title),
-        stringResource(R.string.photopicker_photos_empty_state_body),
-        Icons.Outlined.Image,
-    )
+private fun getEmptyStateContentForMediaset(
+    categoryType: CategoryType
+): Triple<String, String, ImageVector> {
+    return if (categoryType == CategoryType.PEOPLE_AND_PETS) {
+        Triple(
+            stringResource(R.string.photopicker_people_category_empty_state_title),
+            stringResource(R.string.photopicker_people_category_empty_state_body),
+            Icons.Outlined.Group,
+        )
+    } else {
+        Triple(
+            stringResource(R.string.photopicker_photos_empty_state_title),
+            stringResource(R.string.photopicker_photos_empty_state_body),
+            Icons.Outlined.Group,
+        )
+    }
 }
