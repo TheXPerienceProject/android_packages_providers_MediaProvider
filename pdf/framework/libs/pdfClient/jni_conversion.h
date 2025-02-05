@@ -28,6 +28,7 @@
 #include "page_object.h"
 #include "rect.h"
 
+using pdfClient::Annotation;
 using pdfClient::Color;
 using pdfClient::Document;
 using pdfClient::FormWidgetInfo;
@@ -136,6 +137,15 @@ Color ToNativeColor(JNIEnv* env, jobject java_color);
 
 std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object,
                                                ICoordinateConverter* converter);
+
+jobject ToJavaPageAnnotations(JNIEnv* env, const vector<Annotation*>& annotations,
+                              ICoordinateConverter* converter);
+
+jobject ToJavaPageAnnotation(JNIEnv* env, const Annotation* annotation,
+                             ICoordinateConverter* converter);
+
+std::unique_ptr<Annotation> ToNativePageAnnotation(JNIEnv* env, jobject java_annotation,
+                                                   ICoordinateConverter* converter);
 
 }  // namespace convert
 

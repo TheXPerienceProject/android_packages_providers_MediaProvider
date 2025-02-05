@@ -166,7 +166,7 @@ public class SearchResultsSyncWorker extends Worker {
         final Pair<String, String> resumeKey = getResumeKey(searchRequest, syncSource);
 
         if (SYNC_COMPLETE_RESUME_KEY.equals(resumeKey.first)) {
-            Log.i(TAG, "Sync has already been completed.");
+            Log.i(TAG, "Sync was already complete.");
             return;
         }
 
@@ -182,13 +182,14 @@ public class SearchResultsSyncWorker extends Worker {
                 throwIfCloudProviderHasChanged(authority);
 
                 try (Cursor cursor = fetchSearchResultsFromCmp(
-                        searchClient, authority, searchRequest, nextPageToken)) {
+                        searchClient, authority, searchRequest, nextPageToken,
+                        searchRequest.getMimeTypes())) {
 
                     List<ContentValues> contentValues =
                             SearchResultsDatabaseUtil.extractContentValuesList(
                                     searchRequestId, cursor, isLocal(authority));
 
-                    SearchResultsDatabaseUtil
+                    int numberOfRowsInserted = SearchResultsDatabaseUtil
                             .cacheSearchResults(getDatabase(), authority, contentValues,
                                     mCancellationSignal);
 
@@ -207,8 +208,11 @@ public class SearchResultsSyncWorker extends Worker {
                     // Mark sync as completed after getting the first page to start returning
                     // search results to the UI.
                     if (mMarkedSyncWorkAsComplete) {
-                        PickerNotificationSender
-                                .notifySearchResultsChange(mContext, searchRequestId);
+                        // Notify the UI that a change has been made in the DB
+                        if (numberOfRowsInserted > 0) {
+                            PickerNotificationSender
+                                    .notifySearchResultsChange(mContext, searchRequestId);
+                        }
                     } else {
                         markSearchResultsSyncAsComplete(syncSource, getId());
                         mMarkedSyncWorkAsComplete = true;
@@ -318,7 +322,8 @@ public class SearchResultsSyncWorker extends Worker {
             @NonNull PickerSearchProviderClient searchClient,
             @NonNull String authority,
             @NonNull SearchRequest searchRequest,
-            @Nullable String resumePageToken) {
+            @Nullable String resumePageToken,
+            @Nullable List<String> mimeTypes) {
         final String suggestedMediaSetId;
         final String searchText;
         if (searchRequest instanceof SearchSuggestionRequest searchSuggestionRequest) {
@@ -341,6 +346,7 @@ public class SearchResultsSyncWorker extends Worker {
                 suggestedMediaSetId,
                 searchText,
                 CloudMediaProviderContract.SORT_ORDER_DESC_DATE_TAKEN,
+                mimeTypes,
                 PAGE_SIZE,
                 resumePageToken,
                 mCancellationSignal
