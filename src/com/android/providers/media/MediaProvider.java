@@ -1301,12 +1301,24 @@ public class MediaProvider extends ContentProvider {
         }
     }
 
+    @VisibleForTesting
+    protected String[] getDefaultFolderNames() {
+        return DEFAULT_FOLDER_NAMES;
+    }
+
+    @VisibleForTesting
+    protected List<String> getFoldersToSkipInDefaultCreation() {
+        return StringUtils.getStringArrayConfig(getContext(),
+                R.array.config_foldersToSkipInDefaultCreation);
+    }
+
     /**
      * Ensure that default folders are created on mounted storage devices.
      * We only do this once per volume so we don't annoy the user if deleted
-     * manually.
+     * manually. Folders in the exclusion list are not created.
      */
-    private void ensureDefaultFolders(@NonNull MediaVolume volume, @NonNull SQLiteDatabase db) {
+    @VisibleForTesting
+    protected void ensureDefaultFolders(@NonNull MediaVolume volume, @NonNull SQLiteDatabase db) {
         if (volume.shouldSkipDefaultDirCreation()) {
             // Default folders should not be automatically created inside volumes managed from
             // outside Android.
@@ -1326,13 +1338,26 @@ public class MediaProvider extends ContentProvider {
         }
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+        // Get case insensitive exclusion list.
+        List<String> exclusionList =
+                Flags.enableExclusionListForDefaultFolders()
+                        ? getFoldersToSkipInDefaultCreation().stream().map(
+                        String::toLowerCase).collect(Collectors.toList())
+                        : List.of();
         if (prefs.getInt(key, 0) == 0) {
-            for (String folderName : DEFAULT_FOLDER_NAMES) {
+            for (String folderName : getDefaultFolderNames()) {
                 final File folder = new File(volume.getPath(), folderName);
-                if (!folder.exists()) {
-                    folder.mkdirs();
-                    insertDirectory(db, folder.getAbsolutePath());
+                if (folder.exists()) {
+                    continue;
                 }
+                if (Flags.enableExclusionListForDefaultFolders() && exclusionList.contains(
+                        folderName.toLowerCase(Locale.ROOT))) {
+                    // Do not create mobile-centric folders for PC.
+                    Log.d(TAG, "Excluding " + folder + " from default creation");
+                    continue;
+                }
+                folder.mkdirs();
+                insertDirectory(db, folder.getAbsolutePath());
             }
 
             SharedPreferences.Editor editor = prefs.edit();
@@ -3981,7 +4006,8 @@ public class MediaProvider extends ContentProvider {
                     mPickerSyncController.getCloudProvider(), mPickerDataLayer);
         }
         if (table == PICKER_INTERNAL_V2) {
-            return PickerUriResolverV2.query(getContext().getApplicationContext(), uri, queryArgs);
+            return PickerUriResolverV2.query(
+                    getContext().getApplicationContext(), uri, queryArgs, signal);
         }
 
         final DatabaseHelper helper = getDatabaseForUri(uri);
@@ -7236,6 +7262,7 @@ public class MediaProvider extends ContentProvider {
         int userId;
         List<Uri> uris = null;
         String[] packageNames;
+        int packageUid;
         if (checkPermissionShell(caller)) {
             // If the caller is the shell, the accepted parameter is EXTRA_PACKAGE_NAME
             // (as string).
@@ -7244,7 +7271,14 @@ public class MediaProvider extends ContentProvider {
                         "Missing required extras arguments: EXTRA_URI or"
                                 + " EXTRA_PACKAGE_NAME");
             }
-            packageNames = new String[]{extras.getString(Intent.EXTRA_PACKAGE_NAME)};
+            String packageName = extras.getString(Intent.EXTRA_PACKAGE_NAME);
+            packageNames = new String[]{packageName};
+            try {
+                packageUid = mPackageManager.getPackageUid(packageName, 0);
+            } catch (NameNotFoundException e) {
+                Log.e(TAG, "No packageUid found for packageName " + packageName, e);
+                throw new RuntimeException(e);
+            }
             // Uris are not a requirement for revoke all call
             if (!isCallForRevokeAll) {
                 uris = List.of(Uri.parse(extras.getString(MediaStore.EXTRA_URI)));
@@ -7254,7 +7288,7 @@ public class MediaProvider extends ContentProvider {
             userId = UserHandle.myUserId();
         } else if (checkPermissionSelf(caller) || isCallerPhotoPicker()) {
             final PackageManager pm = getContext().getPackageManager();
-            final int packageUid = extras.getInt(Intent.EXTRA_UID);
+            packageUid = extras.getInt(Intent.EXTRA_UID);
             packageNames = pm.getPackagesForUid(packageUid);
             // Get the userId from packageUid as the initiator could be a cloned app, which
             // accesses Media via MP of its parent user and Binder's callingUid reflects
@@ -7270,12 +7304,12 @@ public class MediaProvider extends ContentProvider {
                     getSecurityExceptionMessage("revoke media grants"));
         }
 
-        if (isCallForRevokeAll && !isOwnedPhotosEnabled(caller)) {
+        if (isCallForRevokeAll && !isOwnedPhotosEnabled(packageUid)) {
             mMediaGrants.removeAllMediaGrantsForPackages(packageNames, "user de-selections",
                     userId);
         } else if (uris != null) {
             mMediaGrants.removeMediaGrantsForPackage(packageNames, uris, userId);
-            if (isOwnedPhotosEnabled(caller)) {
+            if (isOwnedPhotosEnabled(packageUid)) {
                 mFilesOwnershipUtils.removeOwnerPackageNameForUris(packageNames, uris,
                         userId);
             }
@@ -10445,15 +10479,17 @@ public class MediaProvider extends ContentProvider {
         // Hence, we check the mPendingOpenInfo object (populated when opens are initiated from
         // MediaProvider) if there's a pending open from MediaProvider with matching tid and uid and
         // use the shouldRedact decision there if there's one.
+        PendingOpenInfo info;
         synchronized (mPendingOpenInfo) {
-            PendingOpenInfo info = mPendingOpenInfo.get(tid);
-            if (info != null && info.uid == original_uid) {
-                boolean shouldRedact = info.shouldRedact;
-                if (shouldRedact) {
-                    return RedactionUtils.getRedactionRanges(file);
-                } else {
-                    return new long[0];
-                }
+            info = mPendingOpenInfo.get(tid);
+        }
+
+        if (info != null && info.uid == original_uid) {
+            boolean shouldRedact = info.shouldRedact;
+            if (shouldRedact) {
+                return RedactionUtils.getRedactionRanges(file);
+            } else {
+                return new long[0];
             }
         }
 

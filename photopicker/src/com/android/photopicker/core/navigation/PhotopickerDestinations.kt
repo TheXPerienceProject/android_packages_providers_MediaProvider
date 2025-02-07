@@ -38,4 +38,10 @@ enum class PhotopickerDestinations(val route: String) {
 
     // The route which shows a grid of the user's categories and albums.
     CATEGORY_GRID("categorygrid"),
+
+    // The route which shows a grid of the user's media set.
+    MEDIA_SET_GRID("mediasetgrid"),
+
+    // The route which shows a grid of the user's media set content.
+    MEDIA_SET_CONTENT_GRID("mediasetcontentgrid"),
 }

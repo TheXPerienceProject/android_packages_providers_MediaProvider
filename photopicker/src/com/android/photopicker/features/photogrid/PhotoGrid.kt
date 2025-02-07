@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -83,11 +84,11 @@ import com.android.photopicker.extensions.navigateToAlbumGrid
 import com.android.photopicker.extensions.navigateToCategoryGrid
 import com.android.photopicker.extensions.navigateToPhotoGrid
 import com.android.photopicker.extensions.navigateToPreviewMedia
-import com.android.photopicker.extensions.transferTouchesToHostInEmbedded
 import com.android.photopicker.features.albumgrid.AlbumGridFeature
 import com.android.photopicker.features.categorygrid.CategoryGridFeature
 import com.android.photopicker.features.navigationbar.NavigationBarButton
 import com.android.photopicker.features.preview.PreviewFeature
+import com.android.photopicker.features.search.SearchFeature
 import com.android.photopicker.util.LocalLocalizationHelper
 import kotlinx.coroutines.launch
 
@@ -170,6 +171,17 @@ fun PhotoGrid(viewModel: PhotoGridViewModel = obtainViewModel()) {
                         } else if (
                             featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
                         ) {
+                            // Dispatch UI event to indicate switching to collections tab
+                            scope.launch {
+                                events.dispatch(
+                                    Event.LogPhotopickerUIEvent(
+                                        FeatureToken.CATEGORY_GRID.token,
+                                        configuration.sessionId,
+                                        configuration.callingPackageUid ?: -1,
+                                        Telemetry.UiEvent.SWITCH_PICKER_TAB,
+                                    )
+                                )
+                            }
                             navController.navigateToCategoryGrid()
                         }
                     }
@@ -205,7 +217,7 @@ fun PhotoGrid(viewModel: PhotoGridViewModel = obtainViewModel()) {
                         if (SdkLevel.isAtLeastU() && isEmbedded && host != null) {
                             // In embedded no need to give extra top padding to make empty
                             // state title and body clearly visible in collapse mode (small view)
-                            Modifier.fillMaxWidth().transferTouchesToHostInEmbedded(host = host)
+                            Modifier.fillMaxWidth()
                         } else {
                             // Provide 20% of screen height as empty space above
                             Modifier.fillMaxWidth().padding(top = emptyStatePadding)
@@ -225,11 +237,6 @@ fun PhotoGrid(viewModel: PhotoGridViewModel = obtainViewModel()) {
                 mediaGrid(
                     items = items,
                     isExpandedScreen = isExpandedScreen,
-                    userScrollEnabled =
-                        when (isEmbedded) {
-                            true -> isExpanded
-                            false -> true
-                        },
                     selection = selection,
                     bannerContent = {
                         hideWhenState(
@@ -357,6 +364,7 @@ fun PhotoGridNavButton(modifier: Modifier) {
     val contentDescriptionString = stringResource(R.string.photopicker_photos_nav_button_label)
     val featureManager = LocalFeatureManager.current
     val categoryFeatureEnabled = featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
+    val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
 
     NavigationBarButton(
         onClick = {
@@ -376,8 +384,8 @@ fun PhotoGridNavButton(modifier: Modifier) {
         modifier = modifier.semantics { contentDescription = contentDescriptionString },
         isCurrentRoute = { route -> route == PHOTO_GRID.route },
     ) {
-        when (categoryFeatureEnabled) {
-            true -> {
+        when {
+            categoryFeatureEnabled && searchFeatureEnabled -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Outlined.PhotoAlbum,
@@ -385,10 +393,14 @@ fun PhotoGridNavButton(modifier: Modifier) {
                             stringResource(R.string.photopicker_photos_nav_button_label),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.photopicker_photos_nav_button_label))
+                    Text(
+                        stringResource(R.string.photopicker_photos_nav_button_label),
+                        maxLines = 1, // Limit the text to a single line
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            false -> Text(stringResource(R.string.photopicker_photos_nav_button_label))
+            else -> Text(stringResource(R.string.photopicker_photos_nav_button_label))
         }
     }
 }

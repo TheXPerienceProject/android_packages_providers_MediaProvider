@@ -109,7 +109,7 @@ public class FilesOwnershipUtils {
             int rowsAffected = db.update(FILES_TABLE_NAME, contentValues, whereClause,
                     whereArgs.toArray(String[]::new));
 
-            Log.d(TAG, "Set owner package name to null for " + rowsAffected + " items for "
+            Log.i(TAG, "Set owner package name to null for " + rowsAffected + " items for "
                     + "packages " + Arrays.toString(packages));
 
             db.execSQL("DROP TABLE " + TEMP_TABLE_NAME);

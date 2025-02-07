@@ -414,20 +414,23 @@ public class PickerDataLayerV2 {
 
         // Add Pinned album and categories to the list of cursors in the order in which they
         // should be displayed. Note that pinned albums can only be local and merged albums.
+        long index = 0;
         for (Pair<MediaGroup, String> mediaGroup: PINNED_CATEGORIES_AND_ALBUMS_ORDER) {
             final Cursor cursor;
-
             switch (mediaGroup.first) {
                 case ALBUM:
                     final String albumId = mediaGroup.second;
                     if (MERGED_ALBUMS.contains(albumId)) {
-                        final Cursor albumsCursor = PickerMediaDatabaseUtil.getMergedAlbumsCursor(
+                        final Cursor mergedAlbumCursor =
+                                PickerMediaDatabaseUtil.getMergedAlbumsCursor(
                                 albumId, appContext, queryArgs, database, effectiveLocalAuthority,
                                 effectiveCloudAuthority);
-                        cursor = MediaGroupCursorUtils.getMediaGroupCursorForAlbums(albumsCursor);
+                        cursor = MediaGroupCursorUtils.getMediaGroupCursorForAlbums(
+                                mergedAlbumCursor, index);
                     } else if (LOCAL_ALBUMS.contains(albumId)) {
-                        final Cursor albumCursor = localAlbums.getOrDefault(albumId, null);
-                        cursor = MediaGroupCursorUtils.getMediaGroupCursorForAlbums(albumCursor);
+                        final Cursor localAlbumCursor = localAlbums.getOrDefault(albumId, null);
+                        cursor = MediaGroupCursorUtils.getMediaGroupCursorForAlbums(
+                                localAlbumCursor, index);
                     } else {
                         Log.e(TAG, "Could not recognize pinned album id, skipping it : " + albumId);
                         cursor = null;
@@ -438,7 +441,7 @@ public class PickerDataLayerV2 {
                     switch (mediaGroup.second) {
                         case CloudMediaProviderContract.MEDIA_CATEGORY_TYPE_PEOPLE_AND_PETS:
                             cursor = MediaGroupCursorUtils.getMediaGroupCursorForCategories(
-                                    categories, effectiveCloudAuthority);
+                                    categories, effectiveCloudAuthority, index);
                             break;
                         default:
                             Log.e(TAG, "Could not recognize pinned category type, skipping it : "
@@ -452,7 +455,10 @@ public class PickerDataLayerV2 {
                     cursor = null;
             }
 
-            allMediaGroupCursors.add(cursor);
+            if (cursor != null) {
+                index += cursor.getCount();
+                allMediaGroupCursors.add(cursor);
+            }
         }
 
         // Add cloud albums at the end.
@@ -462,7 +468,7 @@ public class PickerDataLayerV2 {
             final Cursor cloudAlbumsCursor = getCloudAlbumsCursor(appContext, query,
                     effectiveLocalAuthority, effectiveCloudAuthority);
             allMediaGroupCursors.add(
-                    MediaGroupCursorUtils.getMediaGroupCursorForAlbums(cloudAlbumsCursor));
+                    MediaGroupCursorUtils.getMediaGroupCursorForAlbums(cloudAlbumsCursor, index));
         } catch (RuntimeException ex) {
             Log.w(TAG, "Cloud provider exception while fetching cloud albums cursor", ex);
         }
@@ -882,7 +888,7 @@ public class PickerDataLayerV2 {
         if (cloudAuthority != null) {
             Log.d(TAG, "Waiting for cloud search results");
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudSearchSyncTracker(), /* timeoutInMillis */ 3000);
+                    SyncTrackerRegistry.getCloudSearchSyncTracker(), /* timeoutInMillis */ 5000);
         }
     }
 
@@ -897,12 +903,17 @@ public class PickerDataLayerV2 {
     private static void waitForOngoingMediaInMediaSetSync(
             @Nullable String localAuthority,
             @Nullable String cloudAuthority) {
+        if (localAuthority != null && cloudAuthority != null) {
+            Log.w(TAG, "Media sets sync can only happen with either the local provider or a "
+                    + "cloud provider for a parent category. Please check the input providers.");
+        }
         if (localAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
                     SyncTrackerRegistry.getLocalMediaInMediaSetTracker(), /*timeoutInMillis*/ 500);
-        } else if (cloudAuthority != null) {
+        }
+        if (cloudAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudMediaInMediaSetTracker(), /*timeoutInMillis*/ 500);
+                    SyncTrackerRegistry.getCloudMediaInMediaSetTracker(), /*timeoutInMillis*/ 2000);
         }
     }
 
@@ -917,12 +928,17 @@ public class PickerDataLayerV2 {
     private static void waitForOngoingMediaSetsSync(
             @Nullable String localAuthority,
             @Nullable String cloudAuthority) {
+        if (localAuthority != null && cloudAuthority != null) {
+            Log.w(TAG, "Media set contents sync can only happen with either the local provider or"
+                    + " a cloud provider for a parent category. Please check the input providers.");
+        }
         if (localAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
                     SyncTrackerRegistry.getLocalMediaSetsSyncTracker(), /*timeoutInMillis*/ 500);
-        } else if (cloudAuthority != null) {
+        }
+        if (cloudAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudMediaSetsSyncTracker(), /*timeoutInMillis*/ 500);
+                    SyncTrackerRegistry.getCloudMediaSetsSyncTracker(), /*timeoutInMillis*/ 2000);
         }
     }
 
@@ -1444,7 +1460,6 @@ public class PickerDataLayerV2 {
             @NonNull Bundle extras, @NonNull Context appContext, @NonNull WorkManager workManager) {
 
         requireNonNull(workManager);
-
         MediaSetsSyncRequestParams mediaSetsSyncRequestParams =
                 new MediaSetsSyncRequestParams(extras);
         final Set<String> providers = new HashSet<>(
@@ -1467,7 +1482,9 @@ public class PickerDataLayerV2 {
 
                 final PickerSyncManager syncManager =
                         new PickerSyncManager(getWorkManager(context), context);
-                syncManager.resetCloudSearchResults();
+                final String cloudAuthority = PickerSyncController.getInstanceOrThrow()
+                        .getCloudProviderOrDefault(null);
+                syncManager.resetCloudSearchCache(cloudAuthority);
             }
         } catch (Exception e) {
             Log.e(TAG, "Unexpected error occurred in handleCloudMediaReset", e);

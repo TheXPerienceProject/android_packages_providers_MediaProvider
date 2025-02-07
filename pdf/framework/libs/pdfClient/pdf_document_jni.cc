@@ -45,6 +45,7 @@ using pdfClient::Document;
 using pdfClient::FileReader;
 using pdfClient::GotoLink;
 using pdfClient::Page;
+using pdfClient::Point_f;
 using pdfClient::Point_i;
 using pdfClient::Rectangle_i;
 using pdfClient::SelectionBoundary;
@@ -319,8 +320,8 @@ Java_android_graphics_pdf_PdfDocumentProxy_isPdfLinearized(JNIEnv* env, jobject 
     return doc->IsLinearized();
 }
 
-JNIEXPORT jint JNICALL Java_android_graphics_pdf_PdfDocumentProxy_getFormType(JNIEnv* env,
-                                                                            jobject jPdfDocument) {
+JNIEXPORT jint JNICALL Java_android_graphics_pdf_PdfDocumentProxy_getFormType(
+        JNIEnv* env, jobject jPdfDocument) {
     std::unique_lock<std::mutex> lock(mutex_);
     Document* doc = convert::GetPdfDocPtr(env, jPdfDocument);
     return doc->GetFormType();
@@ -445,4 +446,66 @@ JNIEXPORT jobject JNICALL Java_android_graphics_pdf_PdfDocumentProxy_setFormFiel
     }
     doc->ReleaseRetainedPage(pageNum);
     return convert::ToJavaRects(env, invalid_rects);
+}
+
+JNIEXPORT jint JNICALL Java_android_graphics_pdf_PdfDocumentProxy_addPageObject(
+        JNIEnv* env, jobject jPdfDocument, jint pageNum, jobject jPageObject) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    Document* doc = convert::GetPdfDocPtr(env, jPdfDocument);
+    std::shared_ptr<Page> page = doc->GetPage(pageNum, true);
+
+    std::unique_ptr<PageObject> page_object =
+            convert::ToNativePageObject(env, jPageObject, page.get());
+
+    if (!page_object) {
+        return -1;
+    }
+
+    int new_object_index = page->AddPageObject(std::move(page_object));
+
+    doc->ReleaseRetainedPage(pageNum);
+    return new_object_index;
+}
+
+JNIEXPORT jobject JNICALL Java_android_graphics_pdf_PdfDocumentProxy_getPageObjects(
+        JNIEnv* env, jobject jPdfDocument, jint pageNum) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    Document* doc = convert::GetPdfDocPtr(env, jPdfDocument);
+    std::shared_ptr<Page> page = doc->GetPage(pageNum, true);
+
+    std::vector<PageObject*> page_objects = page->GetPageObjects();
+
+    doc->ReleaseRetainedPage(pageNum);
+    return convert::ToJavaPdfPageObjects(env, page_objects, page.get());
+}
+
+JNIEXPORT jboolean JNICALL Java_android_graphics_pdf_PdfDocumentProxy_removePageObject(
+        JNIEnv* env, jobject jPdfDocument, jint pageNum, jint index) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    Document* doc = convert::GetPdfDocPtr(env, jPdfDocument);
+    std::shared_ptr<Page> page = doc->GetPage(pageNum, true);
+
+    bool removed = page->RemovePageObject(index);
+
+    doc->ReleaseRetainedPage(pageNum);
+    return removed;
+}
+
+JNIEXPORT jboolean JNICALL Java_android_graphics_pdf_PdfDocumentProxy_updatePageObject(
+        JNIEnv* env, jobject jPdfDocument, jint pageNum, jint index, jobject jPageObject) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    Document* doc = convert::GetPdfDocPtr(env, jPdfDocument);
+    std::shared_ptr<Page> page = doc->GetPage(pageNum, true);
+
+    std::unique_ptr<PageObject> page_object =
+            convert::ToNativePageObject(env, jPageObject, page.get());
+
+    if (!page_object) {
+        return false;
+    }
+
+    bool updated = page->UpdatePageObject(index, std::move(page_object));
+
+    doc->ReleaseRetainedPage(pageNum);
+    return updated;
 }

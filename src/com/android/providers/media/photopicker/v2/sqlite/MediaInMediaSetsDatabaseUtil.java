@@ -297,7 +297,7 @@ public class MediaInMediaSetsDatabaseUtil {
      * insert into the media_in_media_sets_table
      */
     public static List<ContentValues> getMediaContentValuesFromCursor(
-            @NonNull Cursor mediaCursor, @NonNull String mediaSetPickerId, boolean isLocal) {
+            @NonNull Cursor mediaCursor, @NonNull Long mediaSetPickerId, boolean isLocal) {
         Objects.requireNonNull(mediaSetPickerId);
         Objects.requireNonNull(mediaCursor);
 

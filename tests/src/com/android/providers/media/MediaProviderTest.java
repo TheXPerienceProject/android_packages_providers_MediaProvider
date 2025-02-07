@@ -20,6 +20,7 @@ import static android.content.ContentResolver.QUERY_ARG_SQL_GROUP_BY;
 import static android.content.ContentResolver.QUERY_ARG_SQL_HAVING;
 import static android.provider.MediaStore.getGeneration;
 
+import static com.android.providers.media.DatabaseHelper.EXTERNAL_DATABASE_NAME;
 import static com.android.providers.media.scan.MediaScannerTest.stage;
 import static com.android.providers.media.util.FileUtils.extractDisplayName;
 import static com.android.providers.media.util.FileUtils.extractRelativePath;
@@ -48,6 +49,7 @@ import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.res.AssetFileDescriptor;
@@ -61,7 +63,10 @@ import android.os.Environment;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Audio.AudioColumns;
 import android.provider.MediaStore.Files.FileColumns;
@@ -97,7 +102,9 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
@@ -113,10 +120,17 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @RunWith(AndroidJUnit4.class)
 public class MediaProviderTest {
+    @ClassRule
+    public static final SetFlagsRule.ClassRule mClassRule = new SetFlagsRule.ClassRule();
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = mClassRule.createSetFlagsRule();
+
     static final String TAG = "MediaProviderTest";
 
     // The test app without permissions
@@ -914,6 +928,209 @@ public class MediaProviderTest {
         uri = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
         assertEndsWith(".mp4",
                 buildFile(uri, null, "", ""));
+    }
+
+    private void setSharedPreference(String preference, int value) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(
+                sIsolatedContext);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt(preference, value);
+        editor.commit();
+    }
+
+
+    @Test
+    public void testEnsureDefaultFolders_EmptyExclusionList() throws Exception {
+        // Put the fake "default" folders in Documents as they can easily be created and
+        // deleted here.
+        String[] defaultFolderList =
+                new String[]{"Documents/A", "Documents/B", "Documents/C", "Documents/D"};
+        final MediaProvider provider = new MediaProvider() {
+            @Override
+            protected String[] getDefaultFolderNames() {
+                return defaultFolderList;
+            }
+
+            @Override
+            protected List<String> getFoldersToSkipInDefaultCreation() {
+                // Set an empty exclusion list.
+                return Arrays.asList();
+            }
+
+            @Override
+            protected void storageNativeBootPropertyChangeListener() {
+                // Ignore this as test app cannot read device config
+            }
+        };
+
+        // Get the external primary volume.
+        final ProviderInfo info = sIsolatedContext.getPackageManager()
+                .resolveContentProvider(MediaStore.AUTHORITY, PackageManager.GET_META_DATA);
+        provider.attachInfo(sIsolatedContext, info);
+        MediaVolume externalPrimary = provider.getVolume(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+
+        // Set this preference to ensure that the default folders are actually created.
+        setSharedPreference("created_default_folders_" + externalPrimary.getId(), 0);
+
+        // Make sure none of the folders exist already.
+        for (String folderName : defaultFolderList) {
+            final File folder = new File(externalPrimary.getPath(), folderName);
+            if (folder.exists()) {
+                assertTrue(folder.delete());
+            }
+        }
+
+        // Create the default folders for the external primary volume.
+        Optional<DatabaseHelper> maybeDatabaseHelper = provider.getDatabaseHelper(
+                EXTERNAL_DATABASE_NAME);
+        assertTrue(maybeDatabaseHelper.isPresent());
+        provider.ensureDefaultFolders(externalPrimary,
+                maybeDatabaseHelper.get().getWritableDatabaseForTest());
+
+        // Make sure all of the folders were created.
+        for (String folderName : defaultFolderList) {
+            final File folder = new File(externalPrimary.getPath(), folderName);
+            try {
+                assertTrue(folder.exists());
+            } finally {
+                // Clean up.
+                folder.delete();
+            }
+        }
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
+    public void testEnsureDefaultFolders_FlagDisabled() throws Exception {
+        // Put the fake "default" folders in Documents as they can easily be created and
+        // deleted here.
+        String[] defaultFolderList =
+                new String[]{"Documents/FolderA", "Documents/FolderB", "Documents/FolderC",
+                        "Documents/FolderD"};
+        List<String> exclusionList = Arrays.asList("Documents/FolderA", "Documents/FolderC");
+        final MediaProvider provider = new MediaProvider() {
+            @Override
+            protected String[] getDefaultFolderNames() {
+                return defaultFolderList;
+            }
+
+            @Override
+            protected List<String> getFoldersToSkipInDefaultCreation() {
+                // This should be ignored as the flag is disabled.
+                return exclusionList;
+            }
+
+            @Override
+            protected void storageNativeBootPropertyChangeListener() {
+                // Ignore this as test app cannot read device config
+            }
+        };
+
+        // Get the external primary volume.
+        final ProviderInfo info = sIsolatedContext.getPackageManager()
+                .resolveContentProvider(MediaStore.AUTHORITY, PackageManager.GET_META_DATA);
+        provider.attachInfo(sIsolatedContext, info);
+        MediaVolume externalPrimary = provider.getVolume(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+
+        // Set this preference to ensure that the default folders are actually created.
+        setSharedPreference("created_default_folders_" + externalPrimary.getId(), 0);
+
+        // Make sure none of the folders exist already.
+        for (String folderName : defaultFolderList) {
+            final File folder = new File(externalPrimary.getPath(), folderName);
+            if (folder.exists()) {
+                assertTrue(folder.delete());
+            }
+        }
+
+        // Create the default folders for the external primary volume.
+        Optional<DatabaseHelper> maybeDatabaseHelper = provider.getDatabaseHelper(
+                EXTERNAL_DATABASE_NAME);
+        assertTrue(maybeDatabaseHelper.isPresent());
+        provider.ensureDefaultFolders(externalPrimary,
+                maybeDatabaseHelper.get().getWritableDatabaseForTest());
+
+        // Make sure all of the folders were created.
+        for (String folderName : defaultFolderList) {
+            final File folder = new File(externalPrimary.getPath(), folderName);
+            try {
+                assertTrue(folder.exists());
+            } finally {
+                // Clean up.
+                folder.delete();
+            }
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
+    public void testEnsureDefaultFolders_WithExclusionList() throws Exception {
+        // Put the fake "default" folders in Documents as they can easily be created and
+        // deleted here.
+        String[] defaultFolderList =
+                new String[]{"Documents/FolderA", "Documents/FolderB", "Documents/FolderC",
+                        "Documents/FolderD"};
+        // The exclusion list is case insensitive.
+        List<String> exclusionList = Arrays.asList("Documents/foldera", "Documents/FOLDERC");
+        final MediaProvider provider = new MediaProvider() {
+            @Override
+            protected String[] getDefaultFolderNames() {
+                return defaultFolderList;
+            }
+
+            @Override
+            protected List<String> getFoldersToSkipInDefaultCreation() {
+                return exclusionList;
+            }
+
+            @Override
+            protected void storageNativeBootPropertyChangeListener() {
+                // Ignore this as test app cannot read device config
+            }
+        };
+
+        // Get the external primary volume.
+        final ProviderInfo info = sIsolatedContext.getPackageManager()
+                .resolveContentProvider(MediaStore.AUTHORITY, PackageManager.GET_META_DATA);
+        provider.attachInfo(sIsolatedContext, info);
+        MediaVolume externalPrimary = provider.getVolume(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+
+        // Set this preference to ensure that the default folders are actually created.
+        setSharedPreference("created_default_folders_" + externalPrimary.getId(), 0);
+
+        // Make sure none of the folders exist already.
+        for (String folderName : defaultFolderList) {
+            final File folder = new File(externalPrimary.getPath(), folderName);
+            if (folder.exists()) {
+                assertTrue(folder.delete());
+            }
+        }
+
+        // Create the default folders for the external primary volume.
+        Optional<DatabaseHelper> maybeDatabaseHelper = provider.getDatabaseHelper(
+                EXTERNAL_DATABASE_NAME);
+        assertTrue(maybeDatabaseHelper.isPresent());
+        provider.ensureDefaultFolders(externalPrimary,
+                maybeDatabaseHelper.get().getWritableDatabaseForTest());
+
+        // Make sure that the folders on exclusion list were not created.
+        List<String> exclusionListCaseInsensitive = exclusionList.stream().map(
+                String::toLowerCase).collect(
+                Collectors.toList());
+        for (String folderName : defaultFolderList) {
+            final File folder = new File(externalPrimary.getPath(), folderName);
+            try {
+                if (exclusionListCaseInsensitive.contains(
+                        folderName.toLowerCase(Locale.ROOT))) {
+                    assertFalse(folder.exists());
+                } else {
+                    assertTrue(folder.exists());
+                }
+            } finally {
+                // Clean up.
+                folder.delete();
+            }
+        }
     }
 
     @Test

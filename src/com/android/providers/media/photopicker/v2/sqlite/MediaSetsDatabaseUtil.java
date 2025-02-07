@@ -32,7 +32,6 @@ import androidx.annotation.Nullable;
 import com.android.providers.media.photopicker.v2.model.MediaSetsSyncRequestParams;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -126,7 +125,7 @@ public class MediaSetsDatabaseUtil {
      */
     public static Pair<String, String[]> getMediaSetIdAndMimeType(
             @NonNull SQLiteDatabase database,
-            @NonNull String mediaSetPickerId) {
+            @NonNull Long mediaSetPickerId) {
         Objects.requireNonNull(database);
         Objects.requireNonNull(mediaSetPickerId);
 
@@ -171,9 +170,14 @@ public class MediaSetsDatabaseUtil {
             @NonNull SQLiteDatabase database, @NonNull MediaSetsSyncRequestParams requestParams) {
         Objects.requireNonNull(database);
         Objects.requireNonNull(requestParams);
-        String categoryId = requestParams.getCategoryId();
-        String authority = requestParams.getAuthority();
-        List<String> mimeTypes = Arrays.asList(requestParams.getMimeTypes());
+        final String categoryId = requestParams.getCategoryId();
+        final String authority = requestParams.getAuthority();
+        final List<String> mimeTypes;
+        if (requestParams.getMimeTypes() != null) {
+            mimeTypes = requestParams.getMimeTypes();
+        } else {
+            mimeTypes = null;
+        }
         Objects.requireNonNull(categoryId);
         Objects.requireNonNull(authority);
 
@@ -201,8 +205,7 @@ public class MediaSetsDatabaseUtil {
                         String.format(Locale.ROOT, " %s = '%s' ",
                                 PickerSQLConstants.MediaSetsTableColumns.MEDIA_SET_AUTHORITY
                                         .getColumnName(), authority)
-                )
-                .appendWhereStandalone(
+                ).appendWhereStandalone(
                         String.format(Locale.ROOT, " %s = '%s' ",
                                 PickerSQLConstants.MediaSetsTableColumns.MIME_TYPE_FILTER
                                         .getColumnName(), getMimeTypesAsString(mimeTypes)));
@@ -219,7 +222,7 @@ public class MediaSetsDatabaseUtil {
      * @return The cursor which contains the media resume key for the media in that media set
      */
     public static String getMediaResumeKey(
-            @NonNull SQLiteDatabase database, @NonNull String mediaPickerId) {
+            @NonNull SQLiteDatabase database, @NonNull Long mediaPickerId) {
         Objects.requireNonNull(database);
         Objects.requireNonNull(mediaPickerId);
 
@@ -257,7 +260,7 @@ public class MediaSetsDatabaseUtil {
      * @param resumeKey The new value of the resume key
      */
     public static void updateMediaInMediaSetSyncResumeKey(@NonNull SQLiteDatabase database,
-            @NonNull String mediaSetPickerId, @Nullable String resumeKey) {
+            @NonNull Long mediaSetPickerId, @Nullable String resumeKey) {
         Objects.requireNonNull(database);
         Objects.requireNonNull(mediaSetPickerId);
 

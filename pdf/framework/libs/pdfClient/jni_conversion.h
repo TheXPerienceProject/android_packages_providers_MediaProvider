@@ -25,13 +25,20 @@
 #include "file.h"
 #include "form_widget_info.h"
 #include "page.h"
+#include "page_object.h"
 #include "rect.h"
 
+using pdfClient::Color;
 using pdfClient::Document;
 using pdfClient::FormWidgetInfo;
 using pdfClient::GotoLink;
 using pdfClient::GotoLinkDest;
+using pdfClient::ICoordinateConverter;
+using pdfClient::Matrix;
 using pdfClient::Option;
+using pdfClient::PageObject;
+using pdfClient::PathObject;
+using pdfClient::Point_f;
 using pdfClient::Rectangle_i;
 using pdfClient::SelectionBoundary;
 using pdfClient::Status;
@@ -107,6 +114,28 @@ jobject ToJavaDestination(JNIEnv* env, const GotoLinkDest dest);
 jobject ToJavaGotoLink(JNIEnv* env, const GotoLink link);
 
 jobject ToJavaGotoLinks(JNIEnv* env, const vector<GotoLink>& links);
+
+jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height);
+
+jobject ToJavaColor(JNIEnv* env, Color color);
+
+jfloatArray ToJavaFloatArray(JNIEnv* env, const float arr[], size_t length);
+
+jobject ToJavaMatrix(JNIEnv* env, const Matrix matrix);
+
+jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments,
+                   ICoordinateConverter* converter);
+
+jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object,
+                            ICoordinateConverter* converter);
+
+jobject ToJavaPdfPageObjects(JNIEnv* env, const vector<PageObject*>& page_objects,
+                             ICoordinateConverter* converter);
+
+Color ToNativeColor(JNIEnv* env, jobject java_color);
+
+std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object,
+                                               ICoordinateConverter* converter);
 
 }  // namespace convert
 

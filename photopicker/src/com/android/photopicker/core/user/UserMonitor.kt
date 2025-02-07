@@ -104,7 +104,7 @@ class UserMonitor(
                             }
                         }
                         .map { getUserProfileFromHandle(it, context) },
-                activeContentResolver = getContentResolver(context, processOwnerUserHandle)
+                activeContentResolver = getContentResolver(context, processOwnerUserHandle),
             )
         )
 
@@ -116,7 +116,7 @@ class UserMonitor(
         _userStatus.stateIn(
             scope,
             SharingStarted.WhileSubscribed(),
-            initialValue = _userStatus.value
+            initialValue = _userStatus.value,
         )
 
     /** Setup a BroadcastReceiver to receive broadcasts for profile availability changes */
@@ -190,7 +190,7 @@ class UserMonitor(
      */
     suspend fun requestSwitchActiveUserProfile(
         requested: UserProfile,
-        context: Context
+        context: Context,
     ): SwitchUserProfileResult {
 
         // Attempt to find the requested profile amongst the profiles known.
@@ -205,7 +205,7 @@ class UserMonitor(
                     it.copy(
                         activeUserProfile = profile,
                         activeContentResolver =
-                            getContentResolver(context, UserHandle.of(profile.identifier))
+                            getContentResolver(context, UserHandle.of(profile.identifier)),
                     )
                 }
                 return SwitchUserProfileResult.SUCCESS
@@ -230,7 +230,7 @@ class UserMonitor(
         handle?.let {
             Log.d(
                 TAG,
-                "Received a profile update for ${handle.getIdentifier()} from intent $intent"
+                "Received a profile update for ${handle.getIdentifier()} from intent $intent",
             )
 
             // Assemble a new UserProfile from the updated UserHandle.
@@ -244,7 +244,7 @@ class UserMonitor(
                         .filterNot { it.identifier == profile.identifier }
                         .toTypedArray(),
                     // Replace the matching profile with the updated one.
-                    profile
+                    profile,
                 )
 
             // Check and see if the profile we just updated is still enabled, and if it is the
@@ -256,7 +256,7 @@ class UserMonitor(
                 Log.i(
                     TAG,
                     "The active profile is no longer enabled, transitioning back to the process" +
-                        " owner's profile."
+                        " owner's profile.",
                 )
 
                 // The current profile is disabled, we need to transition back to the process
@@ -269,7 +269,9 @@ class UserMonitor(
                     _userStatus.update {
                         it.copy(
                             activeUserProfile = processOwnerProfile,
-                            allProfiles = newProfilesList
+                            allProfiles = newProfilesList,
+                            activeContentResolver =
+                                getContentResolver(context, processOwnerProfile.handle),
                         )
                     }
                 }
@@ -280,7 +282,7 @@ class UserMonitor(
                         Log.w(
                             TAG,
                             "Could not find the process owner's profile to switch to when the" +
-                                " active profile was disabled."
+                                " active profile was disabled.",
                         )
 
                         // Still attempt to update the list of profiles.
@@ -297,7 +299,7 @@ class UserMonitor(
             ?: run {
                 Log.w(
                     TAG,
-                    "Received intent: $intent but could not find matching UserHandle. Ignoring."
+                    "Received intent: $intent but could not find matching UserHandle. Ignoring.",
                 )
             }
     }
@@ -307,9 +309,7 @@ class UserMonitor(
      *
      * @return Whether CrossProfile content sharing is supported in this handle.
      */
-    private fun getIsCrossProfileAllowedForHandle(
-        handle: UserHandle,
-    ): Boolean {
+    private fun getIsCrossProfileAllowedForHandle(handle: UserHandle): Boolean {
 
         // First, check if cross profile is delegated to parent profile
         if (SdkLevel.isAtLeastV()) {
@@ -406,7 +406,7 @@ class UserMonitor(
                             if (!isCrossProfileSupported)
                                 add(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
                         }
-                }
+                },
         )
     }
 

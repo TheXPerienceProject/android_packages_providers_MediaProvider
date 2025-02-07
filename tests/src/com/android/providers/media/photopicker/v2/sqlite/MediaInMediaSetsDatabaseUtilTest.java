@@ -108,7 +108,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor3 = getCloudMediaCursor(CLOUD_ID_2, LOCAL_ID_2, 0);
         assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor3, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         int cloudRowsInserted = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -166,7 +166,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor3 = getCloudMediaCursor(CLOUD_ID_3, LOCAL_ID_3, 0);
         assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor3, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -220,8 +220,8 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor3 = getCloudMediaCursor(CLOUD_ID_3, LOCAL_ID_3, 0);
         assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor3, 1);
 
-        String mediaSetPickerId1 = "ms1";
-        String mediaSetPickerId2 = "ms2";
+        Long mediaSetPickerId1 = 1L;
+        Long mediaSetPickerId2 = 2L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -273,7 +273,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor4 = getLocalMediaCursor(LOCAL_ID_4, dateTaken);
         assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursor4, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -343,7 +343,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor3 = getCloudMediaCursor(CLOUD_ID_3, LOCAL_ID_3, 0);
         assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor3, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -402,7 +402,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
                 JPEG_IMAGE_MIME_TYPE, STANDARD_MIME_TYPE_EXTENSION, /* isFavorite */ false);
         assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursor4, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -463,7 +463,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor4 = getLocalMediaCursor(LOCAL_ID_4, 0);
         assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursor4, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -517,7 +517,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor4 = getLocalMediaCursor(LOCAL_ID_4, 0);
         assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursor4, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -582,7 +582,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
         final Cursor cursor3 = getCloudMediaCursor(CLOUD_ID_2, LOCAL_ID_2, 0);
         assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor3, 1);
 
-        String mediaSetPickerId = "mediaSetPickerId";
+        Long mediaSetPickerId = 1L;
 
         int cloudRowsInserted = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                 mDatabase, List.of(
@@ -608,7 +608,7 @@ public class MediaInMediaSetsDatabaseUtilTest {
     }
 
     private ContentValues getContentValues(
-            String localId, String cloudId, String mediaSetPickerId) {
+            String localId, String cloudId, Long mediaSetPickerId) {
         ContentValues contentValues = new ContentValues();
         contentValues.put(
                 PickerSQLConstants.MediaInMediaSetsTableColumns.CLOUD_ID.getColumnName(), cloudId);
