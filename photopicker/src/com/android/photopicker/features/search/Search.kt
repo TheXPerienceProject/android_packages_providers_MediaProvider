@@ -907,6 +907,16 @@ private fun ResultMediaGrid(
     when (resultsState) {
         ResultsState.EMPTY -> {
             EmptySearchResult()
+            LaunchedEffect(Unit) {
+                events.dispatch(
+                    Event.LogPhotopickerUIEvent(
+                        FeatureToken.SEARCH.token,
+                        configuration.sessionId,
+                        configuration.callingPackageUid ?: -1,
+                        Telemetry.UiEvent.UI_LOADED_EMPTY_STATE,
+                    )
+                )
+            }
         }
         ResultsState.LOADING_WITH_INDICATOR -> {
             Box(modifier = Modifier.fillMaxSize()) {
