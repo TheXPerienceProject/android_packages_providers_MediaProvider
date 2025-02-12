@@ -63,9 +63,10 @@ import android.os.Environment;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
-import android.platform.test.annotations.DisableFlags;
-import android.platform.test.annotations.EnableFlags;
-import android.platform.test.flag.junit.SetFlagsRule;
+import android.platform.test.annotations.RequiresFlagsDisabled;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Audio.AudioColumns;
@@ -97,12 +98,10 @@ import com.android.providers.media.util.FileUtilsTest;
 import com.android.providers.media.util.SQLiteQueryBuilder;
 import com.android.providers.media.util.UserCache;
 
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -126,10 +125,8 @@ import java.util.stream.Collectors;
 
 @RunWith(AndroidJUnit4.class)
 public class MediaProviderTest {
-    @ClassRule
-    public static final SetFlagsRule.ClassRule mClassRule = new SetFlagsRule.ClassRule();
     @Rule
-    public final SetFlagsRule mSetFlagsRule = mClassRule.createSetFlagsRule();
+    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
 
     static final String TAG = "MediaProviderTest";
 
@@ -142,8 +139,8 @@ public class MediaProviderTest {
     private static Context sContext;
     private static ContentResolver sIsolatedResolver;
 
-    @BeforeClass
-    public static void setUpBeforeClass() {
+    @Before
+    public void setUp() {
         InstrumentationRegistry.getInstrumentation().getUiAutomation()
                 .adoptShellPermissionIdentity(Manifest.permission.LOG_COMPAT_CHANGE,
                         Manifest.permission.READ_COMPAT_CHANGE_CONFIG,
@@ -154,15 +151,11 @@ public class MediaProviderTest {
                         // MANAGE_USERS permission for MediaProvider module.
                         Manifest.permission.CREATE_USERS,
                         Manifest.permission.INTERACT_ACROSS_USERS);
-    }
-
-    @Before
-    public void setUp() {
         resetIsolatedContext();
     }
 
-    @AfterClass
-    public static void tearDown() {
+    @After
+    public void tearDown() {
         InstrumentationRegistry.getInstrumentation()
                 .getUiAutomation().dropShellPermissionIdentity();
     }
@@ -940,6 +933,7 @@ public class MediaProviderTest {
 
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
     public void testEnsureDefaultFolders_EmptyExclusionList() throws Exception {
         // Put the fake "default" folders in Documents as they can easily be created and
         // deleted here.
@@ -1000,7 +994,7 @@ public class MediaProviderTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
     public void testEnsureDefaultFolders_FlagDisabled() throws Exception {
         // Put the fake "default" folders in Documents as they can easily be created and
         // deleted here.
@@ -1063,7 +1057,7 @@ public class MediaProviderTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_EXCLUSION_LIST_FOR_DEFAULT_FOLDERS)
     public void testEnsureDefaultFolders_WithExclusionList() throws Exception {
         // Put the fake "default" folders in Documents as they can easily be created and
         // deleted here.
@@ -2179,7 +2173,7 @@ public class MediaProviderTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
+    @RequiresFlagsEnabled(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
     public void testQueryingMediaGeolocationDataInProjectionShouldReturnNull() throws Exception {
         // Check with both upper and lower case column names
         String[][] projections = new String[][] {
@@ -2231,7 +2225,7 @@ public class MediaProviderTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
+    @RequiresFlagsEnabled(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
     public void testQueryingMediaGeolocationDataInSelectionShouldReturnEmptyCursor()
             throws Exception {
         final File downloads = new File(Environment.getExternalStorageDirectory(),
@@ -2259,7 +2253,7 @@ public class MediaProviderTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
+    @RequiresFlagsEnabled(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
     public void testQueryingMediaGeolocationDataInOrderByShouldReturnNonEmptyCursor()
             throws Exception {
         String testFileName = "test";
@@ -2290,7 +2284,7 @@ public class MediaProviderTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
+    @RequiresFlagsEnabled(Flags.FLAG_INDEX_MEDIA_LATITUDE_LONGITUDE)
     public void testQueryingMediaGeolocationDataInGroupByAndHavingShouldReturnEmptyCursor()
             throws Exception {
         String testFileName = "test";
