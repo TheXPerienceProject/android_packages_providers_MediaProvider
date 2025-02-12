@@ -742,7 +742,6 @@ public final class MediaStore {
      *
      * @see #EXTRA_OUTPUT
      */
-    @SuppressLint("NewApi")
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     @FlaggedApi(com.android.providers.media.flags.Flags.FLAG_MOTION_PHOTO_INTENT)
     public static final String ACTION_MOTION_PHOTO_CAPTURE =
@@ -769,7 +768,6 @@ public final class MediaStore {
      * @see #ACTION_MOTION_PHOTO_CAPTURE
      * @see #EXTRA_OUTPUT
      */
-    @SuppressLint("NewApi")
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     @FlaggedApi(com.android.providers.media.flags.Flags.FLAG_MOTION_PHOTO_INTENT)
     public static final String ACTION_MOTION_PHOTO_CAPTURE_SECURE =
