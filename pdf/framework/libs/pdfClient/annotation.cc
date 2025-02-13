@@ -88,7 +88,7 @@ ScopedFPDFAnnotation StampAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT documen
     rect.top = annotation_bounds.top;
 
     if (!FPDFAnnot_SetRect(scoped_annot.get(), &rect)) {
-        LOGE("Stamp Annotation bounds can't be set");
+        LOGE("Stamp Annotation bounds couldn't be set");
         return nullptr;
     }
 
@@ -102,7 +102,7 @@ ScopedFPDFAnnotation StampAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT documen
         }
 
         if (!FPDFAnnot_AppendObject(scoped_annot.get(), scoped_page_object.release())) {
-            LOGE("Page object can't be inserted in the stamp annotation");
+            LOGE("Page object couldn't be inserted in the stamp annotation");
             return nullptr;
         }
     }
@@ -153,7 +153,7 @@ bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCU
         }
 
         if (!FPDFAnnot_AppendObject(fpdf_annot, scoped_page_object.release())) {
-            LOGE("Page object can't be inserted in the stamp annotation");
+            LOGE("Page object couldn't be inserted in the stamp annotation");
             return false;
         }
     }
