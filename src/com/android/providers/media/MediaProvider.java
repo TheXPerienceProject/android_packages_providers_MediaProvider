@@ -552,6 +552,14 @@ public class MediaProvider extends ContentProvider {
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.BAKLAVA)
     static final long LOCKDOWN_MEDIASTORE_VERSION = 343977174L;
 
+    /**
+     * Number of uris sent to bulk write/delete/trash/favorite requests restricted at 2000.
+     * Attempting to send more than 2000 uris will result in an IllegalArgumentException.
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.BAKLAVA)
+    static final long LIMIT_CREATE_REQUEST_URIS = 203408344L;
+
     @GuardedBy("mPendingOpenInfo")
     private final Map<Integer, PendingOpenInfo> mPendingOpenInfo = new ArrayMap<>();
 
@@ -8172,6 +8180,11 @@ public class MediaProvider extends ContentProvider {
     private PendingIntent createRequest(@NonNull String method, @NonNull Bundle extras) {
         final ClipData clipData = extras.getParcelable(MediaStore.EXTRA_CLIP_DATA);
         final List<Uri> uris = collectUris(clipData);
+
+        if (getCallingPackageTargetSdkVersion() > Build.VERSION_CODES.VANILLA_ICE_CREAM
+                && CompatChanges.isChangeEnabled(LIMIT_CREATE_REQUEST_URIS) && uris.size() > 2000) {
+            throw new IllegalArgumentException("URI list restricted to 2000 per request");
+        }
 
         for (Uri uri : uris) {
             final int match = matchUri(uri, false);
