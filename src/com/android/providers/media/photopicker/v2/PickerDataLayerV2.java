@@ -913,7 +913,7 @@ public class PickerDataLayerV2 {
         }
         if (cloudAuthority != null) {
             SyncCompletionWaiter.waitForSyncWithTimeout(
-                    SyncTrackerRegistry.getCloudMediaInMediaSetTracker(), /*timeoutInMillis*/ 2000);
+                    SyncTrackerRegistry.getCloudMediaInMediaSetTracker(), /*timeoutInMillis*/ 5000);
         }
     }
 

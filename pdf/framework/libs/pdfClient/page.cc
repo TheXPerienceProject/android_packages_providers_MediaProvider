@@ -853,7 +853,7 @@ void Page::PopulateAnnotations() {
 
         FS_RECTF rect;
         if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
-            LOGE("Failed to get the bounds of the stamp annotation");
+            LOGE("Failed to get the bounds of the annotation");
             break;
         }
         Rectangle_f bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
@@ -875,7 +875,7 @@ void Page::PopulateAnnotations() {
         }
 
         if (!annotation || !annotation->PopulateFromPdfiumInstance(scoped_annot.get())) {
-            LOGE("Failed to create a pdfClient's instance of stamp annotation using pdfium "
+            LOGE("Failed to create a pdfClient's instance of annotation using pdfium "
                  "instance");
         }
 
@@ -936,12 +936,12 @@ bool Page::UpdatePageAnnotation(int index, std::unique_ptr<Annotation> annotatio
     ScopedFPDFAnnotation scoped_annot = ScopedFPDFAnnotation(FPDFPage_GetAnnot(page_.get(), index));
 
     if (!scoped_annot) {
-        LOGE("Failed to get pdfium instance");
+        LOGE("Failed to get pdfium annotation's instance");
         return false;
     }
 
     if (!annotation->UpdatePdfiumInstance(scoped_annot.get(), document_)) {
-        LOGE("Failed to update pdfium annotation");
+        LOGE("Failed to update pdfium annotation's instance");
         return false;
     }
 

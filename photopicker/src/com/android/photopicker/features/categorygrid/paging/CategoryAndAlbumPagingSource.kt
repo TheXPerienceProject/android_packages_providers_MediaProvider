@@ -22,7 +22,9 @@ import android.util.Log
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.android.photopicker.core.configuration.PhotopickerConfiguration
+import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.Events
+import com.android.photopicker.core.features.FeatureToken
 import com.android.photopicker.data.MediaProviderClient
 import com.android.photopicker.data.model.Group
 import com.android.photopicker.data.model.GroupPageKey
@@ -77,6 +79,16 @@ class CategoryAndAlbumPagingSource(
             }
 
         if (result is LoadResult.Page) {
+            // Dispatch a pageInfo event to log paging details for fetching albums
+            // Keeping page number as 0 for all dispatched events for now for simplicity
+            events.dispatch(
+                Event.LogPhotopickerPageInfo(
+                    FeatureToken.CATEGORY_GRID.token,
+                    configuration.sessionId,
+                    /* pageNumber */ 0,
+                    pageSize,
+                )
+            )
             Log.d(
                 TAG,
                 "Received ${result.data.size} category and album items from the data source.",

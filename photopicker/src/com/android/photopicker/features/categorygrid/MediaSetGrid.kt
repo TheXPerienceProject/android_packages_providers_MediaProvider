@@ -129,6 +129,16 @@ fun MediaSetGrid(
                             title = title,
                             body = body,
                         )
+                        LaunchedEffect(Unit) {
+                            events.dispatch(
+                                Event.LogPhotopickerUIEvent(
+                                    FeatureToken.CATEGORY_GRID.token,
+                                    configuration.sessionId,
+                                    configuration.callingPackageUid ?: -1,
+                                    Telemetry.UiEvent.UI_LOADED_EMPTY_STATE,
+                                )
+                            )
+                        }
                     }
 
                     else -> {

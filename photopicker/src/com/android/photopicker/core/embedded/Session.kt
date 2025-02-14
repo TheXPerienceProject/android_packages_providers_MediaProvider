@@ -636,6 +636,7 @@ open class Session(
             lazyEvents = _dependencies.events(),
             photopickerConfiguration =
                 _dependencies.configurationManager().get().configuration.value,
+            lazyFeatureManager = _dependencies.featureManager(),
         )
     }
 

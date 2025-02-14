@@ -268,6 +268,7 @@ class SearchDataServiceImpl(
                             dispatcher = dispatcher,
                             configuration = config,
                             cancellationSignal = cancellationSignal,
+                            events = events,
                         )
 
                     // Ensure that sync is cancelled when the paging source gets invalidated.
@@ -299,6 +300,7 @@ class SearchDataServiceImpl(
                 dispatcher = dispatcher,
                 configuration = config,
                 cancellationSignal = null,
+                events = events,
             )
         }
     }
