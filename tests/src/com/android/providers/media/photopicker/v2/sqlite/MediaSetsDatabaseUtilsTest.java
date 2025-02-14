@@ -233,6 +233,36 @@ public class MediaSetsDatabaseUtilsTest {
         assertTrue(Arrays.toString(retrievedData.second).contains(mMimeType));
     }
 
+    @Test
+    public void testClearMediaSetsCache() {
+        // Insert metadata into the table
+        Cursor c = getCursorForMediaSetInsertionTest();
+        List<String> mimeTypes = new ArrayList<>();
+        mimeTypes.add(mMimeType);
+
+        int mediaSetsInserted = MediaSetsDatabaseUtil.cacheMediaSets(
+                mDatabase, c, mCategoryId, mAuthority, mimeTypes);
+        assertEquals("Count of inserted media sets should be equal to the cursor size",
+                /*expected*/ c.getCount(), /*actual*/ mediaSetsInserted);
+
+        // Delete the inserted items
+        MediaSetsDatabaseUtil.clearMediaSetsCache(mDatabase);
+
+        // Retrieved cursor should be empty
+        Bundle extras = new Bundle();
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_AUTHORITY, mAuthority);
+        extras.putString(MediaSetsSyncRequestParams.KEY_PARENT_CATEGORY_ID, mCategoryId);
+        extras.putStringArrayList(
+                MediaSetsSyncRequestParams.KEY_MIME_TYPES,
+                new ArrayList<String>(mimeTypes));
+        MediaSetsSyncRequestParams requestParams = new MediaSetsSyncRequestParams(extras);
+
+        Cursor mediaSetCursor = MediaSetsDatabaseUtil.getMediaSetsForCategory(
+                mDatabase, requestParams);
+        assertNotNull(mediaSetCursor);
+        assertEquals(/*expected*/ 0, /*actual*/ mediaSetCursor.getCount());
+    }
+
     private Cursor getCursorForMediaSetInsertionTest() {
         String[] columns = new String[]{
                 CloudMediaProviderContract.MediaSetColumns.ID,

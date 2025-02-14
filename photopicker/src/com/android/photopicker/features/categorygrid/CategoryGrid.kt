@@ -74,7 +74,7 @@ private val CELLS_PER_ROW_EXPANDED_FOR_CATEGORY_GRID = 3
 private val MEASUREMENT_HORIZONTAL_CELL_SPACING_CATEGORY_GRID = 16.dp
 
 /**
- * Primary composable for drawing the main Category Grid on [PhotopickerDestinations.CATEGORY_GRID]
+ * Primary composable for drawing the main Category Grid on [PhotopickerDestinations.ALBUM_GRID]
  *
  * @param viewModel - A viewModel override for the composable. Normally, this is fetched via hilt
  *   from the backstack entry by using obtainViewModel()
@@ -224,7 +224,7 @@ fun CategoryButton(modifier: Modifier) {
             navController.navigateToCategoryGrid()
         },
         modifier = modifier.semantics { contentDescription = contentDescriptionString },
-        isCurrentRoute = { route -> route == PhotopickerDestinations.CATEGORY_GRID.route },
+        isCurrentRoute = { route -> route == PhotopickerDestinations.ALBUM_GRID.route },
     ) {
         when {
             searchFeatureEnabled -> {

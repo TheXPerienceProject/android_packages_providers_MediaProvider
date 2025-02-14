@@ -297,9 +297,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -332,9 +332,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -376,9 +376,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -424,9 +424,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be category grid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -508,7 +508,7 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
 
             assertWithMessage("Expected route to be albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -590,9 +590,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -668,9 +668,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -749,9 +749,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -833,9 +833,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -911,9 +911,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
@@ -990,9 +990,9 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
             // Navigate on the UI thread (similar to a click handler)
             composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
 
-            assertWithMessage("Expected route to be categorygrid")
+            assertWithMessage("Expected route to be category albumgrid")
                 .that(navController.currentBackStackEntry?.destination?.route)
-                .isEqualTo(PhotopickerDestinations.CATEGORY_GRID.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
 
             advanceTimeBy(100)
             composeTestRule.waitForIdle()
