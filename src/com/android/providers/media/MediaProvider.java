@@ -1336,13 +1336,19 @@ public class MediaProvider extends ContentProvider {
         }
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-        // Get case insensitive exclusion list.
-        List<String> exclusionList =
-                Flags.enableExclusionListForDefaultFolders()
-                        ? getFoldersToSkipInDefaultCreation().stream().map(
-                        String::toLowerCase).collect(Collectors.toList())
-                        : List.of();
         if (prefs.getInt(key, 0) == 0) {
+            // Get case insensitive exclusion list.
+            List<String> exclusionList =
+                    Flags.enableExclusionListForDefaultFolders()
+                            ? getFoldersToSkipInDefaultCreation().stream().map(
+                            String::toLowerCase).collect(Collectors.toList())
+                            : List.of();
+            if (exclusionList.size() > getDefaultFolderNames().length) {
+                Log.e(TAG, "Exclusion list has " + exclusionList.size()
+                        + " items which exceeds the size of default folders list which has size "
+                        + getDefaultFolderNames().length);
+                exclusionList = List.of();
+            }
             for (String folderName : getDefaultFolderNames()) {
                 final File folder = new File(volume.getPath(), folderName);
                 if (folder.exists()) {

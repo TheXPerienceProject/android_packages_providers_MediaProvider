@@ -48,7 +48,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -361,7 +360,6 @@ fun PhotoGridNavButton(modifier: Modifier) {
     val scope = rememberCoroutineScope()
     val events = LocalEvents.current
     val configuration = LocalPhotopickerConfiguration.current
-    val contentDescriptionString = stringResource(R.string.photopicker_photos_nav_button_label)
     val featureManager = LocalFeatureManager.current
     val categoryFeatureEnabled = featureManager.isFeatureEnabled(CategoryGridFeature::class.java)
     val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
@@ -381,17 +379,13 @@ fun PhotoGridNavButton(modifier: Modifier) {
             }
             navController.navigateToPhotoGrid()
         },
-        modifier = modifier.semantics { contentDescription = contentDescriptionString },
+        modifier = modifier,
         isCurrentRoute = { route -> route == PHOTO_GRID.route },
     ) {
         when {
             categoryFeatureEnabled && searchFeatureEnabled -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.PhotoAlbum,
-                        contentDescription =
-                            stringResource(R.string.photopicker_photos_nav_button_label),
-                    )
+                    Icon(imageVector = Icons.Outlined.PhotoAlbum, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         stringResource(R.string.photopicker_photos_nav_button_label),

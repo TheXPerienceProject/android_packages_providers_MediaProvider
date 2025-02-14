@@ -35,6 +35,8 @@ import android.test.mock.MockContentResolver
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -65,6 +67,7 @@ import com.android.photopicker.data.model.Group
 import com.android.photopicker.data.model.Icon
 import com.android.photopicker.data.model.Media
 import com.android.photopicker.data.model.MediaSource
+import com.android.photopicker.data.paging.FakeInMemoryAlbumPagingSource
 import com.android.photopicker.data.paging.FakeInMemoryCategoryPagingSource.Companion.TEST_ALBUM_NAME_PREFIX
 import com.android.photopicker.extensions.navigateToCategoryGrid
 import com.android.photopicker.features.PhotopickerFeatureBaseTest
@@ -312,6 +315,109 @@ class CategoryGridFeatureTest : PhotopickerFeatureBaseTest() {
                 .onNode(hasText(TEST_ALBUM_NAME_PREFIX + "1"))
                 .assert(hasClickAction())
                 .assertIsDisplayed()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PHOTOPICKER_SEARCH)
+    fun testConsistentCategoryFocus() =
+        testScope.runTest {
+            val dataList =
+                buildList<Group.Category> {
+                    for (i in 1..3) {
+                        add(
+                            Group.Category(
+                                id = "$i",
+                                pickerId = i.toLong(),
+                                authority = "a",
+                                displayName =
+                                    FakeInMemoryAlbumPagingSource.Companion.TEST_ALBUM_NAME_PREFIX +
+                                        "$i",
+                                categoryType = CategoryType.PEOPLE_AND_PETS,
+                                icons = emptyList(),
+                                isLeafCategory = true,
+                            )
+                        )
+                    }
+                }
+
+            val testCategoryDataService = categoryDataService as? TestCategoryDataServiceImpl
+            checkNotNull(testCategoryDataService) { "Expected a TestCategoryDataServiceImpl" }
+            testCategoryDataService.categoryAlbumList = dataList
+
+            composeTestRule.setContent {
+                // Set an explicit size to prevent errors in glide being unable to measure
+                callPhotopickerMain(
+                    featureManager = featureManager,
+                    selection = selection,
+                    events = events,
+                )
+            }
+
+            // wait for the composition to finish
+            advanceTimeBy(100)
+
+            // Navigate on the UI thread (similar to a click handler)
+            composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
+
+            assertWithMessage("Expected route to be albumgrid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
+
+            composeTestRule.waitForIdle()
+
+            // wait for the album grid to show up
+            advanceTimeBy(100)
+
+            val allAlbumNodes =
+                composeTestRule.onAllNodes(
+                    hasText(
+                        text = FakeInMemoryAlbumPagingSource.Companion.TEST_ALBUM_NAME_PREFIX,
+                        substring = true,
+                    )
+                )
+
+            allAlbumNodes[0].assert(hasClickAction()).assertIsDisplayed().performClick()
+
+            assertWithMessage("Expected route to be media set grid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.MEDIA_SET_GRID.route)
+
+            composeTestRule.waitForIdle()
+
+            // Navigate on the UI thread (similar to a click handler)
+            composeTestRule.runOnUiThread({ navController.navigateToCategoryGrid() })
+
+            assertWithMessage("Expected route to be albumgrid")
+                .that(navController.currentBackStackEntry?.destination?.route)
+                .isEqualTo(PhotopickerDestinations.ALBUM_GRID.route)
+
+            advanceTimeBy(100)
+            composeTestRule.waitForIdle()
+
+            // wait for the album grid to show up
+            advanceTimeBy(150)
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000) {
+                try {
+                    composeTestRule
+                        .onNode(
+                            hasText(
+                                FakeInMemoryAlbumPagingSource.Companion.TEST_ALBUM_NAME_PREFIX +
+                                    "1",
+                                substring = true,
+                            )
+                        )
+                        .assertExists()
+                        .assertIsFocused()
+                    true // Condition met
+                } catch (e: AssertionError) {
+                    false // Condition not yet met
+                }
+            }
+
+            allAlbumNodes[0].assertIsFocused()
+            allAlbumNodes[1].assertIsNotFocused()
+            allAlbumNodes[2].assertIsNotFocused()
         }
 
     @Test

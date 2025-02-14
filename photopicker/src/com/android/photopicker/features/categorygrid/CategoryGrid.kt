@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,14 +39,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.android.photopicker.R
 import com.android.photopicker.core.components.MediaGridItem
 import com.android.photopicker.core.components.mediaGrid
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
+import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
+import com.android.photopicker.core.embedded.LocalEmbeddedState
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.LocalEvents
 import com.android.photopicker.core.events.Telemetry
@@ -89,6 +92,10 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
     val events = LocalEvents.current
     val scope = rememberCoroutineScope()
 
+    val isEmbedded =
+        LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
+    val isExpanded = LocalEmbeddedState.current?.isExpanded ?: false
+
     // Use the expanded layout any time the Width is Medium or larger.
     val isExpandedScreen: Boolean =
         when (LocalWindowSizeClass.current.widthSizeClass) {
@@ -97,6 +104,7 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
             else -> false
         }
 
+    val previouslySelectedItem by viewModel.previouslySelectedItem.collectAsStateWithLifecycle()
     Column(
         modifier =
             Modifier.fillMaxSize().pointerInput(Unit) {
@@ -130,6 +138,7 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
         // the category content for the category that is selected by the user.
         mediaGrid(
             items = items,
+            focusItem = previouslySelectedItem,
             onItemClick = { item ->
                 if (item is MediaGridItem.AlbumItem) {
                     // Dispatch events to log album related details
@@ -151,6 +160,7 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
                             )
                         )
                     }
+                    viewModel.setPreviouslySelectedItem(item)
                     navController.navigateToAlbumMediaGridForCategories(album = item.album)
                 } else if (item is MediaGridItem.CategoryItem) {
                     scope.launch {
@@ -163,6 +173,7 @@ fun CategoryGrid(viewModel: CategoryGridViewModel = obtainViewModel()) {
                             )
                         )
                     }
+                    viewModel.setPreviouslySelectedItem(item)
                     navController.navigateToMediaSetGrid(category = item.category)
                 }
             },
@@ -204,7 +215,6 @@ fun CategoryButton(modifier: Modifier) {
     val events = LocalEvents.current
     val sessionId = LocalPhotopickerConfiguration.current.sessionId
     val packageUid = LocalPhotopickerConfiguration.current.callingPackageUid ?: -1
-    val contentDescriptionString = stringResource(R.string.photopicker_categories_nav_button_label)
     val featureManager = LocalFeatureManager.current
     val searchFeatureEnabled = featureManager.isFeatureEnabled(SearchFeature::class.java)
 
@@ -223,7 +233,7 @@ fun CategoryButton(modifier: Modifier) {
             }
             navController.navigateToCategoryGrid()
         },
-        modifier = modifier.semantics { contentDescription = contentDescriptionString },
+        modifier = modifier,
         isCurrentRoute = { route -> route == PhotopickerDestinations.ALBUM_GRID.route },
     ) {
         when {
@@ -232,7 +242,7 @@ fun CategoryButton(modifier: Modifier) {
                     Icon(
                         imageVector =
                             ImageVector.vectorResource(R.drawable.photopicker_category_icon),
-                        contentDescription = contentDescriptionString,
+                        contentDescription = null,
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
