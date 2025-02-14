@@ -264,3 +264,12 @@ flag {
     is_fixed_read_only: true
     bug: "390142346"
 }
+
+flag {
+    name: "exclude_unreliable_volumes"
+    is_exported: true
+    namespace: "mediaprovider"
+    description: "This flag will enable exclusion of unreliable storage volumes in the returned list from MediaStore APIs."
+    is_fixed_read_only: true
+    bug: "391360514"
+}
