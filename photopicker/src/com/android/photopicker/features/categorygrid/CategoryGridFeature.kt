@@ -39,8 +39,8 @@ import com.android.photopicker.core.features.PhotopickerUiFeature
 import com.android.photopicker.core.features.PrefetchResultKey
 import com.android.photopicker.core.features.Priority
 import com.android.photopicker.core.navigation.PhotopickerDestinations
+import com.android.photopicker.core.navigation.PhotopickerDestinations.ALBUM_GRID
 import com.android.photopicker.core.navigation.PhotopickerDestinations.ALBUM_MEDIA_GRID
-import com.android.photopicker.core.navigation.PhotopickerDestinations.CATEGORY_GRID
 import com.android.photopicker.core.navigation.PhotopickerDestinations.PHOTO_GRID
 import com.android.photopicker.core.navigation.Route
 import com.android.photopicker.data.model.Group
@@ -88,7 +88,7 @@ class CategoryGridFeature : PhotopickerUiFeature {
         return setOf(
             // The main grid of the user's category.
             object : Route {
-                override val route = CATEGORY_GRID.route
+                override val route = ALBUM_GRID.route
                 override val initialRoutePriority = Priority.HIGH.priority
                 override val arguments = emptyList<NamedNavArgument>()
                 override val deepLinks = emptyList<NavDeepLink>()
@@ -96,7 +96,7 @@ class CategoryGridFeature : PhotopickerUiFeature {
                 override val dialogProperties = null
 
                 /*
-                Animations for CATEGORY_GRID
+                Animations for ALBUM_GRID for CategoryGridFeature
                 - When navigating directly, content will slide IN from the left edge.
                 - When navigating away, content will slide OUT towards the left edge.
                 - When returning from the backstack, content will slide IN from the right edge.

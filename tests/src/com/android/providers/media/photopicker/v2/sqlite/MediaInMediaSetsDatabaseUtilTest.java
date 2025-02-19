@@ -607,6 +607,47 @@ public class MediaInMediaSetsDatabaseUtilTest {
                 1);
     }
 
+    @Test
+    public void testClearMediaInMediaSetCache() {
+        // Insert data
+        final Cursor cursor1 = getCloudMediaCursor(CLOUD_ID_1, null, 0);
+        assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor1, 1);
+        final Cursor cursor2 = getCloudMediaCursor(CLOUD_ID_2, LOCAL_ID_2, 0);
+        assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor2, 1);
+        final Cursor cursor3 = getCloudMediaCursor(CLOUD_ID_3, LOCAL_ID_3, 0);
+        assertAddMediaOperation(mFacade, CLOUD_PROVIDER, cursor3, 1);
+
+        Long mediaSetPickerId = 1L;
+
+        final long cloudRowsInsertedCount = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
+                mDatabase, List.of(
+                        getContentValues(null, CLOUD_ID_3, mediaSetPickerId),
+                        getContentValues(LOCAL_ID_2, CLOUD_ID_2, mediaSetPickerId),
+                        getContentValues(LOCAL_ID_1, CLOUD_ID_1, mediaSetPickerId)
+                ), CLOUD_PROVIDER);
+
+        assertWithMessage("Unexpected number of rows inserted in the search results table")
+                .that(cloudRowsInsertedCount)
+                .isEqualTo(3);
+
+        // Clear the data
+        MediaInMediaSetsDatabaseUtil.clearMediaInMediaSetsCache(mDatabase);
+
+        // Retrieved cursor should be empty
+        Bundle extras = new Bundle();
+        extras.putInt("page_size", 100);
+        extras.putStringArrayList("providers",
+                new ArrayList<>(Arrays.asList(LOCAL_PROVIDER, CLOUD_PROVIDER)));
+        extras.putString("intent_action", MediaStore.ACTION_PICK_IMAGES);
+        MediaInMediaSetsQuery mediaInMediaSetQuery = new MediaInMediaSetsQuery(
+                extras, mediaSetPickerId);
+        Cursor mediaCursor = MediaInMediaSetsDatabaseUtil.queryMediaInMediaSet(
+                mMockSyncController, mediaInMediaSetQuery, LOCAL_PROVIDER, CLOUD_PROVIDER);
+        assertNotNull(mediaCursor);
+        assertEquals(/*expected*/0, /*actual*/ mediaCursor.getCount());
+
+    }
+
     private ContentValues getContentValues(
             String localId, String cloudId, Long mediaSetPickerId) {
         ContentValues contentValues = new ContentValues();

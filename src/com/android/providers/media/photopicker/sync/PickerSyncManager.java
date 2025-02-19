@@ -17,6 +17,7 @@
 package com.android.providers.media.photopicker.sync;
 
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markAlbumMediaSyncAsComplete;
+import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markAllMediaInMediaSetsSyncAsComplete;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markAllSearchResultsSyncAsComplete;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markMediaInMediaSetSyncAsComplete;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markMediaSetsSyncAsComplete;
@@ -620,7 +621,10 @@ public class PickerSyncManager {
     }
 
     /**
-     * Creates OneTimeWork request for syncing media sets with the given provider
+     * Creates OneTimeWork request for syncing media sets with the given provider.
+     * The existing media sets cache and the media sets content cache is cleared before a new media
+     * sets sync is triggered to ensure accuracy of the media sets metadata stored in the database.
+     * The reset cache and sync requests are chained to ensure correctness of the entire operation.
      * @param requestParams The MediaSetsSyncRequestsParams object containing all input parameters
      *                      for creating a sync request
      * @param syncSource Indicates whether the sync is required with the local provider or
@@ -628,18 +632,35 @@ public class PickerSyncManager {
      */
     public void syncMediaSetsForProvider(
             MediaSetsSyncRequestParams requestParams, @SyncSource int syncSource) {
-        final Map<String, Object> inputMap = new HashMap<>();
-        inputMap.put(SYNC_WORKER_INPUT_AUTHORITY, requestParams.getAuthority());
-        inputMap.put(SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource);
-        inputMap.put(SYNC_WORKER_INPUT_CATEGORY_ID, requestParams.getCategoryId());
+        // Create media sets sync request
+        final Map<String, Object> syncRequestInputMap = new HashMap<>();
+        syncRequestInputMap.put(SYNC_WORKER_INPUT_AUTHORITY, requestParams.getAuthority());
+        syncRequestInputMap.put(SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource);
+        syncRequestInputMap.put(SYNC_WORKER_INPUT_CATEGORY_ID, requestParams.getCategoryId());
         if (requestParams.getMimeTypes() != null) {
-            inputMap.put(EXTRA_MIME_TYPES, requestParams.getMimeTypes().toArray(new String[0]));
+            syncRequestInputMap.put(EXTRA_MIME_TYPES, requestParams.getMimeTypes().toArray(
+                    new String[0]
+            ));
         }
-        final Data inputData = new Data(inputMap);
+        final Data syncRequestInputData = new Data(syncRequestInputMap);
         final OneTimeWorkRequest syncRequest =
-                buildOneTimeWorkerRequest(MediaSetsSyncWorker.class, inputData);
+                buildOneTimeWorkerRequest(MediaSetsSyncWorker.class, syncRequestInputData);
 
-        // track the new request
+        // Create media sets reset request. MediaSets sync are non-resumable.
+        // It's fine to delete the entire cache before a new set is triggered.
+        // The media sets content cache is also completely cleared before we start syncing
+        // any particular media set for its content.
+        // These tables are cleared once per picker session before the media sets sync for this
+        // session is triggered. This ensures that the data read from the cache in every session
+        // is always in sync with the cloud provider.
+        final Data resetRequestInputData = new Data(Map.of(
+                SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource
+        ));
+        final OneTimeWorkRequest resetRequest =
+                buildOneTimeWorkerRequest(MediaSetsResetWorker.class, resetRequestInputData);
+
+        // Track the new requests
+        trackNewMediaSetsSyncRequest(syncSource, resetRequest.getId());
         trackNewMediaSetsSyncRequest(syncSource, syncRequest.getId());
 
         final String workName = syncSource == SYNC_LOCAL_ONLY
@@ -647,15 +668,18 @@ public class PickerSyncManager {
                 : IMMEDIATE_CLOUD_MEDIA_SETS_SYNC_WORK_NAME;
         // Enqueue local or cloud sync request
         try {
-            final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
-                    workName,
-                    ExistingWorkPolicy.APPEND_OR_REPLACE,
-                    syncRequest);
+            final Operation enqueueOperation = mWorkManager
+                    .beginUniqueWork(
+                            workName,
+                            ExistingWorkPolicy.APPEND_OR_REPLACE,
+                            resetRequest)
+                    .then(syncRequest).enqueue();
 
             // Check that the request has been successfully enqueued.
             enqueueOperation.getResult().get();
         } catch (Exception e) {
             Log.e(TAG, "Could not enqueue expedited media sets sync request", e);
+            markMediaSetsSyncAsComplete(syncSource, resetRequest.getId());
             markMediaSetsSyncAsComplete(syncSource, syncRequest.getId());
         }
     }
@@ -668,7 +692,9 @@ public class PickerSyncManager {
      *                   the cloud provider.
      */
     public void syncMediaInMediaSetForProvider(
-            MediaInMediaSetSyncRequestParams requestParams, @SyncSource int syncSource) {
+            MediaInMediaSetSyncRequestParams requestParams,
+            @SyncSource int syncSource) {
+
         final Data inputData =
                 new Data(
                         Map.of(
@@ -679,6 +705,8 @@ public class PickerSyncManager {
         final OneTimeWorkRequest syncRequest =
                 buildOneTimeWorkerRequest(MediaInMediaSetsSyncWorker.class, inputData);
 
+        markAllMediaInMediaSetsSyncAsComplete(syncSource);
+
         // track the new request
         trackNewMediaInMediaSetSyncRequest(syncSource, syncRequest.getId());
 
@@ -688,10 +716,10 @@ public class PickerSyncManager {
         // Enqueue local or cloud sync request
         try {
             final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
-                    workName,
-                    ExistingWorkPolicy.APPEND_OR_REPLACE,
-                    syncRequest
-            );
+                        workName,
+                        ExistingWorkPolicy.REPLACE,
+                        syncRequest
+                );
 
             // Check that the request has been successfully enqueued.
             enqueueOperation.getResult().get();
@@ -703,11 +731,17 @@ public class PickerSyncManager {
 
     @NonNull
     private OneTimeWorkRequest buildOneTimeWorkerRequest(
-            @NonNull Class<? extends Worker> workerClass, @NonNull Data inputData) {
-        return new OneTimeWorkRequest.Builder(workerClass)
-                .setInputData(inputData)
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .build();
+            @NonNull Class<? extends Worker> workerClass, Data inputData) {
+        if (inputData != null) {
+            return new OneTimeWorkRequest.Builder(workerClass)
+                    .setInputData(inputData)
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .build();
+        } else {
+            return new OneTimeWorkRequest.Builder(workerClass)
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .build();
+        }
     }
 
     @NonNull
