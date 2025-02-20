@@ -102,6 +102,7 @@ import androidx.test.runner.AndroidJUnit4;
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.Operation;
+import androidx.work.WorkContinuation;
 import androidx.work.WorkManager;
 
 import com.android.providers.media.MediaProvider;
@@ -163,6 +164,8 @@ public class PickerDataLayerV2Test {
     private WorkManager mMockWorkManager;
     @Mock
     private Operation mMockOperation;
+    @Mock
+    private WorkContinuation mMockWorkContinuation;
     @Mock
     private ListenableFuture<Operation.State.SUCCESS> mMockFuture;
     @Mock
@@ -2693,9 +2696,15 @@ public class PickerDataLayerV2Test {
     public void testTriggerMediaSetsSyncRequest() {
         doReturn(true).when(mMockSyncController).shouldQueryLocalMediaSets(any());
         doReturn(true).when(mMockSyncController).shouldQueryCloudMediaSets(any(), any());
-        doReturn(mMockOperation).when(mMockWorkManager)
-                .enqueueUniqueWork(anyString(), any(ExistingWorkPolicy.class),
-                        any(OneTimeWorkRequest.class));
+        doReturn(mMockWorkContinuation)
+                .when(mMockWorkManager)
+                .beginUniqueWork(
+                        anyString(), any(ExistingWorkPolicy.class), any(List.class));
+        // Handle .then chaining
+        doReturn(mMockWorkContinuation)
+                .when(mMockWorkContinuation)
+                .then(any(List.class));
+        doReturn(mMockOperation).when(mMockWorkContinuation).enqueue();
         doReturn(mMockFuture).when(mMockOperation).getResult();
 
         Bundle extras = new Bundle();
@@ -2711,11 +2720,11 @@ public class PickerDataLayerV2Test {
         PickerDataLayerV2.triggerMediaSetsSync(extras, mContext, mMockWorkManager);
 
         // Assert that both local and cloud syncs were scheduled
-        verify(mMockWorkManager, times(1))
-                .enqueueUniqueWork(anyString(), any(ExistingWorkPolicy.class),
-                        any(OneTimeWorkRequest.class));
+        verify(mMockWorkManager, times(1)).beginUniqueWork(
+                anyString(), any(ExistingWorkPolicy.class), any(List.class));
+        verify(mMockWorkContinuation, times(1)).then(any(List.class));
+        verify(mMockWorkContinuation, times(1)).enqueue();
     }
-
     @Test
     public void testTriggerMediaInMediaSetSyncRequest() {
         doReturn(true).when(mMockSyncController).shouldQueryLocalMediaSets(any());

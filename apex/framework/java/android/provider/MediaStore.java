@@ -1559,6 +1559,11 @@ public final class MediaStore {
      * once obtained you can directly {@link ContentResolver#update} columns
      * like {@link MediaColumns#IS_FAVORITE}, {@link MediaColumns#IS_TRASHED},
      * or {@link ContentResolver#delete}.
+     * <p>
+     * Note: if your app targets {@link android.os.Build.VERSION_CODES#BAKLAVA}
+     * and above, you can send a maximum of 2000 uris in each request.
+     * Attempting to send more than 2000 uris will result in a
+     * {@link java.lang.IllegalArgumentException}.
      *
      * @param resolver Used to connect with {@link MediaStore#AUTHORITY}.
      *            Typically this value is {@link Context#getContentResolver()},
@@ -1591,6 +1596,11 @@ public final class MediaStore {
      * determine if you already hold write access before requesting access, use
      * {@link Context#checkUriPermission(Uri, int, int, int)} with
      * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * <p>
+     * Note: if your app targets {@link android.os.Build.VERSION_CODES#BAKLAVA}
+     * and above, you can send a maximum of 2000 uris in each request.
+     * Attempting to send more than 2000 uris will result in a
+     * {@link java.lang.IllegalArgumentException}.
      *
      * @param resolver Used to connect with {@link MediaStore#AUTHORITY}.
      *            Typically this value is {@link Context#getContentResolver()},
@@ -1632,6 +1642,11 @@ public final class MediaStore {
      * determine if you already hold write access before requesting access, use
      * {@link Context#checkUriPermission(Uri, int, int, int)} with
      * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * <p>
+     * Note: if your app targets {@link android.os.Build.VERSION_CODES#BAKLAVA}
+     * and above, you can send a maximum of 2000 uris in each request.
+     * Attempting to send more than 2000 uris will result in a
+     * {@link java.lang.IllegalArgumentException}.
      *
      * @param resolver Used to connect with {@link MediaStore#AUTHORITY}.
      *            Typically this value is {@link Context#getContentResolver()},
@@ -1712,6 +1727,11 @@ public final class MediaStore {
      * determine if you already hold write access before requesting access, use
      * {@link Context#checkUriPermission(Uri, int, int, int)} with
      * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * <p>
+     * Note: if your app targets {@link android.os.Build.VERSION_CODES#BAKLAVA}
+     * and above, you can send a maximum of 2000 uris in each request.
+     * Attempting to send more than 2000 uris will result in a
+     * {@link java.lang.IllegalArgumentException}.
      *
      * @param resolver Used to connect with {@link MediaStore#AUTHORITY}.
      *            Typically this value is {@link Context#getContentResolver()},

@@ -71,6 +71,7 @@ public class MediaSetsSyncWorker extends Worker {
     @NonNull
     @Override
     public ListenableWorker.Result doWork() {
+
         final int syncSource = getInputData().getInt(SYNC_WORKER_INPUT_SYNC_SOURCE,
                 /* defaultValue */ INVALID_SYNC_SOURCE);
         final String categoryId = getInputData().getString(SYNC_WORKER_INPUT_CATEGORY_ID);
