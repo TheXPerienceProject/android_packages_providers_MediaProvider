@@ -724,6 +724,28 @@ namespace fuse {
  *
  */
 
+bool IsUpstreamPassthroughSupported() {
+    // Upstream passthrough requires some modifications to work. If those are present,
+    // /sys/fs/fuse/fuse_passthrough will read 'supported\n'
+    // - see fs/fuse/inode.c in the kernel source
+
+    string contents;
+    const char* filename = "/sys/fs/fuse/features/fuse_passthrough";
+    if (!android::base::ReadFileToString(filename, &contents)) {
+        LOG(INFO) << "fuse-passthrough is disabled because " << filename << " cannot be read";
+        return false;
+    }
+
+    if (contents == "supported\n") {
+        LOG(INFO) << "fuse-passthrough is enabled because " << filename << " reads 'supported'";
+        return true;
+    } else {
+        LOG(INFO) << "fuse-passthrough is disabled because " << filename
+                  << " does not read 'supported'";
+        return false;
+    }
+}
+
 static void pf_init(void* userdata, struct fuse_conn_info* conn) {
     struct fuse* fuse = reinterpret_cast<struct fuse*>(userdata);
 
