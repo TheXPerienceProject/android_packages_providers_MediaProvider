@@ -32,7 +32,7 @@ namespace pdfClient {
 // Base class for different type of annotations
 class Annotation {
   public:
-    enum class Type { UNKNOWN = 0, Highlight = 2, Stamp = 3 };
+    enum class Type { UNKNOWN = 0, FreeText = 1, Highlight = 2, Stamp = 3 };
 
     Annotation(Type type, const Rectangle_f& bounds) : type_(type), bounds_(bounds) {}
     virtual ~Annotation() = default;
@@ -94,6 +94,32 @@ class HighlightAnnotation : public Annotation {
 
   private:
     Color color_;
+};
+
+class FreeTextAnnotation : public Annotation {
+  public:
+    static constexpr const char* kContents = "Contents";
+    FreeTextAnnotation(const Rectangle_f& bounds) : Annotation(Type::FreeText, bounds) {}
+
+    std::wstring GetTextContent() const { return text_content_; }
+    void SetTextContent(std::wstring textContent) { text_content_ = textContent; }
+
+    Color GetTextColor() const { return text_color_; }
+    void SetTextColor(Color color) { text_color_ = color; }
+
+    Color GetBackgroundColor() const { return background_color_; }
+    void SetBackgroundColor(Color color) { background_color_ = color; }
+
+    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) override;
+    ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) override;
+    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) override;
+
+  private:
+    std::wstring text_content_;
+    Color text_color_;
+    Color background_color_;
+    static bool GetTextContentFromPdfium(FPDF_ANNOTATION fpdf_annot, unsigned long text_length,
+                                         std::wstring& text);
 };
 
 }  // namespace pdfClient

@@ -16,6 +16,9 @@
 
 package com.android.photopicker.features.search
 
+import android.net.Uri
+import com.android.photopicker.data.model.Icon
+import com.android.photopicker.data.model.MediaSource
 import com.android.photopicker.features.search.SearchViewModel.Companion.ZERO_STATE_SEARCH_QUERY
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
@@ -135,5 +138,26 @@ class SearchSuggestionCacheTest {
                     searchSuggestion3,
                 )
             )
+    }
+
+    @Test
+    fun testUpdateHistoryWithFaceSuggestion() {
+        val suggestionsCache = SearchSuggestionCache()
+
+        val faceSearchSuggestion =
+            SearchSuggestion(
+                mediaSetId = "media-set-id-1",
+                authority = "cloud.authority",
+                displayText = null,
+                type = SearchSuggestionType.FACE,
+                icon = Icon(uri = Uri.parse(""), mediaSource = MediaSource.LOCAL),
+            )
+
+        // Try to add history suggestion to cache
+        suggestionsCache.updateHistorySuggestion(faceSearchSuggestion)
+
+        // Check that is wasn't added because it has no display text
+        var actualSuggestionsOrder = suggestionsCache.getSuggestions(ZERO_STATE_SEARCH_QUERY)
+        assertThat(actualSuggestionsOrder).isNull()
     }
 }

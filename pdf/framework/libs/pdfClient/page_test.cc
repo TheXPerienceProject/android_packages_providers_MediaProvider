@@ -37,6 +37,7 @@ namespace {
 using ::pdfClient::Annotation;
 using ::pdfClient::Color;
 using ::pdfClient::Document;
+using ::pdfClient::FreeTextAnnotation;
 using ::pdfClient::ImageObject;
 using ::pdfClient::Page;
 using ::pdfClient::PageObject;
@@ -499,6 +500,94 @@ TEST(Test, RemovePageAnnotationTest) {
     std::vector<Annotation*> updatedAnnotations = page->GetPageAnnotations();
 
     ASSERT_EQ(initialAnnotations.size() - 1, updatedAnnotations.size());
+}
+
+TEST(Test, AddFreeTextAnnotationTest) {
+    Document doc(LoadTestDocument(kAnnotation), false);
+    std::shared_ptr<Page> page = doc.GetPage(0);
+
+    std::vector<Annotation*> annotations = page->GetPageAnnotations();
+
+    // Check for number of annotations (Pdf contains 1 Stamp Annotation)
+    ASSERT_EQ(1, annotations.size());
+
+    // Create and Add a FreeText Annotation
+    Rectangle_f bounds = pdfClient::Rectangle_f{0, 300, 200, 0};
+    auto freeTextAnnotation = std::make_unique<FreeTextAnnotation>(bounds);
+
+    std::wstring textContent = L"Hello World";
+    Color textColor = Color(255, 0, 0, 255);
+    Color backgroundColor = Color(0, 255, 0, 255);
+    freeTextAnnotation->SetTextContent(textContent);
+    freeTextAnnotation->SetTextColor(textColor);
+    freeTextAnnotation->SetBackgroundColor(backgroundColor);
+
+    ASSERT_EQ(page->AddPageAnnotation(std::move(freeTextAnnotation)), annotations.size());
+
+    annotations = page->GetPageAnnotations();
+    ASSERT_EQ(2, annotations.size());
+
+    ASSERT_EQ(Annotation::Type::Stamp, annotations[0]->GetType());
+    ASSERT_EQ(Annotation::Type::FreeText, annotations[1]->GetType());
+    FreeTextAnnotation* addedFreeTextAnnotation = static_cast<FreeTextAnnotation*>(annotations[1]);
+
+    ASSERT_EQ(addedFreeTextAnnotation->GetTextContent(), textContent);
+    // Assert TextColor
+    ASSERT_EQ(addedFreeTextAnnotation->GetTextColor().r, textColor.r);
+    ASSERT_EQ(addedFreeTextAnnotation->GetTextColor().g, textColor.g);
+    ASSERT_EQ(addedFreeTextAnnotation->GetTextColor().b, textColor.b);
+    ASSERT_EQ(addedFreeTextAnnotation->GetTextColor().a, textColor.a);
+
+    // Assert BackGround Color
+    ASSERT_EQ(addedFreeTextAnnotation->GetBackgroundColor().r, backgroundColor.r);
+    ASSERT_EQ(addedFreeTextAnnotation->GetBackgroundColor().g, backgroundColor.g);
+    ASSERT_EQ(addedFreeTextAnnotation->GetBackgroundColor().b, backgroundColor.b);
+    ASSERT_EQ(addedFreeTextAnnotation->GetBackgroundColor().a, backgroundColor.a);
+}
+
+TEST(Test, UpdateFreeTextAnnotationTest) {
+    Document doc(LoadTestDocument(kAnnotation), false);
+    std::shared_ptr<Page> page = doc.GetPage(0);
+    std::vector<Annotation*> annotations = page->GetPageAnnotations();
+
+    // Create and Add a FreeText Annotation
+    Rectangle_f bounds = pdfClient::Rectangle_f{0, 300, 200, 0};
+    auto freeTextAnnotation = std::make_unique<FreeTextAnnotation>(bounds);
+
+    std::wstring textContent = L"Hello World";
+    Color textColor = Color(255, 0, 0, 255);
+    Color backgroundColor = Color(0, 255, 0, 255);
+    freeTextAnnotation->SetTextContent(textContent);
+    freeTextAnnotation->SetTextColor(textColor);
+    freeTextAnnotation->SetBackgroundColor(backgroundColor);
+
+    ASSERT_EQ(page->AddPageAnnotation(std::move(freeTextAnnotation)), annotations.size());
+
+    freeTextAnnotation = std::make_unique<FreeTextAnnotation>(bounds);
+    std::wstring newTextContent = L"Bye World";
+    Color newTextColor = Color(0, 0, 255, 255);
+    Color newBackgroundColor = Color(255, 255, 255, 255);
+    freeTextAnnotation->SetTextContent(newTextContent);
+    freeTextAnnotation->SetTextColor(newTextColor);
+    freeTextAnnotation->SetBackgroundColor(newBackgroundColor);
+
+    page->UpdatePageAnnotation(1, std::move(freeTextAnnotation));
+
+    annotations = page->GetPageAnnotations();
+    FreeTextAnnotation* updatedAnnotation = static_cast<FreeTextAnnotation*>(annotations[1]);
+
+    ASSERT_EQ(updatedAnnotation->GetTextContent(), newTextContent);
+    // Assert Updated TextColor
+    ASSERT_EQ(updatedAnnotation->GetTextColor().r, newTextColor.r);
+    ASSERT_EQ(updatedAnnotation->GetTextColor().g, newTextColor.g);
+    ASSERT_EQ(updatedAnnotation->GetTextColor().b, newTextColor.b);
+    ASSERT_EQ(updatedAnnotation->GetTextColor().a, newTextColor.a);
+
+    // Assert Updated BackGround Color
+    ASSERT_EQ(updatedAnnotation->GetBackgroundColor().r, newBackgroundColor.r);
+    ASSERT_EQ(updatedAnnotation->GetBackgroundColor().g, newBackgroundColor.g);
+    ASSERT_EQ(updatedAnnotation->GetBackgroundColor().b, newBackgroundColor.b);
+    ASSERT_EQ(updatedAnnotation->GetBackgroundColor().a, newBackgroundColor.a);
 }
 
 }  // namespace

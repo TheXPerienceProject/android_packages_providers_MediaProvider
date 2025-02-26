@@ -73,16 +73,20 @@ class SearchSuggestionCache {
      * @param query Input search text query.
      */
     fun updateHistorySuggestion(query: String) {
-        val newHistorySuggestion =
-            SearchSuggestion(
-                mediaSetId = null,
-                authority = null,
-                displayText = query.trim(),
-                type = SearchSuggestionType.HISTORY,
-                icon = null,
-            )
+        try {
+            val newHistorySuggestion =
+                SearchSuggestion(
+                    mediaSetId = null,
+                    authority = null,
+                    displayText = query.trim(),
+                    type = SearchSuggestionType.HISTORY,
+                    icon = null,
+                )
 
-        updateHistorySuggestion(newHistorySuggestion)
+            updateHistorySuggestion(newHistorySuggestion)
+        } catch (e: RuntimeException) {
+            Log.e(TAG, "Could not update search cache with search query $query", e)
+        }
     }
 
     /**
@@ -92,20 +96,30 @@ class SearchSuggestionCache {
      * @param suggestion Input search suggestion query.
      */
     fun updateHistorySuggestion(suggestion: SearchSuggestion) {
-        val historySuggestion =
-            when (suggestion.type) {
-                SearchSuggestionType.HISTORY -> suggestion
-                else -> suggestion.copy(type = SearchSuggestionType.HISTORY)
+        try {
+            if (suggestion.displayText == null) {
+                Log.d(TAG, "Skip adding search suggestion with no display text in history")
+                return
             }
 
-        val newCachedSuggestions = Collections.synchronizedSet(LinkedHashSet<SearchSuggestion>())
-        newCachedSuggestions.add(historySuggestion)
+            val historySuggestion =
+                when (suggestion.type) {
+                    SearchSuggestionType.HISTORY -> suggestion
+                    else -> suggestion.copy(type = SearchSuggestionType.HISTORY)
+                }
 
-        synchronized(cachedSuggestions) {
-            val zeroStateSuggestions = cachedSuggestions[ZERO_STATE_SEARCH_QUERY]
-            zeroStateSuggestions?.let { newCachedSuggestions.addAll(zeroStateSuggestions) }
+            val newCachedSuggestions =
+                Collections.synchronizedSet(LinkedHashSet<SearchSuggestion>())
+            newCachedSuggestions.add(historySuggestion)
+
+            synchronized(cachedSuggestions) {
+                val zeroStateSuggestions = cachedSuggestions[ZERO_STATE_SEARCH_QUERY]
+                zeroStateSuggestions?.let { newCachedSuggestions.addAll(zeroStateSuggestions) }
+            }
+
+            cachedSuggestions[ZERO_STATE_SEARCH_QUERY] = newCachedSuggestions
+        } catch (e: RuntimeException) {
+            Log.e(TAG, "Could not update search cache with suggestion $suggestion", e)
         }
-
-        cachedSuggestions[ZERO_STATE_SEARCH_QUERY] = newCachedSuggestions
     }
 }

@@ -869,6 +869,10 @@ void Page::PopulateAnnotations() {
                 annotation = std::make_unique<HighlightAnnotation>(bounds);
                 break;
             }
+            case FPDF_ANNOT_FREETEXT: {
+                annotation = std::make_unique<FreeTextAnnotation>(bounds);
+                break;
+            }
             default: {
                 break;
             }
