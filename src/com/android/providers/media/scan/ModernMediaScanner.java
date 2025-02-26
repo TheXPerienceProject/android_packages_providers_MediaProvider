@@ -155,6 +155,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
@@ -260,9 +262,20 @@ public class ModernMediaScanner implements MediaScanner {
      */
     private Set<String> mOemSupportedMimeTypes;
 
+    /**
+     * Default OemMetadataService implementation package.
+     */
+    private Optional<String> mDefaultOemMetadataServicePackage;
+
+    /**
+     * Count down latch to process delay in connection to OemMetadataService.
+     */
+    private CountDownLatch mCountDownLatchForOemMetadataConnection = new CountDownLatch(1);
+
     public ModernMediaScanner(@NonNull Context context, @NonNull ConfigStore configStore) {
         mContext = requireNonNull(context);
         mDrmClient = new DrmManagerClient(context);
+        mDefaultOemMetadataServicePackage = configStore.getDefaultOemMetadataServicePackage();
 
         // Dynamically collect the set of MIME types that should be considered
         // to be DRM, as this can vary between devices
@@ -272,15 +285,25 @@ public class ModernMediaScanner implements MediaScanner {
                 mDrmMimeTypes.add(mimeTypes.next());
             }
         }
-        connectOemMetadataServiceWrapper(configStore);
     }
 
     private Set<String> getOemSupportedMimeTypes() {
-        if (mOemMetadataServiceWrapper == null) {
-            return new HashSet<String>();
-        }
-
         try {
+            // Return if no package implements OemMetadataService
+            if (!mDefaultOemMetadataServicePackage.isPresent()) {
+                return new HashSet<>();
+            }
+
+            // Setup connection if missing
+            if (mOemMetadataServiceWrapper == null) {
+                connectOemMetadataServiceWrapper();
+            }
+
+            // Return empty set if we cannot setup any connection
+            if (mOemMetadataServiceWrapper == null) {
+                return new HashSet<>();
+            }
+
             return mOemMetadataServiceWrapper.getSupportedMimeTypes();
         } catch (Exception e) {
             Log.w(TAG, "Error in fetching OEM supported mimetypes", e);
@@ -288,32 +311,42 @@ public class ModernMediaScanner implements MediaScanner {
         }
     }
 
-    private void connectOemMetadataServiceWrapper(ConfigStore configStore) {
-        if (!enableOemMetadata()) {
-            return;
-        }
+    private synchronized void connectOemMetadataServiceWrapper() {
+        try {
+            if (!enableOemMetadata()) {
+                return;
+            }
 
-        Optional<String> pkgOptional = configStore.getDefaultOemMetadataServicePackage();
-        if (!pkgOptional.isPresent()) {
-            Log.v(TAG, "No default package listed for OEM Metadata service");
-            return;
-        }
+            // Return if wrapper is already initialised
+            if (mOemMetadataServiceWrapper != null) {
+                return;
+            }
 
-        Intent intent = new Intent(OemMetadataService.SERVICE_INTERFACE);
-        ResolveInfo resolveInfo = mContext.getPackageManager().resolveService(intent,
-                PackageManager.MATCH_ALL);
-        if (resolveInfo == null || resolveInfo.serviceInfo == null
-                || resolveInfo.serviceInfo.packageName == null
-                || !pkgOptional.get().equalsIgnoreCase(resolveInfo.serviceInfo.packageName)
-                || resolveInfo.serviceInfo.permission == null
-                || !resolveInfo.serviceInfo.permission.equalsIgnoreCase(
-                OemMetadataService.BIND_OEM_METADATA_SERVICE_PERMISSION)) {
-            Log.v(TAG, "No valid package found for OEM Metadata service");
-            return;
-        }
+            if (!mDefaultOemMetadataServicePackage.isPresent()) {
+                Log.v(TAG, "No default package listed for OEM Metadata service");
+                return;
+            }
 
-        intent.setPackage(pkgOptional.get());
-        mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+            Intent intent = new Intent(OemMetadataService.SERVICE_INTERFACE);
+            ResolveInfo resolveInfo = mContext.getPackageManager().resolveService(intent,
+                    PackageManager.MATCH_ALL);
+            if (resolveInfo == null || resolveInfo.serviceInfo == null
+                    || resolveInfo.serviceInfo.packageName == null
+                    || !mDefaultOemMetadataServicePackage.get().equalsIgnoreCase(
+                    resolveInfo.serviceInfo.packageName)
+                    || resolveInfo.serviceInfo.permission == null
+                    || !resolveInfo.serviceInfo.permission.equalsIgnoreCase(
+                    OemMetadataService.BIND_OEM_METADATA_SERVICE_PERMISSION)) {
+                Log.v(TAG, "No valid package found for OEM Metadata service");
+                return;
+            }
+
+            intent.setPackage(mDefaultOemMetadataServicePackage.get());
+            mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+            mCountDownLatchForOemMetadataConnection.await(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            Log.e(TAG, "Exception in connecting OemMetadataServiceWrapper", e);
+        }
     }
 
     private ServiceConnection mServiceConnection = new ServiceConnection() {
@@ -321,14 +354,30 @@ public class ModernMediaScanner implements MediaScanner {
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
             IOemMetadataService service = IOemMetadataService.Stub.asInterface(iBinder);
             mOemMetadataServiceWrapper = new OemMetadataServiceWrapper(service);
+            mCountDownLatchForOemMetadataConnection.countDown();
             Log.i(TAG, "Connected to OemMetadataService");
         }
+
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
             mOemMetadataServiceWrapper = null;
-            Log.i(TAG, "Disconnected from OemMetadataService");
+            Log.w(TAG, "Disconnected from OemMetadataService");
+            mCountDownLatchForOemMetadataConnection = new CountDownLatch(1);
+        }
+
+        @Override
+        public void onBindingDied(ComponentName name) {
+            Log.w(TAG, "Binding to OemMetadataService died");
+            mContext.unbindService(this);
+            mOemMetadataServiceWrapper = null;
+            mCountDownLatchForOemMetadataConnection = new CountDownLatch(1);
         }
     };
+
+    @VisibleForTesting
+    public ServiceConnection getOemMetadataServiceConnection() {
+        return mServiceConnection;
+    }
 
     @Override
     @NonNull
@@ -1005,17 +1054,35 @@ public class ModernMediaScanner implements MediaScanner {
         }
 
         private void fetchOemMetadata(ContentProviderOperation.Builder op, File file) {
-            if (!enableOemMetadata() || mOemMetadataServiceWrapper == null) {
+            if (!enableOemMetadata()) {
                 return;
             }
+            try {
+                // Return if no package implements OemMetadataService
+                if (!mDefaultOemMetadataServicePackage.isPresent()) {
+                    return;
+                }
 
-            try (ParcelFileDescriptor pfd = FileUtils.openSafely(file,
-                    ParcelFileDescriptor.MODE_READ_ONLY)) {
-                Map<String, String> oemMetadata = mOemMetadataServiceWrapper.getOemCustomData(pfd);
-                op.withValue(FileColumns.OEM_METADATA, oemMetadata.toString().getBytes());
-                Log.v(TAG, "Fetched OEM metadata successfully");
+                if (mOemMetadataServiceWrapper == null) {
+                    connectOemMetadataServiceWrapper();
+                }
+
+                // Return if we cannot find any connection
+                if (mOemMetadataServiceWrapper == null) {
+                    return;
+                }
+
+                try (ParcelFileDescriptor pfd = FileUtils.openSafely(file,
+                        ParcelFileDescriptor.MODE_READ_ONLY)) {
+                    Map<String, String> oemMetadata = mOemMetadataServiceWrapper.getOemCustomData(
+                            pfd);
+                    op.withValue(FileColumns.OEM_METADATA, oemMetadata.toString().getBytes());
+                    Log.v(TAG, "Fetched OEM metadata successfully");
+                } catch (Exception e) {
+                    Log.w(TAG, "Failure in fetching OEM metadata", e);
+                }
             } catch (Exception e) {
-                Log.w(TAG, "Failure in fetching OEM metadata", e);
+                Log.w(TAG, "Failure in connecting to OEM metadata service", e);
             }
         }
 

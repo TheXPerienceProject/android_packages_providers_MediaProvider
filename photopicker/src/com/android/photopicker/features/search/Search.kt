@@ -75,6 +75,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -86,7 +88,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -196,6 +201,7 @@ fun SearchBarEnabled(params: LocationParams, viewModel: SearchViewModel, modifie
     val scope = rememberCoroutineScope()
     val events = LocalEvents.current
     val configuration = LocalPhotopickerConfiguration.current
+
     SearchBar(
         inputField = {
             SearchInputContent(
@@ -444,6 +450,7 @@ private fun SearchInput(
     modifier: Modifier,
 ) {
     val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
     SearchBarDefaults.InputField(
         query = searchQuery,
         placeholder = { SearchBarPlaceHolder(focused) },
@@ -466,8 +473,23 @@ private fun SearchInput(
         expanded = focused,
         onExpandedChange = onFocused,
         leadingIcon = { SearchBarIcon(focused, onFocused, onSearchQueryChanged) },
-        modifier = modifier,
+        modifier = modifier.focusRequester(focusRequester),
     )
+    RequestFocusOnResume(focusRequester = focusRequester, focused)
+}
+
+@Composable
+private fun RequestFocusOnResume(focusRequester: FocusRequester, focused: Boolean) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(Unit) {
+        when (focused) {
+            true ->
+                lifecycleOwner.repeatOnLifecycle(state = Lifecycle.State.RESUMED) {
+                    focusRequester.requestFocus()
+                }
+            false -> {}
+        }
+    }
 }
 
 /**

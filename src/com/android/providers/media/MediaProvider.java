@@ -329,6 +329,7 @@ import com.android.providers.media.util.ForegroundThread;
 import com.android.providers.media.util.Logging;
 import com.android.providers.media.util.LongArray;
 import com.android.providers.media.util.Metrics;
+import com.android.providers.media.util.MimeTypeFixHandler;
 import com.android.providers.media.util.MimeUtils;
 import com.android.providers.media.util.PermissionUtils;
 import com.android.providers.media.util.Preconditions;
@@ -512,6 +513,16 @@ public class MediaProvider extends ContentProvider {
     @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public static final long ENABLE_OWNED_PHOTOS = 310703690L;
 
+
+    /**
+     * Excludes unreliable storage volumes from being included in
+     * {@link MediaStore#getExternalVolumeNames(Context)}.
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.CUR_DEVELOPMENT)
+    @VisibleForTesting
+    static final long EXCLUDE_UNRELIABLE_STORAGE_VOLUMES = 391360514L;
+
     /**
      * Set of {@link Cursor} columns that refer to raw filesystem paths.
      */
@@ -545,6 +556,11 @@ public class MediaProvider extends ContentProvider {
      * {@link com.android.settingslib.drawer.TileUtils.META_DATA_PREFERENCE_SUMMARY}
      */
     private static final String META_DATA_PREFERENCE_SUMMARY = "com.android.settings.summary";
+
+    private static final String MEDIAPROVIDER_PREFS = "mediaprovider_prefs";
+
+    private static final String IS_MIME_TYPE_FIXED_IN_ANDROID_15 =
+            "is_mime_type_fixed_in_android_15";
 
     /**
      * Updates the MediaStore versioning schema and format to reduce identifying properties.
@@ -1621,6 +1637,9 @@ public class MediaProvider extends ContentProvider {
 
         PulledMetrics.initialize(context);
         mMaliciousAppDetector = createMaliciousAppDetector();
+
+        initializeMimeTypeFixHandlerForAndroid15(getContext());
+
         return true;
     }
 
@@ -1829,6 +1848,10 @@ public class MediaProvider extends ContentProvider {
 
         mExternalPrimaryBackupExecutor.doBackup(signal);
 
+        // In Android 15, certain MIME types were introduced that are not supported, this fixes
+        // existing data with these unsupported MIME types
+        fixUnsupportedMimeTypesForAndroid15(getContext());
+
         final long durationMillis = (SystemClock.elapsedRealtime() - startTime);
         Metrics.logIdleMaintenance(MediaStore.VOLUME_EXTERNAL, itemCount,
                 durationMillis, staleThumbnails, deletedExpiredMedia);
@@ -1964,6 +1987,38 @@ public class MediaProvider extends ContentProvider {
         } finally {
             PickerSyncController.sIdleMaintenanceSyncLock.unlock();
         }
+    }
+
+    private void fixUnsupportedMimeTypesForAndroid15(Context context) {
+        if (!Flags.enableMimeTypeFixForAndroid15()) {
+            return;
+        }
+
+        if (context == null) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT != Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return;
+        }
+
+        SharedPreferences prefs = context.getSharedPreferences(MEDIAPROVIDER_PREFS,
+                Context.MODE_PRIVATE);
+        if (prefs.getBoolean(IS_MIME_TYPE_FIXED_IN_ANDROID_15, false)) {
+            Log.v(TAG, "Mime type already corrected");
+            return;
+        }
+
+        mExternalDatabase.runWithTransaction(db -> {
+            boolean isSuccess = MimeTypeFixHandler.updateUnsupportedMimeTypes(db);
+            // if success then update the shared pref value
+            if (isSuccess) {
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putBoolean(IS_MIME_TYPE_FIXED_IN_ANDROID_15, true);
+                editor.apply();
+            }
+            return null;
+        });
     }
 
     private void updateSpecialFormatColumn(SQLiteDatabase db, @NonNull CancellationSignal signal) {
@@ -12283,6 +12338,31 @@ public class MediaProvider extends ContentProvider {
             configStore = MediaApplication.getConfigStore();
         }
         return configStore;
+    }
+
+    /**
+     * Initializes the MimeTypeFixHandler for Android 15, running only for Android 15
+     * This method loads the mime types from the res/raw directory
+     * This is necessary to ensure that MediaProvider can handle mime types correctly on Android 15
+     */
+    private void initializeMimeTypeFixHandlerForAndroid15(Context context) {
+        if (Build.VERSION.SDK_INT != Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return;
+        }
+
+        if (!Flags.enableMimeTypeFixForAndroid15()) {
+            return;
+        }
+
+        // Load all the MIME types from various files in the background to reduce the latency
+        // caused when this method is called from onCreate
+        BackgroundThread.getExecutor().execute(() -> {
+            try {
+                MimeTypeFixHandler.loadMimeTypes(context);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize MimeTypeFixHandler: ", e);
+            }
+        });
     }
 
     /**
