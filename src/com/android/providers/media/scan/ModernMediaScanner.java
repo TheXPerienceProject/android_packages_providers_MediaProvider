@@ -47,6 +47,7 @@ import static android.media.MediaMetadataRetriever.METADATA_KEY_WRITER;
 import static android.media.MediaMetadataRetriever.METADATA_KEY_YEAR;
 import static android.provider.MediaStore.AUTHORITY;
 import static android.provider.MediaStore.UNKNOWN_STRING;
+import static android.provider.MediaStore.VOLUME_EXTERNAL;
 import static android.text.format.DateUtils.HOUR_IN_MILLIS;
 import static android.text.format.DateUtils.MINUTE_IN_MILLIS;
 
@@ -1212,21 +1213,20 @@ public class ModernMediaScanner implements MediaScanner {
         }
 
         // Recovery is performed on first scan of file in target device
-        if (existingId == -1) {
-            try {
-                if (restoreExecutor != null) {
-                    Optional<ContentValues> restoredDataOptional = restoreExecutor
-                            .getMetadataForFileIfBackedUp(file.getAbsolutePath(), mContext);
-                    if (restoredDataOptional.isPresent()) {
-                        ContentValues valuesRestored = restoredDataOptional.get();
-                        if (isRestoredMetadataOfActualFile(valuesRestored, attrs)) {
-                            return restoreDataFromBackup(valuesRestored, file, attrs, mimeType);
-                        }
+        try {
+            if (restoreExecutor != null) {
+                Optional<ContentValues> restoredDataOptional = restoreExecutor
+                        .getMetadataForFileIfBackedUp(file.getAbsolutePath(), mContext);
+                if (restoredDataOptional.isPresent()) {
+                    ContentValues valuesRestored = restoredDataOptional.get();
+                    if (isRestoredMetadataOfActualFile(valuesRestored, attrs)) {
+                        return restoreDataFromBackup(valuesRestored, file, attrs, mimeType,
+                                existingId);
                     }
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Error while attempting to restore metadata from backup", e);
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error while attempting to restore metadata from backup", e);
         }
 
         switch (mediaType) {
@@ -1259,8 +1259,9 @@ public class ModernMediaScanner implements MediaScanner {
     }
 
     private ContentProviderOperation.Builder restoreDataFromBackup(
-            ContentValues restoredValues, File file, BasicFileAttributes attrs, String mimeType) {
-        final ContentProviderOperation.Builder op = newUpsert(MediaStore.VOLUME_EXTERNAL, -1);
+            ContentValues restoredValues, File file, BasicFileAttributes attrs, String mimeType,
+            long existingId) {
+        final ContentProviderOperation.Builder op = newUpsert(VOLUME_EXTERNAL, existingId);
         withGenericValues(op, file, attrs, mimeType, /* mediaType */ null);
         op.withValues(restoredValues);
         return op;

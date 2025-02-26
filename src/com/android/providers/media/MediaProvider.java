@@ -300,6 +300,7 @@ import com.android.modules.utils.BackgroundThread;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.providers.media.DatabaseHelper.OnFilesChangeListener;
 import com.android.providers.media.DatabaseHelper.OnLegacyMigrationListener;
+import com.android.providers.media.backupandrestore.BackupAndRestoreUtils;
 import com.android.providers.media.backupandrestore.BackupExecutor;
 import com.android.providers.media.dao.FileRow;
 import com.android.providers.media.flags.Flags;
@@ -1794,6 +1795,7 @@ public class MediaProvider extends ContentProvider {
                 return null;
             });
         }
+        BackupAndRestoreUtils.doCleanUpAfterRestoreIfRequired(getContext());
 
         // Delete any stale thumbnails
         final int staleThumbnails = mExternalDatabase.runWithTransaction((db) -> {
@@ -7374,6 +7376,13 @@ public class MediaProvider extends ContentProvider {
             restoreLocalCallingIdentity(token);
         }
         return null;
+    }
+
+    /**
+     * Triggers backup for MediaProvider.
+     */
+    public void triggerBackup() {
+        mExternalPrimaryBackupExecutor.doBackup(null);
     }
 
     @Nullable

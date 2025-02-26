@@ -44,10 +44,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.modules.utils.BackgroundThread;
-import com.android.providers.media.util.FileUtils;
-import com.android.providers.media.util.ForegroundThread;
-import com.android.providers.media.util.Logging;
-import com.android.providers.media.util.MimeUtils;
+import com.android.providers.media.util.LegacyFileUtils;
+import com.android.providers.media.util.LegacyForegroundThread;
+import com.android.providers.media.util.LegacyLogging;
+import com.android.providers.media.util.LegacyMimeUtils;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -287,7 +287,7 @@ public class LegacyDatabaseHelper extends SQLiteOpenHelper implements AutoClosea
             // completely finish dispatching all change notifications before we
             // process background tasks, to ensure that the background work
             // doesn't steal resources from the more important foreground work
-            ForegroundThread.getExecutor().execute(() -> {
+            LegacyForegroundThread.getExecutor().execute(() -> {
                 // Now that we've finished with all our important work, we can
                 // finally kick off any internal background tasks
                 for (int i = 0; i < state.backgroundTasks.size(); i++) {
@@ -562,11 +562,11 @@ public class LegacyDatabaseHelper extends SQLiteOpenHelper implements AutoClosea
 
         // Derive new column value based on well-known paths
         try (Cursor c = db.query("files", new String[]{FileColumns._ID, FileColumns.DATA},
-                FileColumns.DATA + " REGEXP '" + FileUtils.PATTERN_OWNED_PATH.pattern() + "'",
+                FileColumns.DATA + " REGEXP '" + LegacyFileUtils.PATTERN_OWNED_PATH.pattern() + "'",
                 null, null, null, null, null)) {
             Log.d(TAG, "Updating " + c.getCount() + " entries with well-known owners");
 
-            final Matcher m = FileUtils.PATTERN_OWNED_PATH.matcher("");
+            final Matcher m = LegacyFileUtils.PATTERN_OWNED_PATH.matcher("");
             final ContentValues values = new ContentValues();
 
             while (c.moveToNext()) {
@@ -621,7 +621,7 @@ public class LegacyDatabaseHelper extends SQLiteOpenHelper implements AutoClosea
 
     private static void updateSetIsDownload(SQLiteDatabase db) {
         db.execSQL("UPDATE files SET is_download=1 WHERE _data REGEXP '"
-                + FileUtils.PATTERN_DOWNLOADS_FILE + "'");
+                + LegacyFileUtils.PATTERN_DOWNLOADS_FILE + "'");
     }
 
     private static void updateAddExpiresAndTrashed(SQLiteDatabase db) {
@@ -734,7 +734,7 @@ public class LegacyDatabaseHelper extends SQLiteOpenHelper implements AutoClosea
             while (c.moveToNext()) {
                 final String time = c.getString(0);
                 final String message = c.getString(1);
-                Logging.logPersistent("Historical log " + time + " " + message);
+                LegacyLogging.logPersistent("Historical log " + time + " " + message);
             }
         }
         db.execSQL("DELETE FROM log;");
@@ -787,7 +787,7 @@ public class LegacyDatabaseHelper extends SQLiteOpenHelper implements AutoClosea
                 final long id = c.getLong(0);
                 final String data = c.getString(1);
                 values.put(FileColumns.DATA, data);
-                FileUtils.computeValuesFromData(values, /*isForFuse*/ false);
+                LegacyFileUtils.computeValuesFromData(values, /*isForFuse*/ false);
                 values.remove(FileColumns.DATA);
                 if (!values.isEmpty()) {
                     db.update("files", values, "_id=" + id, null);
@@ -811,9 +811,9 @@ public class LegacyDatabaseHelper extends SQLiteOpenHelper implements AutoClosea
                 final long id = c.getLong(0);
                 final String mimeType = c.getString(1);
                 // Only update Document and Subtitle media type
-                if (MimeUtils.isSubtitleMimeType(mimeType)) {
+                if (LegacyMimeUtils.isSubtitleMimeType(mimeType)) {
                     newMediaTypes.put(id, FileColumns.MEDIA_TYPE_SUBTITLE);
-                } else if (MimeUtils.isDocumentMimeType(mimeType)) {
+                } else if (LegacyMimeUtils.isDocumentMimeType(mimeType)) {
                     newMediaTypes.put(id, FileColumns.MEDIA_TYPE_DOCUMENT);
                 }
             }
