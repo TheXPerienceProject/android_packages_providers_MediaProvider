@@ -192,7 +192,7 @@ fun SearchBarEnabled(params: LocationParams, viewModel: SearchViewModel, modifie
     val focused = rememberSaveable { mutableStateOf(false) }
     val searchTerm = rememberSaveable { mutableStateOf("") }
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
-    val suggestionLists by viewModel.suggestionLists.collectAsStateWithLifecycle()
+    val suggestionLists by viewModel.searchSuggestions.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val events = LocalEvents.current
     val configuration = LocalPhotopickerConfiguration.current
@@ -266,7 +266,7 @@ fun SearchBarEnabled(params: LocationParams, viewModel: SearchViewModel, modifie
                     if (suggestionLists.totalSuggestions > 0) {
                         val focusManager = LocalFocusManager.current
                         ShowSuggestions(
-                            suggestionLists = suggestionLists,
+                            searchSuggestions = suggestionLists,
                             isZeroSearchState = searchTerm.value.isEmpty(),
                             onSuggestionClick = { suggestion ->
                                 focusManager.clearFocus()
@@ -609,14 +609,15 @@ fun EmptySearchResult(modifier: Modifier = Modifier) {
 /**
  * Composable function that shows suggestion in the search view.
  *
- * @param suggestionLists A `SuggestionLists` object containing the search suggestions to display.
+ * @param searchSuggestions A `SearchSuggestions` object containing the different types of
+ *   suggestions to be displayed.
  * @param isZeroSearchState A boolean value indicating if the search query is empty.
  * @param modifier A Modifier that can be applied to the suggestions list.
  * @param onSuggestionClick A callback function to be invoked when a suggestion is clicked.
  */
 @Composable
 private fun ShowSuggestions(
-    suggestionLists: SuggestionLists,
+    searchSuggestions: SearchSuggestions,
     isZeroSearchState: Boolean,
     modifier: Modifier,
     onSuggestionClick: (SearchSuggestion) -> Unit,
@@ -628,9 +629,9 @@ private fun ShowSuggestions(
     val events = LocalEvents.current
     val configuration = LocalPhotopickerConfiguration.current
 
-    val historySuggestions = suggestionLists.history
-    val faceSuggestions = suggestionLists.face
-    val otherSuggestions = suggestionLists.other
+    val historySuggestions = searchSuggestions.history
+    val faceSuggestions = searchSuggestions.face
+    val otherSuggestions = searchSuggestions.other
 
     val state = rememberLazyListState()
     Box(modifier = modifier.padding(MEASUREMENT_LARGE_PADDING)) {
