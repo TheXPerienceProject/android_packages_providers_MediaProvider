@@ -17,6 +17,7 @@
 package com.android.providers.media.photopicker.sync;
 
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markAlbumMediaSyncAsComplete;
+import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markAllSearchResultsSyncAsComplete;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markMediaInMediaSetSyncAsComplete;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markMediaSetsSyncAsComplete;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markSearchResultsSyncAsComplete;
@@ -509,6 +510,10 @@ public class PickerSyncManager {
         final OneTimeWorkRequest syncRequest =
                 buildOneTimeWorkerRequest(SearchResultsSyncWorker.class, inputData);
 
+        // Clear all existing requests since there can be only one unique work running and our
+        // new sync work will replace the existing work (if any).
+        markAllSearchResultsSyncAsComplete(syncSource);
+
         // Track the new sync request
         trackNewSearchResultsSyncRequests(syncSource, syncRequest.getId());
 
@@ -519,7 +524,7 @@ public class PickerSyncManager {
         try {
             final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
                     workName,
-                    ExistingWorkPolicy.APPEND_OR_REPLACE,
+                    ExistingWorkPolicy.REPLACE,
                     syncRequest);
 
             // Check that the request has been successfully enqueued.

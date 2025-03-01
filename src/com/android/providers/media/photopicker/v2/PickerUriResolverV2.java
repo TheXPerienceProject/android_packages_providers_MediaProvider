@@ -50,7 +50,7 @@ public class PickerUriResolverV2 {
     private static final String SEARCH_SUGGESTIONS_PATH_SEGMENT = "search_suggestions";
     private static final String CATEGORIES_PATH_SEGMENT = "categories";
     public static final String MEDIA_SETS_PATH_SEGMENT = "media_sets";
-    private static final String MEDIA_SET_CONTENTS_PATH_SEGMENT = "media_set_contents";
+    public static final String MEDIA_SET_CONTENTS_PATH_SEGMENT = "media_set_contents";
 
 
     static final UriMatcher sUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);

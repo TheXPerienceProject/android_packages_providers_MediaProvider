@@ -139,7 +139,6 @@ import static com.android.providers.media.PickerUriResolver.PICKER_GET_CONTENT_S
 import static com.android.providers.media.PickerUriResolver.PICKER_SEGMENT;
 import static com.android.providers.media.PickerUriResolver.PICKER_TRANSCODED_SEGMENT;
 import static com.android.providers.media.PickerUriResolver.getMediaUri;
-import static com.android.providers.media.flags.Flags.enableBackupAndRestore;
 import static com.android.providers.media.flags.Flags.indexMediaLatitudeLongitude;
 import static com.android.providers.media.flags.Flags.versionLockdown;
 import static com.android.providers.media.photopicker.data.ItemsProvider.EXTRA_MIME_TYPE_SELECTION;
@@ -735,7 +734,7 @@ public class MediaProvider extends ContentProvider {
                     packageManager.getPackageUidAsUser(
                             packageName, PackageManager.PackageInfoFlags.of(0), userId);
             LocalCallingIdentity lci = LocalCallingIdentity.fromExternal(context, mUserCache, uid);
-            if (!lci.checkCallingPermissionUserSelected()) {
+            if (!lci.checkCallingPermissionUserSelected(/* forDataDelivery */ false)) {
                 String[] packages = lci.getSharedPackageNamesArray();
                 mMediaGrants.removeAllMediaGrantsForPackages(
                         packages, /* reason= */ "Mode changed: " + op, userId);
@@ -1211,8 +1210,7 @@ public class MediaProvider extends ContentProvider {
 
                 mDatabaseBackupAndRecovery.deleteFromDbBackup(helper, deletedRow);
                 if (deletedRow.getVolumeName() != null
-                        && deletedRow.getVolumeName().equalsIgnoreCase(VOLUME_EXTERNAL_PRIMARY)
-                        && enableBackupAndRestore()) {
+                        && deletedRow.getVolumeName().equalsIgnoreCase(VOLUME_EXTERNAL_PRIMARY)) {
                     mExternalPrimaryBackupExecutor.deleteBackupForPath(deletedRow.getPath());
                 }
             });
@@ -1813,11 +1811,7 @@ public class MediaProvider extends ContentProvider {
         // value as NULL, and update the same in the picker db
         detectSpecialFormat(signal);
 
-        if (enableBackupAndRestore()) {
-            Log.i(TAG, "Backup is enabled");
-            // Backup needed for B&R
-            mExternalPrimaryBackupExecutor.doBackup(signal);
-        }
+        mExternalPrimaryBackupExecutor.doBackup(signal);
 
         final long durationMillis = (SystemClock.elapsedRealtime() - startTime);
         Metrics.logIdleMaintenance(MediaStore.VOLUME_EXTERNAL, itemCount,
@@ -3360,11 +3354,13 @@ public class MediaProvider extends ContentProvider {
 
     private ArrayList<String> getIncludedDefaultDirectories() {
         final ArrayList<String> includedDefaultDirs = new ArrayList<>();
-        if (mCallingIdentity.get().checkCallingPermissionVideo(/* forWrite */ true)) {
+        if (mCallingIdentity.get().checkCallingPermissionVideo(/* forWrite */
+                true, /* forDataDelivery */ true)) {
             includedDefaultDirs.add(Environment.DIRECTORY_DCIM);
             includedDefaultDirs.add(Environment.DIRECTORY_PICTURES);
             includedDefaultDirs.add(Environment.DIRECTORY_MOVIES);
-        } else if (mCallingIdentity.get().checkCallingPermissionImages(/* forWrite */ true)) {
+        } else if (mCallingIdentity.get().checkCallingPermissionImages(/* forWrite */
+                true, /* forDataDelivery */ true)) {
             includedDefaultDirs.add(Environment.DIRECTORY_DCIM);
             includedDefaultDirs.add(Environment.DIRECTORY_PICTURES);
         }
@@ -7765,7 +7761,7 @@ public class MediaProvider extends ContentProvider {
             throw new SecurityException(
                     getSecurityExceptionMessage("Picker search media init"));
         }
-        return PickerDataLayerV2.handleNewSearchRequest(getContext(), extras);
+        return PickerDataLayerV2.handleSearchResultsInit(getContext(), extras);
     }
 
     private void initMediaSets(@NonNull Bundle extras) {

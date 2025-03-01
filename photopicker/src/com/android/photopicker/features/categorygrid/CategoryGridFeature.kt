@@ -77,6 +77,7 @@ class CategoryGridFeature : PhotopickerUiFeature {
             Event.ShowSnackbarMessage::class.java,
             Event.LogPhotopickerUIEvent::class.java,
             Event.LogPhotopickerAlbumOpenedUIEvent::class.java,
+            Event.LogPhotopickerPageInfo::class.java,
         )
 
     override fun registerLocations(): List<Pair<Location, Int>> {

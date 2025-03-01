@@ -1215,8 +1215,8 @@ public class ModernMediaScanner implements MediaScanner {
         if (existingId == -1) {
             try {
                 if (restoreExecutor != null) {
-                    Optional<ContentValues> restoredDataOptional =
-                            restoreExecutor.getMetadataForFileIfBackedUp(file.getAbsolutePath());
+                    Optional<ContentValues> restoredDataOptional = restoreExecutor
+                            .getMetadataForFileIfBackedUp(file.getAbsolutePath(), mContext);
                     if (restoredDataOptional.isPresent()) {
                         ContentValues valuesRestored = restoredDataOptional.get();
                         if (isRestoredMetadataOfActualFile(valuesRestored, attrs)) {

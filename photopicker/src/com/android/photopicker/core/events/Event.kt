@@ -552,6 +552,9 @@ interface Telemetry {
         UI_LOADED_SEARCH_RESULTS(
             MediaProviderStatsLog.PHOTOPICKER_UIEVENT_LOGGED__UI_EVENT__UI_LOADED_SEARCH_RESULTS
         ),
+        UI_LOADED_EMPTY_STATE(
+            MediaProviderStatsLog.PHOTOPICKER_UIEVENT_LOGGED__UI_EVENT__UI_LOADED_EMPTY_STATE
+        ),
         UNSET_UI_EVENT(MediaProviderStatsLog.PHOTOPICKER_UIEVENT_LOGGED__UI_EVENT__UNSET_UI_EVENT),
     }
 
