@@ -284,6 +284,9 @@ struct fuse {
     }
 
     inline string GetTransformsDir() { return GetEffectiveRootPath() + "/.transforms"; }
+    inline string GetPickerTranscodedDir() {
+        return GetEffectiveRootPath() + "/.picker_transcoded";
+    }
 
     // Note that these two (FromInode / ToInode) conversion wrappers are required
     // because fuse_lowlevel_ops documents that the root inode is always one
@@ -537,6 +540,14 @@ static inline bool is_transforms_dir_path(const string& path, struct fuse* fuse)
     return android::base::StartsWithIgnoreCase(path, fuse->GetTransformsDir());
 }
 
+static inline bool is_picker_transcoded_dir_path(const string& path, struct fuse* fuse) {
+    return android::base::StartsWithIgnoreCase(path, fuse->GetPickerTranscodedDir());
+}
+
+static inline bool is_hidden_dir_path(const string& path, struct fuse* fuse) {
+    return is_transforms_dir_path(path, fuse) || is_picker_transcoded_dir_path(path, fuse);
+}
+
 static std::unique_ptr<mediaprovider::fuse::FileLookupResult> validate_node_path(
         const std::string& path, const std::string& name, fuse_req_t req, int* error_code,
         struct fuse_entry_param* e, const FuseOp op) {
@@ -550,7 +561,7 @@ static std::unique_ptr<mediaprovider::fuse::FileLookupResult> validate_node_path
         return nullptr;
     }
 
-    if (is_transforms_dir_path(path, fuse)) {
+    if (is_hidden_dir_path(path, fuse)) {
         if (op == FuseOp::lookup) {
             // Lookups are only allowed under .transforms/synthetic dir
             if (!(android::base::EqualsIgnoreCase(path, fuse->GetTransformsDir()) ||
@@ -562,6 +573,8 @@ static std::unique_ptr<mediaprovider::fuse::FileLookupResult> validate_node_path
         } else {
             // user-code is only allowed to make lookups under .transforms dir, and that too only
             // under .transforms/synthetic dir
+            // Additionally No operations are allowed on .picker_transcoded directory
+            // as it should be only used by MediaProvider
             *error_code = ENOENT;
             return nullptr;
         }
@@ -710,6 +723,28 @@ namespace fuse {
  * These implement the various functions in fuse_lowlevel_ops
  *
  */
+
+bool IsUpstreamPassthroughSupported() {
+    // Upstream passthrough requires some modifications to work. If those are present,
+    // /sys/fs/fuse/fuse_passthrough will read 'supported\n'
+    // - see fs/fuse/inode.c in the kernel source
+
+    string contents;
+    const char* filename = "/sys/fs/fuse/features/fuse_passthrough";
+    if (!android::base::ReadFileToString(filename, &contents)) {
+        LOG(INFO) << "fuse-passthrough is disabled because " << filename << " cannot be read";
+        return false;
+    }
+
+    if (contents == "supported\n") {
+        LOG(INFO) << "fuse-passthrough is enabled because " << filename << " reads 'supported'";
+        return true;
+    } else {
+        LOG(INFO) << "fuse-passthrough is disabled because " << filename
+                  << " does not read 'supported'";
+        return false;
+    }
+}
 
 static void pf_init(void* userdata, struct fuse_conn_info* conn) {
     struct fuse* fuse = reinterpret_cast<struct fuse*>(userdata);
@@ -1301,9 +1336,9 @@ static void pf_rmdir(fuse_req_t req, fuse_ino_t parent, const char* name) {
         return;
     }
 
-    if (is_transforms_dir_path(parent_path, fuse)) {
-        // .transforms is a special daemon controlled dir so apps shouldn't be able to see it via
-        // readdir, and any dir operations attempted on it should fail
+    if (is_hidden_dir_path(parent_path, fuse)) {
+        // .transforms and .picker_transcoded are special daemon controlled dirs so apps shouldn't
+        // be able to see it via readdir, and any dir operations attempted on it should fail
         fuse_reply_err(req, ENOENT);
         return;
     }
@@ -1357,9 +1392,9 @@ static int do_rename(fuse_req_t req, fuse_ino_t parent, const char* name, fuse_i
         return ENOENT;
     }
 
-    if (is_transforms_dir_path(old_parent_path, fuse)) {
-        // .transforms is a special daemon controlled dir so apps shouldn't be able to see it via
-        // readdir, and any dir operations attempted on it should fail
+    if (is_hidden_dir_path(old_parent_path, fuse)) {
+        // .transforms and .picker_transcoded are special daemon controlled dirs so apps shouldn't
+        // be able to see it via readdir, and any dir operations attempted on it should fail
         return ENOENT;
     }
 

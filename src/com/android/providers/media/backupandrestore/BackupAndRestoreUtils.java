@@ -16,9 +16,20 @@
 
 package com.android.providers.media.backupandrestore;
 
+import static com.android.providers.media.flags.Flags.enableBackupAndRestore;
+
+import android.annotation.NonNull;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.provider.MediaStore;
+import android.util.Log;
+
+import com.android.modules.utils.build.SdkLevel;
+import com.android.providers.media.util.FileUtils;
 
 import com.google.common.collect.HashBiMap;
+
+import java.io.File;
 
 /**
  * Class containing common constants and methods for backup and restore.
@@ -54,6 +65,11 @@ public final class BackupAndRestoreUtils {
      * Key name for storing status of restore.
      */
     static final String RESTORE_COMPLETED = "RESTORE_COMPLETED";
+
+    /**
+     * TAG to be used for logging purposes
+     */
+    static final String TAG = BackupAndRestoreUtils.class.getSimpleName();
 
     /**
      * Array of columns backed up for restore in the future.
@@ -155,5 +171,118 @@ public final class BackupAndRestoreUtils {
         sIdToColumnBiMap.put("40", MediaStore.Files.FileColumns.OWNER_PACKAGE_NAME);
         // Adding number gap to allow addition of new values
         sIdToColumnBiMap.put("80", MediaStore.MediaColumns.XMP);
+    }
+
+    /**
+     * Checks whether backup and restore operations are supported and enabled on the current device.
+     *
+     * <p>This method verifies that the required backup and restore flag is enabled, SDK version is
+     * S+ and ensures the device hardware is suitable for these operations. Backup and restore are
+     * supported only on mobile phones and tablets, excluding devices like automotive systems, TVs,
+     * PCs, and smartwatches.</p>
+     *
+     * @param context the application {@link Context}, used to access system resources.
+     * @return {@code true} if backup and restore is enabled and supported on the device,
+     *         {@code false} otherwise.
+     */
+    static boolean isBackupAndRestoreSupported(Context context) {
+        if (!enableBackupAndRestore() || !SdkLevel.isAtLeastS()) {
+            return false;
+        }
+
+        if (context == null || context.getPackageManager() == null) {
+            return false;
+        }
+
+        final PackageManager pm = context.getPackageManager();
+        return !pm.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+                && !pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+                && !pm.hasSystemFeature(PackageManager.FEATURE_PC)
+                && !pm.hasSystemFeature(PackageManager.FEATURE_WATCH);
+    }
+
+    /**
+     * Deletes the restore directory and unsets shared preference.
+     *
+     * <p>
+     * This method is triggered during idle maintenance after a media scan.
+     * During the scan, restored values are read and metadata is updated.
+     * Once the scan is complete, the restore directory is no longer needed and is deleted.
+     * The shared preference is unset to indicate that no recent restoration has occurred.
+     * </p>
+     *
+     * @param context The context to check shared preference and delete the restore directory
+     */
+    public static void doCleanUpAfterRestoreIfRequired(Context context) {
+        if (isBackupAndRestoreSupported(context) && isRestoringFromRecentBackup(context)) {
+            try {
+                deleteRestoreDirectory(context);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to delete restore directory", e);
+            }
+            disableRestoreFromRecentBackup(context);
+        }
+    }
+
+    /**
+     * Indicates that the values should be read from the recent backup. Sets shared preference's
+     * value to true.
+     *
+     * @param context The context used to access shared preferences.
+     */
+    static void enableRestoreFromRecentBackup(@NonNull Context context) {
+        context.getSharedPreferences(SHARED_PREFERENCE_NAME,
+                Context.MODE_PRIVATE).edit().putBoolean(RESTORE_COMPLETED, true).apply();
+    }
+
+    /**
+     * Indicates that values shouldn't be read from backup. Sets shared preference value to false.
+     *
+     * @param context The context used to access shared preferences.
+     */
+    static void disableRestoreFromRecentBackup(@NonNull Context context) {
+        context.getSharedPreferences(SHARED_PREFERENCE_NAME,
+                Context.MODE_PRIVATE).edit().putBoolean(RESTORE_COMPLETED, false).apply();
+    }
+
+    /**
+     * Checks if the shared preference is set, indicating a recent restore operation.
+     *
+     * @param context The application context used to access shared preferences.
+     * @return {@code true} if a restore operation was recently completed, {@code false} otherwise.
+     */
+    static boolean isRestoringFromRecentBackup(@NonNull Context context) {
+        return context.getSharedPreferences(SHARED_PREFERENCE_NAME,
+                Context.MODE_PRIVATE).getBoolean(RESTORE_COMPLETED, false);
+    }
+
+    /**
+     * Deletes the backup directory if it exists.
+     *
+     * @param context The application context used to locate and delete the backup directory.
+     */
+    static void deleteBackupDirectory(@NonNull Context context) {
+        File filesDir = context.getFilesDir();
+        File backupDir = new File(filesDir, BACKUP_DIRECTORY_NAME);
+
+        if (backupDir.exists() && backupDir.isDirectory()) {
+            FileUtils.deleteContents(backupDir);
+            backupDir.delete();
+        }
+    }
+
+    /**
+     * Deletes the restore directory if it exists.
+     *
+     * @param context The application context used to locate and delete the restore directory.
+     */
+    static void deleteRestoreDirectory(@NonNull Context context) {
+        File filesDir = context.getFilesDir();
+        File restoreDir = new File(filesDir, RESTORE_DIRECTORY_NAME);
+
+        if (restoreDir.exists() && restoreDir.isDirectory()) {
+            FileUtils.deleteContents(restoreDir);
+            restoreDir.delete();
+        }
     }
 }

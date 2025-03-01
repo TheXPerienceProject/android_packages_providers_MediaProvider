@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -53,6 +54,8 @@ public final class OemMetadataServiceWrapper {
 
     private final IOemMetadataService mOemMetadataService;
 
+    private final ExecutorService mExecutorService;
+
     private final long mServiceTimeoutInSeconds;
 
     public OemMetadataServiceWrapper(@NonNull IOemMetadataService oemMetadataService) {
@@ -65,6 +68,7 @@ public final class OemMetadataServiceWrapper {
 
         this.mOemMetadataService = oemMetadataService;
         this.mServiceTimeoutInSeconds = serviceTimeoutInSeconds;
+        mExecutorService = Executors.newFixedThreadPool(3);
     }
 
     /**
@@ -76,7 +80,7 @@ public final class OemMetadataServiceWrapper {
             return new HashSet<>();
         }
 
-        return Executors.newSingleThreadExecutor().submit(() -> {
+        return mExecutorService.submit(() -> {
             CompletableFuture<Set<String>> future = new CompletableFuture<>();
             RemoteCallback callback = new RemoteCallback(
                     result -> setResultForGetSupportedMimeTypes(result, future));
@@ -94,7 +98,7 @@ public final class OemMetadataServiceWrapper {
             return new HashMap<>();
         }
 
-        return Executors.newSingleThreadExecutor().submit(() -> {
+        return mExecutorService.submit(() -> {
             CompletableFuture<Map<String, String>> future = new CompletableFuture<>();
             RemoteCallback callback = new RemoteCallback(
                     result -> setResultForGetOemCustomData(result, future));

@@ -28,6 +28,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.providers.media.PickerUriResolver;
 import com.android.providers.media.photopicker.PickerSyncController;
@@ -80,7 +81,7 @@ public class MediaGroupCursorUtils {
      * {@link CloudMediaProviderContract.MediaSetColumns} cursor.
      * @return Cursor with the columns {@link PickerSQLConstants.MediaGroupResponseColumns}.
      */
-    public static Cursor getMediaGroupCursorForMediaSets(Cursor cursor) {
+    public static Cursor getMediaGroupCursorForMediaSets(@Nullable Cursor cursor) {
         if (cursor == null) {
             return null;
         }
@@ -413,18 +414,20 @@ public class MediaGroupCursorUtils {
      * find the local copy of it and returns the URI of the local copy. Otherwise returns the input
      * coverUri as it is.
      */
-    private static String maybeGetLocalUri(
+    @VisibleForTesting
+    public static String maybeGetLocalUri(
             @Nullable String rawCoverUri,
             @NonNull Map<String, String> cloudToLocalIdMap) {
         if (rawCoverUri == null) {
             return null;
         }
 
+        final String localAuthority = PickerSyncController.getInstanceOrThrow().getLocalProvider();
         try {
             final Uri coverUri = Uri.parse(rawCoverUri);
             final String mediaId = coverUri.getLastPathSegment();
             if (cloudToLocalIdMap.containsKey(mediaId)) {
-                return getUri(cloudToLocalIdMap.get(mediaId), coverUri.getAuthority()).toString();
+                return getUri(cloudToLocalIdMap.get(mediaId), localAuthority).toString();
             } else {
                 return rawCoverUri;
             }
@@ -444,6 +447,10 @@ public class MediaGroupCursorUtils {
     }
 
     private static String getEncodedUserAuthority(String authority) {
-        return MY_USER_ID + "@" + authority;
+        if (authority.contains("@")) {
+            return authority;
+        } else {
+            return MY_USER_ID + "@" + authority;
+        }
     }
 }

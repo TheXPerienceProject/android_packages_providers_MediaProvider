@@ -121,15 +121,15 @@ public class AlbumsCursorWrapper extends CursorWrapper {
                 return mCoverAuthority;
 
             case UNWRAPPED_COVER_URI:
-                // TODO(b/317118334): Use local copy of the cover image when available.
                 final String mediaId = getMediaIdFromWrappedCursor();
+
                 if (EMPTY_MEDIA_ID.equals(mediaId)) {
                     return Uri.EMPTY.toString();
                 } else {
                     return PickerUriResolver
                             .getMediaUri(getEncodedUserAuthority(mCoverAuthority))
                             .buildUpon()
-                            .appendPath(getMediaIdFromWrappedCursor())
+                            .appendPath(mediaId)
                             .build()
                             .toString();
                 }

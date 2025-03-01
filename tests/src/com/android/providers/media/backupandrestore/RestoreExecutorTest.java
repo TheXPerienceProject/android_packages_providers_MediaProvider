@@ -16,8 +16,7 @@
 
 package com.android.providers.media.backupandrestore;
 
-import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.FIELD_SEPARATOR;
-import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.KEY_VALUE_SEPARATOR;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreTestUtils.createSerialisedValue;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.RESTORE_COMPLETED;
 import static com.android.providers.media.scan.MediaScanner.REASON_UNKNOWN;
 import static com.android.providers.media.scan.MediaScannerTest.stage;
@@ -53,7 +52,6 @@ import com.android.providers.media.util.FileUtils;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -73,11 +71,6 @@ public final class RestoreExecutorTest {
     @Rule
     public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
 
-    /**
-     * Map used to store key id for given column and vice versa.
-     */
-    private static Map<String, String> sColumnNameToIdMap;
-
     private Context mIsolatedContext;
 
     private ContentResolver mIsolatedResolver;
@@ -85,11 +78,6 @@ public final class RestoreExecutorTest {
     private ModernMediaScanner mModern;
 
     private File mDownloadsDir;
-
-    @BeforeClass
-    public static void setupBeforeClass() {
-        createColumnToKeyMap();
-    }
 
     @Before
     public void setUp() {
@@ -346,64 +334,5 @@ public final class RestoreExecutorTest {
     private void stageNewFile(int resId, File file) throws IOException {
         file.createNewFile();
         stage(resId, file);
-    }
-
-    private String createSerialisedValue(Map<String, String> entries) {
-        StringBuilder sb = new StringBuilder();
-        for (String backupColumn : sColumnNameToIdMap.keySet()) {
-            if (entries.containsKey(backupColumn)) {
-                sb.append(sColumnNameToIdMap.get(backupColumn)).append(KEY_VALUE_SEPARATOR).append(
-                        entries.get(backupColumn));
-                sb.append(FIELD_SEPARATOR);
-            }
-        }
-        return sb.toString();
-    }
-
-    private static void createColumnToKeyMap() {
-        sColumnNameToIdMap = new HashMap<>();
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns.IS_FAVORITE, "0");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns.MEDIA_TYPE, "1");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns.MIME_TYPE, "2");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns._USER_ID, "3");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns.SIZE, "4");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.DATE_TAKEN, "5");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.CD_TRACK_NUMBER, "6");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.ALBUM, "7");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.ARTIST, "8");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.AUTHOR, "9");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.COMPOSER, "10");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.GENRE, "11");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.TITLE, "12");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.YEAR, "13");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.DURATION, "14");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.NUM_TRACKS, "15");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.WRITER, "16");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.ALBUM_ARTIST, "17");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.DISC_NUMBER, "18");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.COMPILATION, "19");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.BITRATE, "20");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.CAPTURE_FRAMERATE, "21");
-        sColumnNameToIdMap.put(MediaStore.Audio.AudioColumns.TRACK, "22");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.DOCUMENT_ID, "23");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.INSTANCE_ID, "24");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.ORIGINAL_DOCUMENT_ID, "25");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.RESOLUTION, "26");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.ORIENTATION, "27");
-        sColumnNameToIdMap.put(MediaStore.Video.VideoColumns.COLOR_STANDARD, "28");
-        sColumnNameToIdMap.put(MediaStore.Video.VideoColumns.COLOR_TRANSFER, "29");
-        sColumnNameToIdMap.put(MediaStore.Video.VideoColumns.COLOR_RANGE, "30");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns._VIDEO_CODEC_TYPE, "31");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.WIDTH, "32");
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.HEIGHT, "33");
-        sColumnNameToIdMap.put(MediaStore.Images.ImageColumns.DESCRIPTION, "34");
-        sColumnNameToIdMap.put(MediaStore.Images.ImageColumns.EXPOSURE_TIME, "35");
-        sColumnNameToIdMap.put(MediaStore.Images.ImageColumns.F_NUMBER, "36");
-        sColumnNameToIdMap.put(MediaStore.Images.ImageColumns.ISO, "37");
-        sColumnNameToIdMap.put(MediaStore.Images.ImageColumns.SCENE_CAPTURE_TYPE, "38");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns._SPECIAL_FORMAT, "39");
-        sColumnNameToIdMap.put(MediaStore.Files.FileColumns.OWNER_PACKAGE_NAME, "40");
-        // Adding number gap to allow addition of new values
-        sColumnNameToIdMap.put(MediaStore.MediaColumns.XMP, "80");
     }
 }
