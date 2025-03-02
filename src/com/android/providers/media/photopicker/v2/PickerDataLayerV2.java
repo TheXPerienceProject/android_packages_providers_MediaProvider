@@ -354,7 +354,7 @@ public class PickerDataLayerV2 {
         // This is an external query into the CMP, so catch any exceptions that might get thrown
         // so that at a minimum, the local results are sent back to the UI.
         try {
-            allAlbumCursors.add(getCloudAlbumsCursor(appContext, query, effectiveLocalAuthority,
+            allAlbumCursors.add(getCloudAlbumsCursor(appContext, query, localAuthority,
                     effectiveCloudAuthority));
         } catch (RuntimeException ex) {
             Log.w(TAG, "Cloud provider exception while fetching cloud albums cursor", ex);
@@ -466,7 +466,7 @@ public class PickerDataLayerV2 {
         // so that at a minimum, the local results are sent back to the UI.
         try {
             final Cursor cloudAlbumsCursor = getCloudAlbumsCursor(appContext, query,
-                    effectiveLocalAuthority, effectiveCloudAuthority);
+                    localAuthority, effectiveCloudAuthority);
             allMediaGroupCursors.add(
                     MediaGroupCursorUtils.getMediaGroupCursorForAlbums(cloudAlbumsCursor, index));
         } catch (RuntimeException ex) {

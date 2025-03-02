@@ -652,6 +652,7 @@ open class MediaProviderClient {
                     },
                 EXTRA_MIME_TYPES to config.mimeTypes,
                 EXTRA_INTENT_ACTION to config.action,
+                Intent.EXTRA_UID to config.callingPackageUid,
                 CategoryAndAlbumQuery.PARENT_CATEGORY_ID.key to parentCategoryId,
             )
         try {
@@ -748,6 +749,7 @@ open class MediaProviderClient {
                 MediaQuery.PROVIDERS.key to arrayListOf(parentMediaSet.authority),
                 EXTRA_MIME_TYPES to config.mimeTypes,
                 EXTRA_INTENT_ACTION to config.action,
+                Intent.EXTRA_UID to config.callingPackageUid,
                 MediaSetContentsQuery.PARENT_MEDIA_SET_PICKER_ID.key to parentMediaSet.pickerId,
                 MediaSetContentsQuery.PARENT_MEDIA_SET_AUTHORITY.key to parentMediaSet.authority,
             )

@@ -30,8 +30,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.MockitoAnnotations.initMocks;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.UserHandle;
 
 import androidx.test.InstrumentationRegistry;
 
@@ -176,5 +179,52 @@ public class MediaGroupCursorUtilsTest {
         assertWithMessage("Result map size is not as expected")
                 .that(result.size())
                 .isEqualTo(0);
+    }
+
+    @Test
+    public void testGetLocalUri() {
+        final String cloudAuthority = "cloud.authority";
+        final String cloudMediaId = "cloud-id";
+        final String localMediaId = "local-id";
+        final Uri cloudUri = new Uri.Builder()
+                .scheme(ContentResolver.SCHEME_CONTENT)
+                .encodedAuthority(cloudAuthority)
+                .appendPath("media")
+                .appendPath(cloudMediaId)
+                .build();
+
+        final String localAuthority = PickerSyncController.getInstanceOrThrow().getLocalProvider();
+        final Uri expectedLocalUri = new Uri.Builder()
+                .scheme(ContentResolver.SCHEME_CONTENT)
+                .encodedAuthority(UserHandle.myUserId() + "@" + localAuthority)
+                .appendPath("media")
+                .appendPath(localMediaId)
+                .build();
+
+        final String actualLocalUri = MediaGroupCursorUtils.maybeGetLocalUri(
+                cloudUri.toString(), Map.of(cloudMediaId, localMediaId));
+
+        assertWithMessage("Mapped local uri is not as expected.")
+                .that(actualLocalUri)
+                .isEqualTo(expectedLocalUri.toString());
+    }
+
+    @Test
+    public void testGetLocalUriWithNoMapping() {
+        final String cloudAuthority = "cloud.authority";
+        final String cloudMediaId = "cloud-id";
+        final Uri cloudUri = new Uri.Builder()
+                .scheme(ContentResolver.SCHEME_CONTENT)
+                .encodedAuthority(cloudAuthority)
+                .appendPath("media")
+                .appendPath(cloudMediaId)
+                .build();
+
+        final String actualUri = MediaGroupCursorUtils.maybeGetLocalUri(
+                cloudUri.toString(), Map.of());
+
+        assertWithMessage("Returned uri is not as expected.")
+                .that(actualUri)
+                .isEqualTo(cloudUri.toString());
     }
 }

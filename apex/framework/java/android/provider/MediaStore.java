@@ -32,6 +32,7 @@ import android.annotation.WorkerThread;
 import android.app.Activity;
 import android.app.AppOpsManager;
 import android.app.PendingIntent;
+import android.app.compat.CompatChanges;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ClipData;
 import android.content.ContentProvider;
@@ -61,6 +62,7 @@ import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Environment;
 import android.os.OperationCanceledException;
+import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 import android.os.RemoteException;
@@ -661,6 +663,11 @@ public final class MediaStore {
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String INTENT_ACTION_VIDEO_CAMERA = "android.media.action.VIDEO_CAMERA";
+
+    /**
+     * This is a copy of the flag that exists in MediaProvider.
+     */
+    static final long EXCLUDE_UNRELIABLE_STORAGE_VOLUMES = 391360514L;
 
     /**
      * Standard Intent action that can be sent to have the camera application
@@ -4734,13 +4741,30 @@ public final class MediaStore {
                 case Environment.MEDIA_MOUNTED_READ_ONLY: {
                     final String volumeName = sv.getMediaStoreVolumeName();
                     if (volumeName != null) {
-                        res.add(volumeName);
+                        File directory = sv.getDirectory();
+                        if (shouldExcludeUnReliableStorageVolumes(context)
+                                && directory != null
+                                && directory.getAbsolutePath() != null
+                                && directory.getAbsolutePath().startsWith("/mnt/")) {
+                            Log.d(TAG, "skipping unreliable volume : " + volumeName);
+                        } else {
+                            res.add(volumeName);
+                        }
                     }
                     break;
                 }
             }
         }
         return res;
+    }
+
+    /**
+     * Checks if the EXCLUDE_UNRELIABLE_STORAGE_VOLUMES appcompat flag is enabled.
+     */
+    private static boolean shouldExcludeUnReliableStorageVolumes(Context context) {
+        return Flags.excludeUnreliableVolumes()
+                && CompatChanges.isChangeEnabled(
+                EXCLUDE_UNRELIABLE_STORAGE_VOLUMES, context.getApplicationInfo().uid);
     }
 
     /**

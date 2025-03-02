@@ -37,7 +37,7 @@ import android.util.ArraySet;
 
 import androidx.annotation.NonNull;
 
-import com.android.providers.media.util.Logging;
+import com.android.providers.media.util.LegacyLogging;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -77,7 +77,7 @@ public class LegacyMediaProvider extends ContentProvider {
         final Context context = getContext();
 
         final File persistentDir = context.getDir("logs", Context.MODE_PRIVATE);
-        Logging.initPersistent(persistentDir);
+        LegacyLogging.initPersistent(persistentDir);
 
         mInternalDatabase = new LegacyDatabaseHelper(context, INTERNAL_DATABASE_NAME, true);
         mExternalDatabase = new LegacyDatabaseHelper(context, EXTERNAL_DATABASE_NAME, true);
@@ -239,6 +239,6 @@ public class LegacyMediaProvider extends ContentProvider {
 
     @Override
     public void dump(FileDescriptor fd, PrintWriter writer, String[] args) {
-        Logging.dumpPersistent(writer);
+        LegacyLogging.dumpPersistent(writer);
     }
 }

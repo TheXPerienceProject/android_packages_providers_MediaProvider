@@ -20,13 +20,12 @@ import static android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY;
 
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.FIELD_SEPARATOR;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.KEY_VALUE_SEPARATOR;
-import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.RESTORE_COMPLETED;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.RESTORE_DIRECTORY_NAME;
-import static com.android.providers.media.backupandrestore.BackupExecutor.isBackupAndRestoreSupported;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.isBackupAndRestoreSupported;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.isRestoringFromRecentBackup;
 
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.SharedPreferences;
 
 import com.android.providers.media.leveldb.LevelDBInstance;
 import com.android.providers.media.leveldb.LevelDBManager;
@@ -82,14 +81,6 @@ public final class RestoreExecutor {
             contentValues.put(key, keyValueMap.get(key));
         }
         return Optional.of(contentValues);
-    }
-
-    private static boolean isRestoringFromRecentBackup(Context context) {
-        // Shared preference with key "RESTORE_COMPLETED" should be set to true for recovery to
-        // take place.
-        SharedPreferences sharedPreferences = context.getSharedPreferences(
-                BackupAndRestoreUtils.SHARED_PREFERENCE_NAME, Context.MODE_PRIVATE);
-        return sharedPreferences.getBoolean(RESTORE_COMPLETED, false);
     }
 
     private Map<String, String> deSerialiseValueString(String valueString) {

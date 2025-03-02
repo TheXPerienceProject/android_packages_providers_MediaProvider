@@ -32,7 +32,7 @@
     <string name="photopicker_clear_selection_button_description" msgid="8614016909754648208">"لغو انتخاب کردن همه"</string>
     <string name="photopicker_selection_size_description" msgid="1142474949774463967">"‫<xliff:g id="COUNT">%1$s</xliff:g> عکس یا ویدیو انتخاب شده است"</string>
     <string name="photopicker_selection_limit_exceeded_snackbar" msgid="9136196524514670280">"حداکثر <xliff:g id="COUNT">%1$s</xliff:g> مورد انتخاب کنید"</string>
-    <string name="photopicker_photos_nav_button_label" msgid="8716403708343738371">"Photos"</string>
+    <string name="photopicker_photos_nav_button_label" msgid="8716403708343738371">"عکس‌ها"</string>
     <string name="photopicker_albums_nav_button_label" msgid="4738165281285221320">"آلبوم‌ها"</string>
     <string name="photopicker_photos_empty_state_title" msgid="7018770515431149456">"هنوز عکسی وجود ندارد"</string>
     <string name="photopicker_photos_empty_state_body" msgid="5959729294856198675">"ضبط عکس و ویدیو را شروع کنید"</string>

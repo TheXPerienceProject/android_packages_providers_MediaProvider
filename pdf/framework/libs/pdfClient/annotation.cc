@@ -16,6 +16,8 @@
 
 #include "annotation.h"
 
+#include <utils/pdf_strings.h>
+
 #include "logging.h"
 
 #define LOG_TAG "annotation"
@@ -222,4 +224,93 @@ bool HighlightAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_
     return true;
 }
 
+bool FreeTextAnnotation::GetTextContentFromPdfium(FPDF_ANNOTATION fpdf_annot,
+                                                  unsigned long text_length, std::wstring& text) {
+    // Create a buffer of the obtained size to store the text contents.
+    ScopedFPDFWChar text_content_buffer = std::make_unique<FPDF_WCHAR[]>(text_length);
+    if (!FPDFAnnot_GetStringValue(fpdf_annot, kContents, text_content_buffer.get(), text_length)) {
+        return false;
+    }
+
+    text = pdfClient_utils::ToWideString(text_content_buffer.get(), text_length);
+    return true;
+}
+
+bool FreeTextAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) {
+    // Pass a empty buffer to get the length of the text contents.
+    unsigned long text_length = FPDFAnnot_GetStringValue(fpdf_annot, kContents, nullptr, 0);
+    if (text_length == 0) {
+        LOGE("Failed to get contents of FreeText Annotation");
+        return false;
+    }
+
+    if (!GetTextContentFromPdfium(fpdf_annot, text_length, text_content_)) {
+        LOGE("GetTextContentFromPdfium Failed.");
+        return false;
+    }
+
+    // Get color
+    if (!FPDFAnnot_GetColor(fpdf_annot, FPDFANNOT_COLORTYPE_Color, &text_color_.r, &text_color_.g,
+                            &text_color_.b, &text_color_.a)) {
+        LOGE("Couldn't get text color of freetext annotation");
+        return false;
+    }
+
+    if (!FPDFAnnot_GetColor(fpdf_annot, FPDFANNOT_COLORTYPE_InteriorColor, &background_color_.r,
+                            &background_color_.g, &background_color_.b, &background_color_.a)) {
+        LOGE("Couldn't get background color of freetext annotation");
+        return false;
+    }
+    return true;
+}
+
+ScopedFPDFAnnotation FreeTextAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT document,
+                                                              FPDF_PAGE page) {
+    ScopedFPDFAnnotation scoped_annot =
+            ScopedFPDFAnnotation(FPDFPage_CreateAnnot(page, FPDF_ANNOT_FREETEXT));
+
+    if (!scoped_annot) {
+        LOGE("Failed to create FreeText Annotation");
+        return nullptr;
+    }
+
+    if (!UpdatePdfiumInstance(scoped_annot.get(), document)) {
+        LOGE("Failed to create FreeText Annotation with given parameters");
+    }
+
+    return scoped_annot;
+}
+
+bool FreeTextAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) {
+    if (FPDFAnnot_GetSubtype(fpdf_annot) != FPDF_ANNOT_FREETEXT) {
+        LOGE("Unsupported operation - can't update a freetext annotation with some other type of "
+             "annotation");
+        return false;
+    }
+
+    Rectangle_f annotation_bounds = GetBounds();
+    if (!FPDFAnnot_SetRect(fpdf_annot, reinterpret_cast<FS_RECTF*>(&annotation_bounds))) {
+        LOGE("FreeText Annotation bounds could not be updated");
+        return false;
+    }
+
+    auto fpdfWideString = pdfClient_utils::ToFPDFWideString(text_content_);
+    if (!FPDFAnnot_SetStringValue(fpdf_annot, kContents, fpdfWideString.get())) {
+        LOGE("FreeText Annotation text content could not be updated");
+    }
+
+    if (!FPDFAnnot_SetColor(fpdf_annot, FPDFANNOT_COLORTYPE_Color, text_color_.r, text_color_.g,
+                            text_color_.b, text_color_.a)) {
+        LOGE("FreeText Annotation text color couldn't be updated");
+        return false;
+    }
+
+    if (!FPDFAnnot_SetColor(fpdf_annot, FPDFANNOT_COLORTYPE_InteriorColor, background_color_.r,
+                            background_color_.g, background_color_.b, background_color_.a)) {
+        LOGE("FreeText Annotation background color couldn't be updated");
+        return false;
+    }
+
+    return true;
+}
 }  // namespace pdfClient

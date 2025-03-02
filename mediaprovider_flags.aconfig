@@ -273,3 +273,12 @@ flag {
     is_fixed_read_only: true
     bug: "391360514"
 }
+
+flag {
+    name: "enable_mime_type_fix_for_android_15"
+    is_exported: true
+    namespace: "mediaprovider"
+    description: "This flag enables the fix for MIME type mapping in Android 15, correcting the faulty mime.types entries."
+    is_fixed_read_only: true
+    bug: "376910932"
+}

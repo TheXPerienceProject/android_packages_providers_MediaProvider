@@ -36,15 +36,13 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
-import android.platform.test.annotations.RequiresFlagsEnabled;
-import android.platform.test.flag.junit.CheckFlagsRule;
-import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.IOemMetadataService;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Files.FileColumns;
 import android.provider.OemMetadataService;
 import android.provider.OemMetadataServiceWrapper;
-import android.provider.media.internal.flags.Flags;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SdkSuppress;
@@ -73,12 +71,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 @RunWith(AndroidJUnit4.class)
-@RequiresFlagsEnabled(com.android.providers.media.flags.Flags.FLAG_ENABLE_OEM_METADATA)
+@EnableFlags(com.android.providers.media.flags.Flags.FLAG_ENABLE_OEM_METADATA)
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
 public class OemMetadataServiceTest {
 
-    @Rule
-    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+    @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private static final long POLLING_TIMEOUT_MILLIS = TimeUnit.SECONDS.toMillis(5);
     private static final long POLLING_SLEEP_MILLIS = 100;
@@ -179,6 +176,7 @@ public class OemMetadataServiceTest {
             }
         } finally {
             audioFile.delete();
+            isolatedContext.unbindService(modernMediaScanner.getOemMetadataServiceConnection());
         }
     }
 

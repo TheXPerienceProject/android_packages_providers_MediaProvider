@@ -145,7 +145,7 @@ fun Flow<PagingData<MediaGridItem.MediaItem>>.insertMonthSeparators(
                 val format =
                     // If the current calendar year is different from the items year, append the
                     // year to to the month string.
-                    if (afterLocalDateTime.getYear() != LocalDateTime.now().getYear()) "MMMM YYYY"
+                    if (afterLocalDateTime.getYear() != LocalDateTime.now().getYear()) "MMMM yyyy"
 
                     // The year is the same, so just use the month's name.
                     else "MMMM"
