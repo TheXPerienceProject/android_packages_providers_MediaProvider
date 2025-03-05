@@ -132,7 +132,7 @@ bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCU
 
     // First Remove all the known existing objects from the stamp annotation, and then rewrite
     int num_objects = FPDFAnnot_GetObjectCount(fpdf_annot);
-    for (int object_index = 0; object_index < num_objects; object_index++) {
+    for (int object_index = num_objects - 1; object_index >= 0; object_index--) {
         FPDF_PAGEOBJECT pageObject = FPDFAnnot_GetObject(fpdf_annot, object_index);
         int object_type = FPDFPageObj_GetType(pageObject);
         if (pageObject != nullptr &&
