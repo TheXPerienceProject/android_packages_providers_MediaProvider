@@ -390,4 +390,17 @@ public class SyncTrackerRegistry {
             getCloudMediaInMediaSetTracker().markSyncCompleted(syncRequestId);
         }
     }
+
+    /**
+     * Mark all media in media sets sync pending futures as complete
+     */
+    public static void markAllMediaInMediaSetsSyncAsComplete(
+            @PickerSyncManager.SyncSource int syncSource) {
+        if (syncSource == SYNC_LOCAL_ONLY || syncSource == SYNC_LOCAL_AND_CLOUD) {
+            getLocalMediaInMediaSetTracker().markAllSyncsCompleted();
+        }
+        if (syncSource == SYNC_CLOUD_ONLY || syncSource == SYNC_LOCAL_AND_CLOUD) {
+            getCloudMediaInMediaSetTracker().markAllSyncsCompleted();
+        }
+    }
 }

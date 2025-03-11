@@ -655,29 +655,43 @@ public class PickerSyncManagerTest {
 
         mPickerSyncManager.syncMediaSetsForProvider(requestParams, SYNC_LOCAL_ONLY);
         verify(mMockWorkManager, times(1))
-                .enqueueUniqueWork(anyString(), any(), mOneTimeWorkRequestArgumentCaptor.capture());
+                .beginUniqueWork(
+                        anyString(),
+                        any(ExistingWorkPolicy.class),
+                        mOneTimeWorkRequestListArgumentCaptor.capture());
+        verify(mMockWorkContinuation, times(1))
+                .then(mOneTimeWorkRequestListArgumentCaptor.capture());
+        verify(mMockWorkContinuation).enqueue();
 
-        final List<OneTimeWorkRequest> workRequestList =
-                mOneTimeWorkRequestArgumentCaptor.getAllValues();
-        assertThat(workRequestList.size()).isEqualTo(1);
+        final List<List<OneTimeWorkRequest>> workRequestList =
+                mOneTimeWorkRequestListArgumentCaptor.getAllValues();
+        assertThat(workRequestList.size()).isEqualTo(2);
 
-        WorkRequest workRequest = workRequestList.get(0);
-        assertThat(workRequest.getWorkSpec().workerClassName)
+        WorkRequest resetRequest = workRequestList.get(0).get(0);
+        assertThat(resetRequest.getWorkSpec().workerClassName)
+                .isEqualTo(MediaSetsResetWorker.class.getName());
+        assertThat(resetRequest.getWorkSpec().expedited).isTrue();
+        assertThat(resetRequest.getWorkSpec().isPeriodic()).isFalse();
+        assertThat(resetRequest.getWorkSpec().id).isNotNull();
+        assertThat(resetRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
+
+        WorkRequest syncRequest = workRequestList.get(1).get(0);
+        assertThat(syncRequest.getWorkSpec().workerClassName)
                 .isEqualTo(MediaSetsSyncWorker.class.getName());
-        assertThat(workRequest.getWorkSpec().expedited).isTrue();
-        assertThat(workRequest.getWorkSpec().isPeriodic()).isFalse();
-        assertThat(workRequest.getWorkSpec().id).isNotNull();
-        assertThat(workRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().expedited).isTrue();
+        assertThat(syncRequest.getWorkSpec().isPeriodic()).isFalse();
+        assertThat(syncRequest.getWorkSpec().id).isNotNull();
+        assertThat(syncRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
+        assertThat(syncRequest.getWorkSpec().input
                 .getInt(SYNC_WORKER_INPUT_SYNC_SOURCE, -1))
                 .isEqualTo(SYNC_LOCAL_ONLY);
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().input
                 .getString(SYNC_WORKER_INPUT_CATEGORY_ID))
                 .isEqualTo(categoryId);
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().input
                 .getString(SYNC_WORKER_INPUT_AUTHORITY))
                 .isEqualTo(SearchProvider.AUTHORITY);
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().input
                 .getStringArray(EXTRA_MIME_TYPES))
                 .isEqualTo(mimeTypes);
     }
@@ -701,29 +715,43 @@ public class PickerSyncManagerTest {
 
         mPickerSyncManager.syncMediaSetsForProvider(requestParams, SYNC_CLOUD_ONLY);
         verify(mMockWorkManager, times(1))
-                .enqueueUniqueWork(anyString(), any(), mOneTimeWorkRequestArgumentCaptor.capture());
+                .beginUniqueWork(
+                        anyString(),
+                        any(ExistingWorkPolicy.class),
+                        mOneTimeWorkRequestListArgumentCaptor.capture());
+        verify(mMockWorkContinuation, times(1))
+                .then(mOneTimeWorkRequestListArgumentCaptor.capture());
+        verify(mMockWorkContinuation).enqueue();
 
-        final List<OneTimeWorkRequest> workRequestList =
-                mOneTimeWorkRequestArgumentCaptor.getAllValues();
-        assertThat(workRequestList.size()).isEqualTo(1);
+        final List<List<OneTimeWorkRequest>> workRequestList =
+                mOneTimeWorkRequestListArgumentCaptor.getAllValues();
+        assertThat(workRequestList.size()).isEqualTo(2);
 
-        WorkRequest workRequest = workRequestList.get(0);
-        assertThat(workRequest.getWorkSpec().workerClassName)
+        WorkRequest resetRequest = workRequestList.get(0).get(0);
+        assertThat(resetRequest.getWorkSpec().workerClassName)
+                .isEqualTo(MediaSetsResetWorker.class.getName());
+        assertThat(resetRequest.getWorkSpec().expedited).isTrue();
+        assertThat(resetRequest.getWorkSpec().isPeriodic()).isFalse();
+        assertThat(resetRequest.getWorkSpec().id).isNotNull();
+        assertThat(resetRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
+
+        WorkRequest syncRequest = workRequestList.get(1).get(0);
+        assertThat(syncRequest.getWorkSpec().workerClassName)
                 .isEqualTo(MediaSetsSyncWorker.class.getName());
-        assertThat(workRequest.getWorkSpec().expedited).isTrue();
-        assertThat(workRequest.getWorkSpec().isPeriodic()).isFalse();
-        assertThat(workRequest.getWorkSpec().id).isNotNull();
-        assertThat(workRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().expedited).isTrue();
+        assertThat(syncRequest.getWorkSpec().isPeriodic()).isFalse();
+        assertThat(syncRequest.getWorkSpec().id).isNotNull();
+        assertThat(syncRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
+        assertThat(syncRequest.getWorkSpec().input
                 .getInt(SYNC_WORKER_INPUT_SYNC_SOURCE, -1))
                 .isEqualTo(SYNC_CLOUD_ONLY);
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().input
                 .getString(SYNC_WORKER_INPUT_CATEGORY_ID))
                 .isEqualTo(categoryId);
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().input
                 .getString(SYNC_WORKER_INPUT_AUTHORITY))
                 .isEqualTo(SearchProvider.AUTHORITY);
-        assertThat(workRequest.getWorkSpec().input
+        assertThat(syncRequest.getWorkSpec().input
                 .getStringArray(EXTRA_MIME_TYPES))
                 .isEqualTo(mimeTypes);
     }

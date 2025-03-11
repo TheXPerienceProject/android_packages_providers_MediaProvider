@@ -97,7 +97,7 @@ import org.mockito.MockitoAnnotations
     ViewModelModule::class,
 )
 @HiltAndroidTest
-@SdkSuppress(minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTestApi::class)
 class SearchFeatureTest : PhotopickerFeatureBaseTest() {
     /* Hilt's rule needs to come first to ensure the DI container is setup for the test. */

@@ -1452,7 +1452,8 @@ public class PickerDataLayerV2 {
                 new MediaInMediaSetSyncRequestParams(extras);
         final Set<String> providers = new HashSet<>(
                 Objects.requireNonNull(extras.getStringArrayList("providers")));
-        scheduleMediaInMediaSetSync(requestParams, appContext, workManager, providers);
+        scheduleMediaInMediaSetSync(
+                requestParams, appContext, workManager, providers);
     }
 
     /**
@@ -1466,6 +1467,7 @@ public class PickerDataLayerV2 {
     private static void scheduleMediaInMediaSetSync(
             @NonNull MediaInMediaSetSyncRequestParams requestParams, @NonNull Context context,
             @NonNull WorkManager workManager, @NonNull Set<String> providers) {
+
         PickerSyncController syncController = PickerSyncController.getInstanceOrThrow();
         PickerSyncManager syncManager = new PickerSyncManager(workManager, context);
         int syncSource = Objects.equals(requestParams.getAuthority(),
@@ -1474,10 +1476,12 @@ public class PickerDataLayerV2 {
 
         // Sync MediaSet content only if the media sets can actually be queried
         if (syncSource == SYNC_LOCAL_ONLY && syncController.shouldQueryLocalMediaSets(providers)) {
-            syncManager.syncMediaInMediaSetForProvider(requestParams, SYNC_LOCAL_ONLY);
+            syncManager.syncMediaInMediaSetForProvider(
+                    requestParams, SYNC_LOCAL_ONLY);
         } else if (syncController.shouldQueryCloudMediaSets(
                 providers, requestParams.getAuthority())) {
-            syncManager.syncMediaInMediaSetForProvider(requestParams, SYNC_CLOUD_ONLY);
+            syncManager.syncMediaInMediaSetForProvider(
+                    requestParams, SYNC_CLOUD_ONLY);
         } else {
             Log.e(TAG, "Unidentified provider authority: " + requestParams.getAuthority()
                     + " skipping MediaSet content sync.");

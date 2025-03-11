@@ -31,6 +31,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -75,6 +76,8 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -116,6 +119,7 @@ import com.android.photopicker.util.LocalLocalizationHelper
 import com.android.photopicker.util.getMediaContentDescription
 import java.text.DateFormat
 import java.text.NumberFormat
+import kotlinx.coroutines.delay
 
 /** The number of grid cells per row for Phone / narrow layouts */
 private val CELLS_PER_ROW: Int = 3
@@ -183,6 +187,7 @@ val MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE = 12.dp
  *
  * @param items The LazyPagingItems that have been collected. See [collectAsLazyPagingItems] to
  *   transform a PagingData flow into the correct format for this composable.
+ * @param focusItem Optional item that needs to request focus when the media grid is drawn.
  * @param isExpandedScreen Whether the device is using an expanded screen size. This impacts the
  *   default number of cells shown per row. Has no effect if columns parameter is set directly.
  * @param columns number of cells per row.
@@ -197,10 +202,12 @@ val MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE = 12.dp
  * @param contentItemFactory Optional custom implementation for composing individual grid items.
  * @param contentSeparatorFactory Optional custom implementation for composing individual grid
  *   separators.
+ * @param bannerContent Optional custom implementation for banner content to displayed
  */
 @Composable
 fun mediaGrid(
     items: LazyPagingItems<MediaGridItem>,
+    focusItem: MediaGridItem? = null,
     selection: Set<Media>,
     onItemClick: (item: MediaGridItem) -> Unit,
     onItemLongPress: (item: MediaGridItem) -> Unit = {},
@@ -233,10 +240,11 @@ fun mediaGrid(
                         onClick = onClick,
                         onLongPress = onLongPress,
                         dateFormat = dateFormat,
+                        focusItem = focusItem,
                     )
 
-                is MediaGridItem.AlbumItem -> defaultBuildAlbumItem(item, onClick)
-                is MediaGridItem.CategoryItem -> defaultBuildCategoryItem(item, onClick)
+                is MediaGridItem.AlbumItem -> defaultBuildAlbumItem(item, onClick, focusItem)
+                is MediaGridItem.CategoryItem -> defaultBuildCategoryItem(item, onClick, focusItem)
                 is MediaGridItem.PersonMediaSetItem -> defaultBuildPersonMediaSetItem(item, onClick)
                 is MediaGridItem.MediaSetItem -> defaultBuildMediaSetItem(item, onClick)
                 else -> {}
@@ -381,6 +389,7 @@ private fun defaultBuildMediaItem(
     onClick: ((item: MediaGridItem) -> Unit)?,
     onLongPress: ((item: MediaGridItem) -> Unit)?,
     dateFormat: DateFormat,
+    focusItem: MediaGridItem?,
 ) {
     when (item) {
         is MediaGridItem.MediaItem -> {
@@ -400,7 +409,20 @@ private fun defaultBuildMediaItem(
                 )
 
             // Modifier for the image itself, which uses the animated padding defined above.
-            val baseModifier = Modifier.fillMaxSize().padding(padding)
+            var baseModifier = Modifier.fillMaxSize().padding(padding)
+
+            // If the caller has specified an item to receive focus,
+            // apply the focus requester modifier to it.
+            if (focusItem != null) {
+                val focusRequester = remember { FocusRequester() }
+                baseModifier = baseModifier.focusRequester(focusRequester).focusable(true)
+                LaunchedEffect(Unit) {
+                    if (item == focusItem) {
+                        delay(150)
+                        focusRequester.requestFocus()
+                    }
+                }
+            }
 
             // Additionally, selected items get rounded corners, so that is added to the
             // baseModifier
@@ -616,11 +638,15 @@ private fun SelectedIconOverlay(isSelected: Boolean, selectedIndex: Int) {
  * GridCell, and provides a text title for it just below the thumbnail.
  */
 @Composable
-private fun defaultBuildAlbumItem(item: MediaGridItem, onClick: ((item: MediaGridItem) -> Unit)?) {
+private fun defaultBuildAlbumItem(
+    item: MediaGridItem,
+    onClick: ((item: MediaGridItem) -> Unit)?,
+    focusItem: MediaGridItem? = null,
+) {
     when (item) {
         is MediaGridItem.AlbumItem -> {
-            Column(
-                // Apply semantics for the click handlers
+            // Apply semantics for the click handlers
+            var baseModifier =
                 Modifier.semantics(mergeDescendants = true) {
                         onClick(
                             action = {
@@ -631,7 +657,21 @@ private fun defaultBuildAlbumItem(item: MediaGridItem, onClick: ((item: MediaGri
                     }
                     .pointerInput(Unit) { detectTapGestures(onTap = { onClick?.invoke(item) }) }
                     .padding(bottom = MEASUREMENT_DEFAULT_ALBUM_BOTTOM_PADDING)
-            ) {
+
+            // If the caller has specified an item to receive focus,
+            // apply the focus requester modifier to it.
+            if (focusItem != null) {
+                val focusRequester = remember { FocusRequester() }
+                baseModifier = baseModifier.focusRequester(focusRequester).focusable(true)
+                LaunchedEffect(Unit) {
+                    if (item == focusItem) {
+                        delay(150)
+                        focusRequester.requestFocus()
+                    }
+                }
+            }
+
+            Column(modifier = baseModifier) {
                 // In the current implementation for AlbumsGrid, favourites and videos are
                 // 2 mandatory albums and are shown even when they contain no data. For this
                 // case they have special thumbnails associated with them.
@@ -763,21 +803,36 @@ private fun defaultBuildMediaSetItem(
 private fun defaultBuildCategoryItem(
     item: MediaGridItem.CategoryItem,
     onClick: ((item: MediaGridItem) -> Unit)?,
+    focusItem: MediaGridItem?,
 ) {
-    Column(
-        // Apply semantics for the click handlers
+    // Apply semantics for the click handlers
+    var baseModifier =
         Modifier.semantics(mergeDescendants = true) {
                 contentDescription = item.category.displayName ?: ""
                 onClick(
                     action = {
                         onClick?.invoke(item)
-                        /* eventHandled= */ true
+                        /* eventHandled */ true
                     }
                 )
             }
             .pointerInput(Unit) { detectTapGestures(onTap = { onClick?.invoke(item) }) }
             .padding(bottom = MEASUREMENT_DEFAULT_ALBUM_BOTTOM_PADDING)
-    ) {
+
+    // If the caller has specified an item to receive focus,
+    // apply the focus requester modifier to it.
+    if (focusItem != null) {
+        val focusRequester = remember { FocusRequester() }
+        baseModifier = baseModifier.focusRequester(focusRequester).focusable(true)
+        LaunchedEffect(Unit) {
+            if (item == focusItem) {
+                delay(150)
+                focusRequester.requestFocus()
+            }
+        }
+    }
+
+    Column(modifier = baseModifier) {
         with(item.category) {
             val modifier =
                 Modifier.fillMaxWidth()
