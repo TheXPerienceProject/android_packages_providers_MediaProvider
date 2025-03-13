@@ -624,7 +624,7 @@ fun EmptySearchResult(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth().padding(top = emptyStatePadding),
         icon = Icons.Outlined.HideImage,
         title = stringResource(R.string.photopicker_search_result_empty_state_title),
-        body = stringResource(R.string.photopicker_search_result_empty_state_body),
+        body = stringResource(R.string.photopicker_search_result_empty_state_message),
     )
 }
 

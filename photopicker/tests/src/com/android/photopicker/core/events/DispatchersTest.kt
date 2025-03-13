@@ -154,7 +154,8 @@ class DispatchersTest {
         mockSystemService(mockContext, UserManager::class.java) { mockUserManager }
 
         if (SdkLevel.isAtLeastV()) {
-            whenever(mockUserManager.getUserProperties(any(UserHandle::class.java))) {
+            whenever(mockUserManager.getUserProperties(any(UserHandle::class.java)))
+            @JvmSerializableLambda {
                 UserProperties.Builder().build()
             }
             whenever(mockUserManager.getUserBadge()) {
