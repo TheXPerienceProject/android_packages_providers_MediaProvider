@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Tente pesquisar palavras semelhantes"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Sugestões"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Pesquisa desativada."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Tente pesquisar palavras semelhantes.\n\nApenas os itens salvos em backup vão aparecer nos resultados da pesquisa."</string>
 </resources>

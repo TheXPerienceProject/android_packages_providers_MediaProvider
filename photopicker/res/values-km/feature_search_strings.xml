@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"សាកល្បងស្វែងរកពាក្យស្រដៀងគ្នា"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"ការណែនាំ"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"បាន​បិទ​ការ​ស្វែងរក។"</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"សាកល្បងស្វែងរកពាក្យស្រដៀងគ្នា។\n\nមានតែធាតុដែលត្រូវបានបម្រុងទុកប៉ុណ្ណោះដែលនឹងបង្ហាញនៅក្នុងលទ្ធផល​ស្វែងរករបស់អ្នក។"</string>
 </resources>

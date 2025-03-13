@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Zama ukusesha amagama afanayo"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Iziphakamiso"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Usesho lukhutshaziwe."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Zama ukusesha amagama afanayo.\n\nYizinto ezenzelwe ikhophi kuphela ezizovela emiphumeleni yakho yosesho."</string>
 </resources>

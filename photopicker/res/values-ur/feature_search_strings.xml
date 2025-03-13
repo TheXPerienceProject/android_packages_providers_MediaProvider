@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"ملتے جلتے الفاظ تلاش کرنے کی کوشش کریں"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"تجاویز"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"تلاش غیر فعال ہے۔"</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"ملتے جلتے الفاظ تلاش کرنے کی کوشش کریں۔\n\nآپ کے تلاش کے نتائج میں صرف وہ آئٹمز ظاہر ہوں گے جن کا بیک اپ لیا گیا ہے۔"</string>
 </resources>

@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Kokeile hakea samankaltaisia sanoja"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Ehdotukset"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Haku poistettu käytöstä."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Kokeile hakea samankaltaisia sanoja.\n\nVain varmuuskopioidut kohteet näkyvät hakutuloksissa."</string>
 </resources>
