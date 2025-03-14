@@ -224,6 +224,8 @@ android_test {
         "exoplayer-mediaprovider-ui",
         "SettingsLibProfileSelector",
         "SettingsLibSelectorWithWidgetPreference",
+        "SettingsLibTopIntroPreference",
+        "SettingsLibCollapsingToolbarBaseActivity",
         "mediaprovider_flags_java_lib",
         "flag-junit",
         "androidx.media3.media3-common",

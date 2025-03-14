@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Pokušajte pretražiti slične riječi"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Prijedlozi"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Pretraživanje je onemogućeno."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Pokušajte pretražiti slične riječi.\n\nU rezultatima pretraživanja će se prikazati samo stavke čija je sigurnosna kopija napravljena."</string>
 </resources>

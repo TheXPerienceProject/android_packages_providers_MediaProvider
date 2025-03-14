@@ -18,6 +18,8 @@ package com.android.providers.media.photopicker.sync;
 
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.EXPIRED_SUGGESTIONS_RESET;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.EXTRA_MIME_TYPES;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.IMMEDIATE_CLOUD_MEDIA_IN_MEDIA_SET_SYNC_WORK_NAME;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.IMMEDIATE_CLOUD_SEARCH_SYNC_WORK_NAME;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_RESULTS_FULL_CACHE_RESET;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_PARTIAL_CACHE_RESET;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SEARCH_RESULTS_RESET_DELAY;
@@ -37,6 +39,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
@@ -59,6 +62,7 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.Operation;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkContinuation;
+import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.WorkRequest;
 
@@ -71,6 +75,7 @@ import com.android.providers.media.photopicker.v2.model.MediaInMediaSetSyncReque
 import com.android.providers.media.photopicker.v2.model.MediaSetsSyncRequestParams;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -81,7 +86,10 @@ import org.mockito.Mock;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 public class PickerSyncManagerTest {
@@ -116,6 +124,9 @@ public class PickerSyncManagerTest {
         mConfigStore = new TestConfigStore();
         mConfigStore.enableCloudMediaFeatureAndSetAllowedCloudProviderPackages(
                 "com.hooli.super.awesome.cloudpicker");
+        final SettableFuture<List<WorkInfo>> listenableFuture = SettableFuture.create();
+        listenableFuture.set(List.of());
+        doReturn(listenableFuture).when(mMockWorkManager).getWorkInfosByTag(anyString());
     }
 
 
@@ -603,6 +614,121 @@ public class PickerSyncManagerTest {
         assertThat(workRequest.getWorkSpec().input
                 .getInt(SYNC_WORKER_INPUT_SEARCH_REQUEST_ID, -1))
                 .isEqualTo(10);
+    }
+
+    @Test
+    public void testExistingSearchResultsSync() {
+        setupPickerSyncManager(/* schedulePeriodicSyncs */ false);
+
+        final int searchRequestId = 10;
+        final String authority = PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY;
+
+        final SettableFuture<List<WorkInfo>> listenableFuture = SettableFuture.create();
+        final WorkInfo workInfo = new WorkInfo(
+                UUID.randomUUID(), WorkInfo.State.RUNNING, new HashSet<>());
+        final String tag = String.format(Locale.ROOT, "%s-%s-%s",
+                IMMEDIATE_CLOUD_SEARCH_SYNC_WORK_NAME, authority, searchRequestId);
+        listenableFuture.set(List.of(workInfo));
+        doReturn(listenableFuture).when(mMockWorkManager).getWorkInfosByTag(eq(tag));
+
+        mPickerSyncManager.syncSearchResultsForProvider(
+                searchRequestId,
+                SYNC_CLOUD_ONLY,
+                authority
+        );
+        verify(mMockWorkManager, times(0))
+                .enqueueUniqueWork(anyString(), any(), any(OneTimeWorkRequest.class));
+    }
+
+    @Test
+    public void testExistingMediaSetContentsSync() {
+        setupPickerSyncManager(/* schedulePeriodicSyncs */ false);
+
+        final int pickerMediaSetId = 10;
+        final String authority = PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY;
+
+        final SettableFuture<List<WorkInfo>> listenableFuture = SettableFuture.create();
+        final WorkInfo workInfo = new WorkInfo(
+                UUID.randomUUID(), WorkInfo.State.RUNNING, new HashSet<>());
+        final String tag = String.format(Locale.ROOT, "%s-%s-%s",
+                IMMEDIATE_CLOUD_MEDIA_IN_MEDIA_SET_SYNC_WORK_NAME, authority, pickerMediaSetId);
+        listenableFuture.set(List.of(workInfo));
+        doReturn(listenableFuture).when(mMockWorkManager).getWorkInfosByTag(eq(tag));
+
+        Bundle extras = new Bundle();
+        extras.putString(MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_AUTHORITY,
+                authority);
+        extras.putLong(MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_PICKER_ID,
+                pickerMediaSetId);
+        extras.putStringArrayList("providers", new ArrayList<>(List.of(authority)));
+
+        MediaInMediaSetSyncRequestParams requestParams = new MediaInMediaSetSyncRequestParams(
+                extras);
+        mPickerSyncManager.syncMediaInMediaSetForProvider(
+                requestParams,
+                SYNC_CLOUD_ONLY
+        );
+
+        verify(mMockWorkManager, times(0))
+                .enqueueUniqueWork(anyString(), any(), any(OneTimeWorkRequest.class));
+    }
+
+    @Test
+    public void testSearchResultsSyncIsScheduled() {
+        setupPickerSyncManager(/* schedulePeriodicSyncs */ false);
+
+        final int searchRequestId = 10;
+        final String authority = PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY;
+
+        final SettableFuture<List<WorkInfo>> listenableFuture = SettableFuture.create();
+        final WorkInfo workInfo = new WorkInfo(
+                UUID.randomUUID(), WorkInfo.State.RUNNING, new HashSet<>());
+        final String tag = String.format(Locale.ROOT, "%s-%s-%s",
+                IMMEDIATE_CLOUD_SEARCH_SYNC_WORK_NAME, authority, searchRequestId + 1);
+        listenableFuture.set(List.of(workInfo));
+        doReturn(listenableFuture).when(mMockWorkManager).getWorkInfosByTag(eq(tag));
+
+        mPickerSyncManager.syncSearchResultsForProvider(
+                searchRequestId,
+                SYNC_CLOUD_ONLY,
+                authority
+        );
+        verify(mMockWorkManager, times(1))
+                .enqueueUniqueWork(anyString(), any(), any(OneTimeWorkRequest.class));
+    }
+
+    @Test
+    public void testMediaSetContentsSyncIsScheduled() {
+        setupPickerSyncManager(/* schedulePeriodicSyncs */ false);
+
+        final int pickerMediaSetId = 10;
+        final String authority = PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY;
+
+        final SettableFuture<List<WorkInfo>> listenableFuture = SettableFuture.create();
+        final WorkInfo workInfo = new WorkInfo(
+                UUID.randomUUID(), WorkInfo.State.RUNNING, new HashSet<>());
+        final String tag = String.format(Locale.ROOT, "%s-%s-%s",
+                IMMEDIATE_CLOUD_MEDIA_IN_MEDIA_SET_SYNC_WORK_NAME,
+                authority, pickerMediaSetId + 1);
+        listenableFuture.set(List.of(workInfo));
+        doReturn(listenableFuture).when(mMockWorkManager).getWorkInfosByTag(eq(tag));
+
+        Bundle extras = new Bundle();
+        extras.putString(MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_AUTHORITY,
+                authority);
+        extras.putLong(MediaInMediaSetSyncRequestParams.KEY_PARENT_MEDIA_SET_PICKER_ID,
+                pickerMediaSetId);
+        extras.putStringArrayList("providers", new ArrayList<>(List.of(authority)));
+
+        MediaInMediaSetSyncRequestParams requestParams = new MediaInMediaSetSyncRequestParams(
+                extras);
+        mPickerSyncManager.syncMediaInMediaSetForProvider(
+                requestParams,
+                SYNC_CLOUD_ONLY
+        );
+
+        verify(mMockWorkManager, times(1))
+                .enqueueUniqueWork(anyString(), any(), any(OneTimeWorkRequest.class));
     }
 
     @Test

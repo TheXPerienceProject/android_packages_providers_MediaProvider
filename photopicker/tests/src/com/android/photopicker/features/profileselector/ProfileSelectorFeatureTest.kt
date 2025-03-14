@@ -261,7 +261,7 @@ class ProfileSelectorFeatureTest : PhotopickerFeatureBaseTest() {
             whenever(mockUserManager.isQuietModeEnabled(otherProfile)) { true }
             whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { userHandle }
             whenever(mockUserManager.getProfileParent(otherProfile)) { userHandle }
-            whenever(mockUserManager.getUserProperties(otherProfile)) {
+            whenever(mockUserManager.getUserProperties(otherProfile)) @JvmSerializableLambda {
                 UserProperties.Builder().setShowInQuietMode(SHOW_IN_QUIET_MODE_HIDDEN).build()
             }
             //

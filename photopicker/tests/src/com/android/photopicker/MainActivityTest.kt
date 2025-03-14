@@ -114,7 +114,8 @@ class MainActivityTest {
                 resources.getDrawable(R.drawable.android, /* theme= */ null)
             }
             whenever(mockUserManager.getProfileLabel()) { "label" }
-            whenever(mockUserManager.getUserProperties(any(UserHandle::class.java))) {
+            whenever(mockUserManager.getUserProperties(any(UserHandle::class.java)))
+            @JvmSerializableLambda {
                 UserProperties.Builder().build()
             }
         }

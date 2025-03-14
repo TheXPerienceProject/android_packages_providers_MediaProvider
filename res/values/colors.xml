@@ -35,4 +35,7 @@
     <color name="preview_highlight_color">#8AB4F8</color>
     <color name="preview_default_grey">#202124</color>
     <color name="preview_background_color">@android:color/black</color>
+
+    <!-- PhotoPicker Settings Activity -->
+    <color name="picker_settings_background_color">@android:color/white</color>
 </resources>

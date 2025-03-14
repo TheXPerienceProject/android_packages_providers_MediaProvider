@@ -32,18 +32,19 @@ import androidx.annotation.UiThread;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceScreen;
 
 import com.android.providers.media.R;
 import com.android.providers.media.photopicker.data.model.UserId;
 import com.android.settingslib.widget.SelectorWithWidgetPreference;
+import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 
 /**
  * This fragment will display a list of available cloud providers for the profile selected.
  * Users can view or change the preferred cloud provider media app.
  */
-public class SettingsCloudMediaSelectFragment extends PreferenceFragmentCompat
+public class SettingsCloudMediaSelectFragment extends SettingsBasePreferenceFragment
         implements SelectorWithWidgetPreference.OnClickListener {
     public static final String EXTRA_TAB_USER_ID = "user_id";
     private static final String TAG = "SettingsCMSelectFgmt";
@@ -91,7 +92,7 @@ public class SettingsCloudMediaSelectFragment extends PreferenceFragmentCompat
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-        super.addPreferencesFromResource(R.xml.pref_screen_picker_settings);
+        super.addPreferencesFromResource(R.xml.cloud_media_selection_settings);
 
         mSettingsCloudMediaViewModel.loadData(getConfigStore());
         observeMediaCollectionInfoChanges();
@@ -101,12 +102,12 @@ public class SettingsCloudMediaSelectFragment extends PreferenceFragmentCompat
     @UiThread
     private void refreshUI() {
         final PreferenceScreen screen = getPreferenceScreen();
-        resetPreferenceScreen(screen);
 
-        screen.addPreference(buildTitlePreference());
+        final PreferenceGroup preferenceGroup = findPreference("cloud_media_provider_options");
+
         for (CloudMediaProviderOption provider :
                 mSettingsCloudMediaViewModel.getProviderOptions()) {
-            screen.addPreference(buildProviderOptionPreference(provider));
+            preferenceGroup.addPreference(buildProviderOptionPreference(provider));
         }
 
         updateSelectedRadioButton();
@@ -182,22 +183,8 @@ public class SettingsCloudMediaSelectFragment extends PreferenceFragmentCompat
         return pref;
     }
 
-    @NonNull
-    private Preference buildTitlePreference() {
-        final Preference titlePref = new Preference(getPrefContext());
-        titlePref.setTitle(R.string.picker_settings_selection_message);
-        titlePref.setSelectable(false);
-        titlePref.setPersistent(false);
-        titlePref.setLayoutResource(R.layout.pref_settings_cloud_select_title);
-        return titlePref;
-    }
-
     private Context getPrefContext() {
         return getPreferenceManager().getContext();
-    }
-
-    private void resetPreferenceScreen(PreferenceScreen screen) {
-        screen.removeAll();
     }
 
     @NonNull

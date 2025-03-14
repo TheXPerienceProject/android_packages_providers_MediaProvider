@@ -25,6 +25,7 @@
 using pdfClient::Annotation;
 using pdfClient::Color;
 using pdfClient::Document;
+using pdfClient::FreeTextAnnotation;
 using pdfClient::HighlightAnnotation;
 using pdfClient::ICoordinateConverter;
 using pdfClient::ImageObject;
@@ -63,6 +64,7 @@ static const char* kImageObject = "android/graphics/pdf/component/PdfPageImageOb
 static const char* kStampAnnotation = "android/graphics/pdf/component/StampAnnotation";
 static const char* kPdfAnnotation = "android/graphics/pdf/component/PdfAnnotation";
 static const char* kHighlightAnnotation = "android/graphics/pdf/component/HighlightAnnotation";
+static const char* kFreeTextAnnotation = "android/graphics/pdf/component/FreeTextAnnotation";
 
 static const char* kBitmap = "android/graphics/Bitmap";
 static const char* kBitmapConfig = "android/graphics/Bitmap$Config";
@@ -124,6 +126,10 @@ jobject ToJavaInteger(JNIEnv* env, const int& i) {
 
 jobject ToJavaString(JNIEnv* env, const std::string& s) {
     return env->NewStringUTF(s.c_str());
+}
+
+jobject ToJavaString(JNIEnv* env, const std::wstring& s) {
+    return env->NewString((jchar*)s.c_str(), s.length());
 }
 
 // Copy a C++ vector to a java ArrayList, using the given function to convert.
@@ -430,6 +436,35 @@ jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height) {
     AndroidBitmap_unlockPixels(env, java_bitmap);
 
     return java_bitmap;
+}
+
+jstring wstringToJstringUTF16(JNIEnv* env, const std::wstring& wstr) {
+    jsize len = wstr.length();
+    jchar* jchars = new jchar[len + 1];  // +1 for null terminator
+
+    for (size_t i = 0; i < len; ++i) {
+        jchars[i] = static_cast<jchar>(wstr[i]);
+    }
+    jchars[len] = 0;
+
+    jstring result = env->NewString(jchars, len);
+
+    delete[] jchars;
+
+    return result;
+}
+
+std::wstring jStringToWstring(JNIEnv* env, jstring java_string) {
+    std::wstring value;
+
+    const jchar* raw = env->GetStringChars(java_string, 0);
+    jsize len = env->GetStringLength(java_string);
+
+    value.assign(raw, raw + len);
+
+    env->ReleaseStringChars(java_string, raw);
+
+    return value;
 }
 
 int ToJavaColorInt(Color color) {
@@ -859,6 +894,43 @@ jobject ToJavaHighlightAnnotation(JNIEnv* env, const Annotation* annotation,
 
     return java_annotation;
 }
+
+jobject ToJavaFreeTextAnnotation(JNIEnv* env, const Annotation* annotation,
+                                 ICoordinateConverter* converter) {
+    jobject java_bounds = ToJavaRectF(env, annotation->GetBounds(), converter);
+
+    // Cast to FreeText Annotation
+    const FreeTextAnnotation* freetext_annotation =
+            static_cast<const FreeTextAnnotation*>(annotation);
+    // Find Java FreeTextAnnotation class.
+    static jclass freetext_annotation_class = GetPermClassRef(env, kFreeTextAnnotation);
+    // Get Constructor Id.
+    static jmethodID init = env->GetMethodID(freetext_annotation_class, "<init>",
+                                             funcsig("V", kRectF, kString).c_str());
+
+    // Get Java String for text content.
+    jobject java_string = wstringToJstringUTF16(env, freetext_annotation->GetTextContent());
+    // Create Java FreeTextAnnotation Object.
+    jobject java_freetext_annotation =
+            env->NewObject(freetext_annotation_class, init, java_bounds, java_string);
+
+    // Set Text color.
+    static jmethodID set_text_color =
+            env->GetMethodID(freetext_annotation_class, "setTextColor", funcsig("V", "I").c_str());
+    // call setTextColor
+    env->CallVoidMethod(java_freetext_annotation, set_text_color,
+                        ToJavaColorInt(freetext_annotation->GetTextColor()));
+
+    // Set Background color.
+    static jmethodID set_background_color = env->GetMethodID(
+            freetext_annotation_class, "setBackgroundColor", funcsig("V", "I").c_str());
+    // call setBackgroundColor
+    env->CallVoidMethod(java_freetext_annotation, set_background_color,
+                        ToJavaColorInt(freetext_annotation->GetBackgroundColor()));
+
+    return java_freetext_annotation;
+}
+
 jobject ToJavaPageAnnotation(JNIEnv* env, const Annotation* annotation,
                              ICoordinateConverter* converter) {
     if (!annotation) {
@@ -874,6 +946,10 @@ jobject ToJavaPageAnnotation(JNIEnv* env, const Annotation* annotation,
         }
         case Annotation::Type::Highlight: {
             java_annotation = ToJavaHighlightAnnotation(env, annotation, converter);
+            break;
+        }
+        case Annotation::Type::FreeText: {
+            java_annotation = ToJavaFreeTextAnnotation(env, annotation, converter);
             break;
         }
         default:
@@ -931,6 +1007,41 @@ std::unique_ptr<Annotation> ToNativeHighlightAnnotation(JNIEnv* env, jobject jav
     return highlight_annotation;
 }
 
+std::unique_ptr<Annotation> ToNativeFreeTextAnnotation(JNIEnv* env, jobject java_annotation,
+                                                       Rectangle_f native_bounds) {
+    // Create FreeTextAnnotation Instance.
+    auto freetext_annotation = std::make_unique<FreeTextAnnotation>(native_bounds);
+
+    // Get Ref to Java FreeTextAnnotation Class.
+    static jclass freetext_annotation_class = GetPermClassRef(env, kFreeTextAnnotation);
+
+    // Get the TextContent from Java layer.
+    static jmethodID get_text_content =
+            env->GetMethodID(freetext_annotation_class, "getTextContent", funcsig(kString).c_str());
+    auto java_text_content =
+            static_cast<jstring>(env->CallObjectMethod(java_annotation, get_text_content));
+
+    // Set the TextContent
+    std::wstring native_text_content = jStringToWstring(env, java_text_content);
+    freetext_annotation->SetTextContent(native_text_content);
+
+    // Get the text color
+    static jmethodID get_text_color =
+            env->GetMethodID(freetext_annotation_class, "getTextColor", funcsig("I").c_str());
+    jint java_text_color_int = env->CallIntMethod(java_annotation, get_text_color);
+
+    freetext_annotation->SetTextColor(ToNativeColor(java_text_color_int));
+
+    // Get the background color
+    static jmethodID get_background_color =
+            env->GetMethodID(freetext_annotation_class, "getBackgroundColor", funcsig("I").c_str());
+    jint java_background_color_int = env->CallIntMethod(java_annotation, get_background_color);
+
+    freetext_annotation->SetBackgroundColor(ToNativeColor(java_background_color_int));
+
+    return freetext_annotation;
+}
+
 std::unique_ptr<Annotation> ToNativePageAnnotation(JNIEnv* env, jobject java_annotation,
                                                    ICoordinateConverter* converter) {
     // Find Java PdfAnnotation class and GetType
@@ -953,6 +1064,10 @@ std::unique_ptr<Annotation> ToNativePageAnnotation(JNIEnv* env, jobject java_ann
         }
         case Annotation::Type::Highlight: {
             annotation = ToNativeHighlightAnnotation(env, java_annotation, native_bounds);
+            break;
+        }
+        case Annotation::Type::FreeText: {
+            annotation = ToNativeFreeTextAnnotation(env, java_annotation, native_bounds);
             break;
         }
         default:

@@ -112,8 +112,6 @@ public class SearchResultsSyncWorker extends Worker {
                             + "sync authority: %s, search request id: %s",
                     syncSource, syncAuthority, searchRequestId));
 
-            throwIfWorkerStopped();
-
             final SearchRequest searchRequest = SearchRequestDatabaseUtil
                     .getSearchRequestDetails(getDatabase(), searchRequestId);
             validateWorkInput(syncSource, syncAuthority, searchRequestId, searchRequest);
@@ -184,10 +182,15 @@ public class SearchResultsSyncWorker extends Worker {
                 try (Cursor cursor = fetchSearchResultsFromCmp(
                         searchClient, authority, searchRequest, nextPageToken,
                         searchRequest.getMimeTypes())) {
+                    Log.d(TAG, "Fetching search results for request id " + searchRequestId
+                            + " and next page token " + nextPageToken);
 
                     List<ContentValues> contentValues =
                             SearchResultsDatabaseUtil.extractContentValuesList(
                                     searchRequestId, cursor, isLocal(authority));
+
+                    throwIfWorkerStopped();
+                    throwIfCloudProviderHasChanged(authority);
 
                     int numberOfRowsInserted = SearchResultsDatabaseUtil
                             .cacheSearchResults(getDatabase(), authority, contentValues,
@@ -220,11 +223,13 @@ public class SearchResultsSyncWorker extends Worker {
                 }
             }
         } finally {
-            // Save sync resume key till the point it was performed successfully
-            if (nextPageToken != null) {
+            // Save progress in DB
+            // TODO(b/398221732): Resume search results syncs.
+            if (SYNC_COMPLETE_RESUME_KEY.equals(nextPageToken)) {
+                throwIfWorkerStopped();
                 setResumeKey(searchRequest, nextPageToken, syncSource);
                 SearchRequestDatabaseUtil
-                        .updateResumeKey(getDatabase(), searchRequestId, nextPageToken,
+                        .updateResumeKey(getDatabase(), searchRequestId, SYNC_COMPLETE_RESUME_KEY,
                                 authority, isLocal(authority));
             }
         }
@@ -244,10 +249,6 @@ public class SearchResultsSyncWorker extends Worker {
                             + "when a sync has been triggered with %s",
                     resumeKey.second,
                     authority));
-
-            // Check if this worker has stopped and the current sync request is obsolete
-            throwIfWorkerStopped();
-            throwIfCloudProviderHasChanged(authority);
 
             try {
                 getDatabase().beginTransaction();

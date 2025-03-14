@@ -101,8 +101,6 @@ public class MediaInMediaSetsSyncWorker extends Worker {
             Log.i(TAG, "Starting media in media sets sync from sync source " + syncSource
                     + " with mediaSetId " + mediaSetId);
 
-            checkIfWorkerHasStopped();
-
             checkValidityOfWorkerInputParams(
                     mediaSetId, syncSource, mediaSetPickerId, mediaSetAuthority);
 
@@ -160,6 +158,9 @@ public class MediaInMediaSetsSyncWorker extends Worker {
 
                 try (Cursor mediaInMediaSetsCursor = fetchMediaInMediaSetFromCmp(
                         searchClient, mediaSetId, resumePageToken, mimeTypes)) {
+                    Log.d(TAG, "Fetching media set content for request id " + mediaSetPickerId
+                            + " and next page token " + resumePageToken);
+
                     // Cache the media items in this media set
                     List<ContentValues> mediaItemsToInsert =
                             MediaInMediaSetsDatabaseUtil.getMediaContentValuesFromCursor(
@@ -167,6 +168,9 @@ public class MediaInMediaSetsSyncWorker extends Worker {
                                     mediaSetPickerId,
                                     isAuthorityLocal(mediaSetAuthority)
                             );
+
+                    checkIfWorkerHasStopped();
+                    checkIfCurrentCloudProviderAuthorityHasChanged(mediaSetAuthority);
                     int numberOfRowsInserted = MediaInMediaSetsDatabaseUtil.cacheMediaOfMediaSet(
                             mDatabase, mediaItemsToInsert, mediaSetAuthority
                     );
@@ -198,9 +202,14 @@ public class MediaInMediaSetsSyncWorker extends Worker {
                 }
             }
         } finally {
-            MediaSetsDatabaseUtil.updateMediaInMediaSetSyncResumeKey(
-                    mDatabase, mediaSetPickerId, resumePageToken
-            );
+            // Save progress in DB
+            // TODO(b/398221732): Resume syncs.
+            if (SYNC_COMPLETE_RESUME_KEY.equals(resumePageToken)) {
+                checkIfWorkerHasStopped();
+                MediaSetsDatabaseUtil.updateMediaInMediaSetSyncResumeKey(
+                        mDatabase, mediaSetPickerId, SYNC_COMPLETE_RESUME_KEY
+                );
+            }
         }
     }
 

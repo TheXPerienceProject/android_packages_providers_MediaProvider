@@ -39,6 +39,7 @@
     <!-- Defines theme of the PhotoPickerSettingsActivity -->
     <style name="PickerSettingsDefaultTheme" parent="PickerDefaultTheme">
         <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowBackground">@color/picker_settings_background_color</item>
         <item name="android:listPreferredItemHeightSmall">
             @dimen/picker_settings_list_item_height
         </item>

@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Provo të kërkosh për fjalë të ngjashme"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Sugjerime"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Kërkimi është çaktivizuar."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Provo të kërkosh për fjalë të ngjashme.\n\nNë rezultatet e tua të kërkimit do të shfaqen vetëm artikujt që janë rezervuar."</string>
 </resources>

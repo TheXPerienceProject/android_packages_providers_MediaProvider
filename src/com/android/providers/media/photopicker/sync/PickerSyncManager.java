@@ -46,6 +46,7 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.Operation;
 import androidx.work.OutOfQuotaPolicy;
 import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.Worker;
 
@@ -56,12 +57,17 @@ import com.android.providers.media.photopicker.data.PickerSyncRequestExtras;
 import com.android.providers.media.photopicker.v2.model.MediaInMediaSetSyncRequestParams;
 import com.android.providers.media.photopicker.v2.model.MediaSetsSyncRequestParams;
 
+import com.google.common.util.concurrent.ListenableFuture;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+
 
 /**
  * This class manages all the triggers for Picker syncs.
@@ -508,31 +514,53 @@ public class PickerSyncManager {
                                 SYNC_WORKER_INPUT_AUTHORITY, authority,
                                 SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource,
                                 SYNC_WORKER_INPUT_SEARCH_REQUEST_ID, searchRequestId));
-        final OneTimeWorkRequest syncRequest =
-                buildOneTimeWorkerRequest(SearchResultsSyncWorker.class, inputData);
-
-        // Clear all existing requests since there can be only one unique work running and our
-        // new sync work will replace the existing work (if any).
-        markAllSearchResultsSyncAsComplete(syncSource);
-
-        // Track the new sync request
-        trackNewSearchResultsSyncRequests(syncSource, syncRequest.getId());
 
         final String workName = syncSource == SYNC_LOCAL_ONLY
                 ? IMMEDIATE_LOCAL_SEARCH_SYNC_WORK_NAME
                 : IMMEDIATE_CLOUD_SEARCH_SYNC_WORK_NAME;
-        // Enqueue local or cloud sync request
-        try {
-            final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
-                    workName,
-                    ExistingWorkPolicy.REPLACE,
-                    syncRequest);
 
-            // Check that the request has been successfully enqueued.
-            enqueueOperation.getResult().get();
-        } catch (Exception e) {
-            Log.e(TAG, "Could not enqueue expedited search results sync request", e);
-            markSearchResultsSyncAsComplete(syncSource, syncRequest.getId());
+        final String tag = String.format(Locale.ROOT, "%s-%s-%s",
+                workName, authority, searchRequestId);
+
+        final OneTimeWorkRequest syncRequest =
+                new OneTimeWorkRequest.Builder(SearchResultsSyncWorker.class)
+                        .setInputData(inputData)
+                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .addTag(tag)
+                        .build();
+
+        synchronized (PickerSyncManager.class) {
+            // Check if this work is already in progress. This logic is inside a class level
+            // synchronized block to avoid race conditions.
+            try {
+                if (isWorkPendingForTag(tag)) {
+                    Log.d(TAG, "Sync work is already in progress. Ignoring sync request " + tag);
+                    return;
+                }
+            } catch (InterruptedException | ExecutionException | RuntimeException e) {
+                Log.e(TAG, "Error occurred in fetching work info - scheduling sync work " + tag);
+            }
+
+            // Clear all existing requests since there can be only one unique work running and our
+            // new sync work will replace the existing work (if any).
+            markAllSearchResultsSyncAsComplete(syncSource);
+
+            // Track the new sync request
+            trackNewSearchResultsSyncRequests(syncSource, syncRequest.getId());
+
+            // Enqueue local or cloud sync request
+            try {
+                final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
+                        workName,
+                        ExistingWorkPolicy.REPLACE,
+                        syncRequest);
+
+                // Check that the request has been successfully enqueued.
+                enqueueOperation.getResult().get();
+            } catch (Exception e) {
+                Log.e(TAG, "Could not enqueue expedited search results sync request", e);
+                markSearchResultsSyncAsComplete(syncSource, syncRequest.getId());
+            }
         }
     }
 
@@ -584,7 +612,7 @@ public class PickerSyncManager {
         // Enqueue full cache reset request. Ensure that this runs when the device is idle to
         // prevent search requests from clearing when the user is using PhotoPicker search feature.
         try {
-            Log.d(TAG, "Scheduling search results full cache reset request.");
+            Log.d(TAG, "Scheduling delayed search results full cache reset request.");
             mWorkManager.enqueueUniqueWork(
                     SEARCH_CACHE_RESET_WORK_NAME,
                     ExistingWorkPolicy.KEEP,
@@ -694,7 +722,6 @@ public class PickerSyncManager {
     public void syncMediaInMediaSetForProvider(
             MediaInMediaSetSyncRequestParams requestParams,
             @SyncSource int syncSource) {
-
         final Data inputData =
                 new Data(
                         Map.of(
@@ -702,31 +729,65 @@ public class PickerSyncManager {
                                 SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource,
                                 SYNC_WORKER_INPUT_MEDIA_SET_PICKER_ID,
                                 requestParams.getMediaSetPickerId()));
-        final OneTimeWorkRequest syncRequest =
-                buildOneTimeWorkerRequest(MediaInMediaSetsSyncWorker.class, inputData);
-
-        markAllMediaInMediaSetsSyncAsComplete(syncSource);
-
-        // track the new request
-        trackNewMediaInMediaSetSyncRequest(syncSource, syncRequest.getId());
 
         final String workName = syncSource == SYNC_LOCAL_ONLY
                 ? IMMEDIATE_LOCAL_MEDIA_IN_MEDIA_SET_SYNC_WORK_NAME
                 : IMMEDIATE_CLOUD_MEDIA_IN_MEDIA_SET_SYNC_WORK_NAME;
-        // Enqueue local or cloud sync request
-        try {
-            final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
+
+        final String tag = String.format(Locale.ROOT, "%s-%s-%s",
+                workName, requestParams.getAuthority(), requestParams.getMediaSetPickerId());
+
+        final OneTimeWorkRequest syncRequest =
+                new OneTimeWorkRequest.Builder(MediaInMediaSetsSyncWorker.class)
+                        .setInputData(inputData)
+                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .addTag(tag)
+                        .build();
+
+        synchronized (PickerSyncManager.class) {
+            // Check if this work is already in progress. This logic is inside a class level
+            // synchronized block to avoid race conditions.
+            try {
+                if (isWorkPendingForTag(tag)) {
+                    Log.d(TAG, "Sync work is already in progress. Ignoring sync request " + tag);
+                    return;
+                }
+            } catch (InterruptedException | ExecutionException | RuntimeException e) {
+                Log.e(TAG, "Error occurred in fetching work info - scheduling sync work " + tag);
+            }
+
+            markAllMediaInMediaSetsSyncAsComplete(syncSource);
+
+            // track the new request
+            trackNewMediaInMediaSetSyncRequest(syncSource, syncRequest.getId());
+
+            // Enqueue local or cloud sync request
+            try {
+                final Operation enqueueOperation = mWorkManager.enqueueUniqueWork(
                         workName,
                         ExistingWorkPolicy.REPLACE,
                         syncRequest
                 );
 
-            // Check that the request has been successfully enqueued.
-            enqueueOperation.getResult().get();
-        } catch (Exception e) {
-            Log.e(TAG, "Could not enqueue expedited media in media set sync request", e);
-            markMediaInMediaSetSyncAsComplete(syncSource, syncRequest.getId());
+                // Check that the request has been successfully enqueued.
+                enqueueOperation.getResult().get();
+            } catch (Exception e) {
+                Log.e(TAG, "Could not enqueue expedited media in media set sync request", e);
+                markMediaInMediaSetSyncAsComplete(syncSource, syncRequest.getId());
+            }
         }
+    }
+
+    private boolean isWorkPendingForTag(@NonNull String tag)
+            throws InterruptedException, ExecutionException {
+        ListenableFuture<List<WorkInfo>> future = mWorkManager.getWorkInfosByTag(tag);
+        List<WorkInfo> workInfos = future.get();
+        for (WorkInfo workInfo : workInfos) {
+            if (!workInfo.getState().isFinished()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @NonNull

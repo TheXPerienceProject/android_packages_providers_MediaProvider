@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"मिलते-जुलते शब्द खोजें"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"सुझाव"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"खोज करने की सुविधा बंद की गई है."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"मिलते-जुलते शब्द खोजें.\n\nआपके खोज के नतीजों में सिर्फ़ वे आइटम दिखेंगे जिनका बैक अप लिया गया है."</string>
 </resources>

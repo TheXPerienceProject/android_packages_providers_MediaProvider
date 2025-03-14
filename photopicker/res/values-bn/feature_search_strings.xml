@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"একই ধরনের শব্দ সার্চ করার চেষ্টা করুন"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"সাজেশন"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"সার্চ বন্ধ করা হয়েছে।"</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"একই ধরনের শব্দ দিয়ে সার্চ করে দেখুন।\n\nযেসব আইটেমের ব্যাক-আপ নেওয়া আছে শুধু সেগুলিই আপনার সার্চ ফলাফলে দেখা যাবে।"</string>
 </resources>

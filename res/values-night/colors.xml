@@ -21,4 +21,7 @@
 
     <!-- PhotoPicker -->
     <color name="picker_background_color">#202124</color>
+
+    <!-- PhotoPicker Settings Activity -->
+    <color name="picker_settings_background_color">@android:color/black</color>
 </resources>
