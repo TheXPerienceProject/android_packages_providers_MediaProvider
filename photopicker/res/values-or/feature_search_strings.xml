@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"ସମାନ ଶବ୍ଦଗୁଡ଼ିକ ସର୍ଚ୍ଚ କରିବାକୁ ଚେଷ୍ଟା କରନ୍ତୁ"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"ପରାମର୍ଶ"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"ସର୍ଚ୍ଚକୁ ଅକ୍ଷମ କରାଯାଇଛି।"</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"ସମାନ ଶବ୍ଦଗୁଡ଼ିକ ସର୍ଚ୍ଚ କରିବାକୁ ଚେଷ୍ଟା କରନ୍ତୁ।\n\nକେବଳ ବେକଅପ ନିଆଯାଇଥିବା ଆଇଟମଗୁଡ଼ିକ ଆପଣଙ୍କ ସର୍ଚ୍ଚ ଫଳାଫଳରେ ଦେଖାଯିବ।"</string>
 </resources>

@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"একেধৰণৰ শব্দবোৰ সন্ধান কৰি চাওক"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"পৰামৰ্শ"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"সন্ধান কৰাটো অক্ষম কৰা আছে।"</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"একেধৰণৰ শব্দ সন্ধান কৰি চাওক।\n\nকেৱল বেক আপ লোৱা বস্তু আপোনাৰ সন্ধানৰ ফলাফলত ওলাব।"</string>
 </resources>

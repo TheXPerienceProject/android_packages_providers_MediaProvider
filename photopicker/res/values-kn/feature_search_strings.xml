@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"ಅದೇ ರೀತಿಯ ಪದಗಳನ್ನು ಹುಡುಕಲು ಪ್ರಯತ್ನಿಸಿ"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"ಸಲಹೆಗಳು"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"ಹುಡುಕಾಟ ಫೀಚರ್‌ ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"ಅದೇ ರೀತಿಯ ಪದಗಳನ್ನು ಹುಡುಕಲು ಪ್ರಯತ್ನಿಸಿ.\n\nಬ್ಯಾಕಪ್ ಮಾಡಲಾದ ಐಟಂಗಳು ಮಾತ್ರ ನಿಮ್ಮ ಹುಡುಕಾಟ ಫಲಿತಾಂಶಗಳಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತವೆ."</string>
 </resources>

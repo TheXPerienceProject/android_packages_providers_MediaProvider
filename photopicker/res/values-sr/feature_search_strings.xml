@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Потражите сличне речи"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Предлози"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Претрага је онемогућена."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Потражите сличне речи.\n\nУ резултатима претраге се приказују само ставке за које је направљена резервна копија."</string>
 </resources>

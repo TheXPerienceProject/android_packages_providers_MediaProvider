@@ -16,37 +16,23 @@
   -->
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:id="@+id/settings_activity_root"
-              android:background="@color/picker_background_color"
-              android:orientation="vertical"
-              android:layout_height="match_parent"
-              android:layout_width="match_parent">
-
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/picker_settings_toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize" />
+    android:id="@+id/settings_activity_root"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
     <TextView
-        android:id="@+id/picker_settings_title"
-        android:text="@string/picker_settings_title"
-        android:textAppearance="@style/PickerHeadingTextAppearance"
-        android:layout_marginTop="@dimen/picker_settings_title_margin_top"
-        android:layout_margin="@dimen/picker_settings_margin_default"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <TextView
-        android:id="@+id/picker_settings_description"
         android:text="@string/picker_settings_description"
-        android:layout_margin="@dimen/picker_settings_margin_default"
-        android:textAppearance="@style/PickerBodyTextAppearance"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/picker_settings_description_padding_bottom"
+        android:paddingTop="@dimen/picker_settings_description_padding_top"
+        android:paddingStart="@dimen/picker_settings_description_padding_start"
+        android:paddingEnd="@dimen/picker_settings_description_padding_end"
+        android:textAppearance="@style/PickerSettingsDescription" />
 
     <FrameLayout
         android:id="@+id/settings_fragment_container"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="match_parent" />
 </LinearLayout>

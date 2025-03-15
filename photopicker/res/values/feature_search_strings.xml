@@ -35,4 +35,7 @@
 
     <!-- Search disabled hint message -->
     <string name="photopicker_search_disabled_hint" translation_description="Hint message shown on search bar click when search state is not enabled">Search disabled.</string>
+
+    <!-- Empty state search message to show for search when cloud search has no results -->
+    <string name="photopicker_search_result_empty_state_message" translation_description="Message shown to the user when no search results are able to be shown underneath the primary message title informing only backed up items will be shown in search results">Try searching for similar words.\n\nOnly items that are backed up will appear in your search results.</string>
 </resources>

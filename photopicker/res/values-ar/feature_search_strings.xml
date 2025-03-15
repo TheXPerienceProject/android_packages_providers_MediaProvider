@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"جرِّب البحث عن كلمات مُشابهة"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"اقتراحات"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"تم إيقاف البحث."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"يُرجى تجربة البحث عن كلمات مُشابهة.\n\nستظهر العناصر التي تم الاحتفاظ بنسخة احتياطية منها فقط في نتائج البحث."</string>
 </resources>

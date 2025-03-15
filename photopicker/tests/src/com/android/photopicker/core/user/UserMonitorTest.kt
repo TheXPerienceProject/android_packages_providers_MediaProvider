@@ -159,11 +159,13 @@ class UserMonitorTest {
                 resources.getDrawable(R.drawable.android, /* theme= */ null)
             }
             whenever(mockUserManager.getProfileLabel()) { PLATFORM_PROVIDED_PROFILE_LABEL }
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIMARY)) {
+            whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIMARY))
+            @JvmSerializableLambda {
                 UserProperties.Builder().build()
             }
             // By default, allow managed profile to be available
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) {
+            whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED))
+            @JvmSerializableLambda {
                 UserProperties.Builder()
                     .setCrossProfileContentSharingStrategy(
                         UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
@@ -206,7 +208,8 @@ class UserMonitorTest {
     fun testProfilesForCrossProfileIntentForwardingVPlus() {
 
         assumeTrue(SdkLevel.isAtLeastV())
-        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) {
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED))
+        @JvmSerializableLambda {
             UserProperties.Builder()
                 .setCrossProfileContentSharingStrategy(
                     UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
@@ -297,7 +300,8 @@ class UserMonitorTest {
         whenever(mockUserManager.userProfiles) {
             listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, disabledSharingProfile)
         }
-        whenever(mockUserManager.getUserProperties(disabledSharingProfile)) {
+        whenever(mockUserManager.getUserProperties(disabledSharingProfile))
+        @JvmSerializableLambda {
             UserProperties.Builder()
                 .setShowInSharingSurfaces(UserProperties.SHOW_IN_SHARING_SURFACES_NO)
                 .build()
@@ -908,7 +912,7 @@ class UserMonitorTest {
         assumeTrue(SdkLevel.isAtLeastV())
 
         whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_MANAGED)) { true }
-        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) {
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) @JvmSerializableLambda {
             UserProperties.Builder().setShowInQuietMode(SHOW_IN_QUIET_MODE_HIDDEN).build()
         }
 

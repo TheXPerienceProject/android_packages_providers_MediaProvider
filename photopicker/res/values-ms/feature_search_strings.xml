@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"Cuba cari perkataan yang serupa"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"Cadangan"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"Carian dilumpuhkan."</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"Cuba cari perkataan yang serupa.\n\nHanya item yang disandarkan akan dipaparkan dalam hasil carian anda."</string>
 </resources>

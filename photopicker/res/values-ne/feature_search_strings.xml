@@ -24,4 +24,5 @@
     <string name="photopicker_search_result_empty_state_body" msgid="1732249539645056618">"उस्तै शब्दहरू खोजी हेर्नुहोस्"</string>
     <string name="photopicker_search_suggestions_text" msgid="1758802235973720586">"सुझावहरू"</string>
     <string name="photopicker_search_disabled_hint" msgid="4049451515025551462">"खोज गर्ने सुविधा अफ गरिएको छ।"</string>
+    <string name="photopicker_search_result_empty_state_message" msgid="2834353361038395730">"उस्तै शब्दहरू खोजी हेर्नुहोस्।\n\nब्याकअप गरिएका सामग्री मात्र तपाईंका खोज परिणाममा देखिने छन्।"</string>
 </resources>
