@@ -18,6 +18,7 @@ package com.android.providers.media.util;
 
 import android.content.ClipDescription;
 import android.mtp.MtpConstants;
+import android.os.Build;
 import android.provider.MediaStore.Files.FileColumns;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
@@ -26,8 +27,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.providers.media.flags.Flags;
+
 import java.io.File;
 import java.util.Locale;
+import java.util.Optional;
 
 public class MimeUtils {
     private static final String TAG = "MimeUtils";
@@ -45,6 +49,13 @@ public class MimeUtils {
     public static @NonNull String resolveMimeType(@NonNull File file) {
         final String extension = FileUtils.extractFileExtension(file.getPath());
         if (extension == null) return ClipDescription.MIMETYPE_UNKNOWN;
+
+        // In Android 15, certain unsupported MIME types were introduced
+        // This ensures new files with these MIME types are handled with the correct MIME type
+        Optional<String> android15MimeType = getMimeTypeForAndroid15(extension);
+        if (android15MimeType.isPresent()) {
+            return android15MimeType.get();
+        }
 
         final String mimeType = MimeTypeMap.getSingleton()
                 .getMimeTypeFromExtension(extension.toLowerCase(Locale.ROOT));
@@ -282,5 +293,13 @@ public class MimeUtils {
         }
 
         return "";
+    }
+
+    private static Optional<String> getMimeTypeForAndroid15(String extension) {
+        if (Flags.enableMimeTypeFixForAndroid15()
+                && Build.VERSION.SDK_INT == Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return MimeTypeFixHandler.getMimeType(extension);
+        }
+        return Optional.empty();
     }
 }

@@ -28,7 +28,7 @@ import com.android.photopicker.features.search.model.SearchSuggestion
  * @property face List of face type search suggestions.
  * @property other List of other types of search suggestions.
  */
-data class SuggestionLists(
+data class SearchSuggestions(
     val history: List<SearchSuggestion> = emptyList(),
     val face: List<SearchSuggestion> = emptyList(),
     val other: List<SearchSuggestion> = emptyList(),

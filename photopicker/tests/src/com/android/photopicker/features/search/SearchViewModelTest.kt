@@ -80,9 +80,9 @@ class SearchViewModelTest {
                 )
             viewModel.fetchSuggestions("")
             advanceTimeBy(1000)
-            val suggestionLists = viewModel.suggestionLists.value
+            val suggestionLists = viewModel.searchSuggestions.value
             assertWithMessage("Unexpected total suggestions list size not correct")
-                .that(viewModel.suggestionLists.value.totalSuggestions)
+                .that(viewModel.searchSuggestions.value.totalSuggestions)
                 .isEqualTo(4)
             assertWithMessage("Unexpected history suggestions list size")
                 .that(suggestionLists.history.size)
@@ -122,7 +122,7 @@ class SearchViewModelTest {
             advanceTimeBy(1000)
             viewModel.fetchSuggestions("abc")
             advanceTimeBy(1000)
-            val suggestionLists = viewModel.suggestionLists.value
+            val suggestionLists = viewModel.searchSuggestions.value
             assertWithMessage("Unexpected total suggestions list size not correct")
                 .that(suggestionLists.totalSuggestions)
                 .isEqualTo(4)

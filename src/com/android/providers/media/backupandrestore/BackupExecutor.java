@@ -22,19 +22,17 @@ import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.BACKUP_DIRECTORY_NAME;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.FIELD_SEPARATOR;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.KEY_VALUE_SEPARATOR;
-import static com.android.providers.media.flags.Flags.enableBackupAndRestore;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.isBackupAndRestoreSupported;
 import static com.android.providers.media.util.Logging.TAG;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.os.CancellationSignal;
 import android.provider.MediaStore.Files.FileColumns;
 import android.provider.MediaStore.MediaColumns;
 import android.util.Log;
 
-import com.android.modules.utils.build.SdkLevel;
 import com.android.providers.media.DatabaseHelper;
 import com.android.providers.media.leveldb.LevelDBEntry;
 import com.android.providers.media.leveldb.LevelDBInstance;
@@ -109,34 +107,6 @@ public final class BackupExecutor {
         Log.v(TAG, "Last backed up generation number: " + lastBackedUpGenerationNumber);
         long lastGenerationNumber = backupData(lastBackedUpGenerationNumber, signal);
         updateLastBackedUpGenerationNumber(lastGenerationNumber);
-    }
-
-    /**
-     * Checks whether backup and restore operations are supported and enabled on the current device.
-     *
-     * <p>This method verifies that the required backup and restore flag is enabled, SDK version is
-     * S+ and ensures the device hardware is suitable for these operations. Backup and restore are
-     * supported only on mobile phones and tablets, excluding devices like automotive systems, TVs,
-     * PCs, and smartwatches.</p>
-     *
-     * @param context the application {@link Context}, used to access system resources.
-     * @return {@code true} if backup and restore is enabled and supported on the device,
-     *         {@code false} otherwise.
-     */
-    public static boolean isBackupAndRestoreSupported(Context context) {
-        if (!enableBackupAndRestore() || !SdkLevel.isAtLeastS()) {
-            return false;
-        }
-
-        if (context == null || context.getPackageManager() == null) {
-            return false;
-        }
-
-        final PackageManager pm = context.getPackageManager();
-        return !pm.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
-                && !pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
-                && !pm.hasSystemFeature(PackageManager.FEATURE_PC)
-                && !pm.hasSystemFeature(PackageManager.FEATURE_WATCH);
     }
 
     private long clearBackupIfNeededAndReturnLastBackedUpNumber(long currentDbGenerationNumber,

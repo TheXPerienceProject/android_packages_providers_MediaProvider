@@ -84,11 +84,17 @@
             android:name="com.android.providers.media.MediaApplication"
             android:label="@string/picker_app_label"
             android:icon="@mipmap/picker_app_icon"
-            android:allowBackup="false"
             android:supportsRtl="true"
             android:forceQueryable="true"
             android:usesCleartextTraffic="true"
-            android:crossProfile="true">
+            android:crossProfile="true"
+            android:allowBackup="true"
+            android:fullBackupOnly="true"
+            android:backupInForeground="true"
+            android:killAfterRestore="false"
+            android:restoreAnyVersion="true"
+            android:backupAgent="com.android.providers.media.backupandrestore.MediaBackupAgent"
+            android:dataExtractionRules="@xml/data_extraction_rules">
         <provider
                 android:name="com.android.providers.media.MediaProvider"
                 android:authorities="media"
