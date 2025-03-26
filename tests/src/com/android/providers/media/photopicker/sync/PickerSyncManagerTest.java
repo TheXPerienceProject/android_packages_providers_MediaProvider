@@ -800,6 +800,15 @@ public class PickerSyncManagerTest {
         assertThat(resetRequest.getWorkSpec().isPeriodic()).isFalse();
         assertThat(resetRequest.getWorkSpec().id).isNotNull();
         assertThat(resetRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
+        assertThat(resetRequest.getWorkSpec().input
+                .getInt(SYNC_WORKER_INPUT_SYNC_SOURCE, -1))
+                .isEqualTo(SYNC_LOCAL_ONLY);
+        assertThat(resetRequest.getWorkSpec().input
+                .getString(SYNC_WORKER_INPUT_CATEGORY_ID))
+                .isEqualTo(categoryId);
+        assertThat(resetRequest.getWorkSpec().input
+                .getString(SYNC_WORKER_INPUT_AUTHORITY))
+                .isEqualTo(SearchProvider.AUTHORITY);
 
         WorkRequest syncRequest = workRequestList.get(1).get(0);
         assertThat(syncRequest.getWorkSpec().workerClassName)
@@ -860,6 +869,15 @@ public class PickerSyncManagerTest {
         assertThat(resetRequest.getWorkSpec().isPeriodic()).isFalse();
         assertThat(resetRequest.getWorkSpec().id).isNotNull();
         assertThat(resetRequest.getWorkSpec().constraints.requiresBatteryNotLow()).isFalse();
+        assertThat(resetRequest.getWorkSpec().input
+                .getInt(SYNC_WORKER_INPUT_SYNC_SOURCE, -1))
+                .isEqualTo(SYNC_CLOUD_ONLY);
+        assertThat(resetRequest.getWorkSpec().input
+                .getString(SYNC_WORKER_INPUT_CATEGORY_ID))
+                .isEqualTo(categoryId);
+        assertThat(resetRequest.getWorkSpec().input
+                .getString(SYNC_WORKER_INPUT_AUTHORITY))
+                .isEqualTo(SearchProvider.AUTHORITY);
 
         WorkRequest syncRequest = workRequestList.get(1).get(0);
         assertThat(syncRequest.getWorkSpec().workerClassName)

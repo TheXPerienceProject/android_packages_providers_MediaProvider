@@ -19,12 +19,16 @@
 #include <android/bitmap.h>
 #include <string.h>
 
+#include "image_object.h"
 #include "logging.h"
 #include "rect.h"
+#include "text_object.h"
 
 using pdfClient::Annotation;
 using pdfClient::Color;
 using pdfClient::Document;
+using pdfClient::Font;
+using pdfClient::font_names;
 using pdfClient::FreeTextAnnotation;
 using pdfClient::HighlightAnnotation;
 using pdfClient::ICoordinateConverter;
@@ -38,6 +42,7 @@ using pdfClient::Rectangle_f;
 using pdfClient::Rectangle_i;
 using pdfClient::SelectionBoundary;
 using pdfClient::StampAnnotation;
+using pdfClient::TextObject;
 using std::string;
 using std::vector;
 
@@ -59,6 +64,8 @@ static const char* kGotoLinkDestination =
         "android/graphics/pdf/content/PdfPageGotoLinkContent$Destination";
 static const char* kGotoLink = "android/graphics/pdf/content/PdfPageGotoLinkContent";
 static const char* kPageObject = "android/graphics/pdf/component/PdfPageObject";
+static const char* kTextFont = "android/graphics/pdf/component/PdfPageTextObjectFont";
+static const char* kTextObject = "android/graphics/pdf/component/PdfPageTextObject";
 static const char* kPathObject = "android/graphics/pdf/component/PdfPagePathObject";
 static const char* kImageObject = "android/graphics/pdf/component/PdfPageImageObject";
 static const char* kStampAnnotation = "android/graphics/pdf/component/StampAnnotation";
@@ -128,8 +135,31 @@ jobject ToJavaString(JNIEnv* env, const std::string& s) {
     return env->NewStringUTF(s.c_str());
 }
 
-jobject ToJavaString(JNIEnv* env, const std::wstring& s) {
-    return env->NewString((jchar*)s.c_str(), s.length());
+jobject ToJavaString(JNIEnv* env, const std::wstring& ws) {
+    jsize len = ws.length();
+    jchar* jchars = new jchar[len + 1];  // Null Termination
+
+    for (size_t i = 0; i < len; ++i) {
+        jchars[i] = static_cast<jchar>(ws[i]);
+    }
+    jchars[len] = 0;
+
+    jstring result = env->NewString(jchars, len);
+
+    delete[] jchars;
+    return result;
+}
+
+std::wstring ToNativeWideString(JNIEnv* env, jstring java_string) {
+    std::wstring value;
+
+    const jchar* raw = env->GetStringChars(java_string, 0);
+    jsize len = env->GetStringLength(java_string);
+
+    value.assign(raw, raw + len);
+
+    env->ReleaseStringChars(java_string, raw);
+    return value;
 }
 
 // Copy a C++ vector to a java ArrayList, using the given function to convert.
@@ -438,35 +468,6 @@ jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height) {
     return java_bitmap;
 }
 
-jstring wstringToJstringUTF16(JNIEnv* env, const std::wstring& wstr) {
-    jsize len = wstr.length();
-    jchar* jchars = new jchar[len + 1];  // +1 for null terminator
-
-    for (size_t i = 0; i < len; ++i) {
-        jchars[i] = static_cast<jchar>(wstr[i]);
-    }
-    jchars[len] = 0;
-
-    jstring result = env->NewString(jchars, len);
-
-    delete[] jchars;
-
-    return result;
-}
-
-std::wstring jStringToWstring(JNIEnv* env, jstring java_string) {
-    std::wstring value;
-
-    const jchar* raw = env->GetStringChars(java_string, 0);
-    jsize len = env->GetStringLength(java_string);
-
-    value.assign(raw, raw + len);
-
-    env->ReleaseStringChars(java_string, raw);
-
-    return value;
-}
-
 int ToJavaColorInt(Color color) {
     // Get ARGB values from Native Color
     uint A = color.a;
@@ -548,14 +549,12 @@ jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments
             case PathObject::Segment::Command::Move: {
                 static jmethodID move_to =
                         env->GetMethodID(path_class, "moveTo", funcsig("V", "F", "F").c_str());
-
                 env->CallVoidMethod(java_path, move_to, output.x, output.y);
                 break;
             }
             case PathObject::Segment::Command::Line: {
                 static jmethodID line_to =
                         env->GetMethodID(path_class, "lineTo", funcsig("V", "F", "F").c_str());
-
                 env->CallVoidMethod(java_path, line_to, output.x, output.y);
                 break;
             }
@@ -565,12 +564,118 @@ jobject ToJavaPath(JNIEnv* env, const std::vector<PathObject::Segment>& segments
         // Check if segment isClosed.
         if (segment.is_closed) {
             static jmethodID close = env->GetMethodID(path_class, "close", funcsig("V").c_str());
-
             env->CallVoidMethod(java_path, close);
         }
     }
 
     return java_path;
+}
+
+jobject ToJavaPdfTextObject(JNIEnv* env, const TextObject* text_object) {
+    // Find Java PdfTextObject Class.
+    static jclass text_object_class = GetPermClassRef(env, kTextObject);
+
+    // Create Java Text String from TextObject Data String.
+    jobject java_string = ToJavaString(env, text_object->text_);
+
+    // Get Native Font Object Data.
+    int font_family = static_cast<int>(text_object->font_.GetFamily());
+    bool bold = text_object->font_.IsBold();
+    bool italic = text_object->font_.IsItalic();
+
+    // Create Java TextObjectFont Instance.
+    static jclass text_font_class = GetPermClassRef(env, kTextFont);
+    static jmethodID init_text_font =
+            env->GetMethodID(text_font_class, "<init>", funcsig("V", "I", "Z", "Z").c_str());
+    jobject java_font = env->NewObject(text_font_class, init_text_font, font_family, bold, italic);
+
+    // Create Java PdfTextObject Instance.
+    static jmethodID init_text_object = env->GetMethodID(
+            text_object_class, "<init>", funcsig("V", kString, kTextFont, "F").c_str());
+    float font_size = text_object->font_size_;
+    jobject java_text_object =
+            env->NewObject(text_object_class, init_text_object, java_string, java_font, font_size);
+
+    // Set Java PdfTextObject Render Mode.
+    int render_mode = static_cast<int>(text_object->render_mode_);
+    static jmethodID set_render_mode = env->GetMethodID(text_object_class, "setRenderMode", "(I)V");
+    env->CallVoidMethod(java_text_object, set_render_mode, render_mode);
+
+    // Set Java PdfTextObject Fill Color.
+    static jmethodID set_fill_color = env->GetMethodID(text_object_class, "setFillColor", "(I)V");
+    env->CallVoidMethod(java_text_object, set_fill_color, ToJavaColorInt(text_object->fill_color_));
+
+    // Set Java PdfTextObject Stroke Color.
+    static jmethodID set_stroke_color =
+            env->GetMethodID(text_object_class, "setStrokeColor", "(I)V");
+    env->CallVoidMethod(java_text_object, set_stroke_color,
+                        ToJavaColorInt(text_object->stroke_color_));
+
+    // Set Java PdfTextObject Stroke Width.
+    static jmethodID set_stroke_width =
+            env->GetMethodID(text_object_class, "setStrokeWidth", "(F)V");
+    env->CallVoidMethod(java_text_object, set_stroke_width, text_object->stroke_width_);
+
+    return java_text_object;
+}
+
+jobject ToJavaPdfPathObject(JNIEnv* env, const PathObject* path_object,
+                            ICoordinateConverter* converter) {
+    // Find Java PdfPathObject Class.
+    static jclass path_object_class = GetPermClassRef(env, kPathObject);
+    // Get Constructor Id.
+    static jmethodID init_path =
+            env->GetMethodID(path_object_class, "<init>", funcsig("V", kPath).c_str());
+
+    // Create Java Path from Native PathSegments.
+    jobject java_path = ToJavaPath(env, path_object->segments_, converter);
+
+    // Create Java PdfPathObject Instance.
+    jobject java_path_object = env->NewObject(path_object_class, init_path, java_path);
+
+    // Set Java PdfPathObject FillColor.
+    if (path_object->is_fill_) {
+        static jmethodID set_fill_color =
+                env->GetMethodID(path_object_class, "setFillColor", funcsig("V", kColor).c_str());
+
+        env->CallVoidMethod(java_path_object, set_fill_color,
+                            ToJavaColor(env, path_object->fill_color_));
+    }
+
+    // Set Java PdfPathObject StrokeColor.
+    if (path_object->is_stroke_) {
+        static jmethodID set_stroke_color =
+                env->GetMethodID(path_object_class, "setStrokeColor", funcsig("V", kColor).c_str());
+
+        env->CallVoidMethod(java_path_object, set_stroke_color,
+                            ToJavaColor(env, path_object->stroke_color_));
+    }
+
+    // Set Java Stroke Width.
+    static jmethodID set_stroke_width =
+            env->GetMethodID(path_object_class, "setStrokeWidth", "(F)V");
+    env->CallVoidMethod(java_path_object, set_stroke_width, path_object->stroke_width_);
+
+    return java_path_object;
+}
+
+jobject ToJavaPdfImageObject(JNIEnv* env, const ImageObject* image_object) {
+    // Find Java ImageObject Class.
+    static jclass image_object_class = GetPermClassRef(env, kImageObject);
+    // Get Constructor Id.
+    static jmethodID init_image =
+            env->GetMethodID(image_object_class, "<init>", funcsig("V", kBitmap).c_str());
+
+    // Get Bitmap readable buffer from ImageObject Data.
+    void* buffer = image_object->GetBitmapReadableBuffer();
+
+    // Create Java Bitmap from Native Bitmap Buffer.
+    jobject java_bitmap = ToJavaBitmap(env, buffer, image_object->width_, image_object->height_);
+
+    // Create Java PdfImageObject Instance.
+    jobject java_image_object = env->NewObject(image_object_class, init_image, java_bitmap);
+
+    return java_image_object;
 }
 
 jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object,
@@ -584,66 +689,13 @@ jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object,
 
     switch (page_object->GetType()) {
         case PageObject::Type::Path: {
-            // Cast to PathObject
             const PathObject* path_object = static_cast<const PathObject*>(page_object);
-
-            // Find Java PathObject Class.
-            static jclass path_object_class = GetPermClassRef(env, kPathObject);
-            // Get Constructor Id.
-            static jmethodID init_path =
-                    env->GetMethodID(path_object_class, "<init>", funcsig("V", kPath).c_str());
-
-            // Create Java Path from Native PathSegments.
-            jobject java_path = ToJavaPath(env, path_object->segments, converter);
-
-            // Create Java PathObject Instance.
-            java_page_object = env->NewObject(path_object_class, init_path, java_path);
-
-            // Set Java PathObject FillColor.
-            if (path_object->is_fill_mode) {
-                static jmethodID set_fill_color = env->GetMethodID(
-                        path_object_class, "setFillColor", funcsig("V", kColor).c_str());
-
-                env->CallVoidMethod(java_page_object, set_fill_color,
-                                    ToJavaColor(env, path_object->fill_color));
-            }
-
-            // Set Java PathObject StrokeColor.
-            if (path_object->is_stroke) {
-                static jmethodID set_stroke_color = env->GetMethodID(
-                        path_object_class, "setStrokeColor", funcsig("V", kColor).c_str());
-
-                env->CallVoidMethod(java_page_object, set_stroke_color,
-                                    ToJavaColor(env, path_object->stroke_color));
-            }
-
-            // Set Java Stroke Width.
-            static jmethodID set_stroke_width =
-                    env->GetMethodID(path_object_class, "setStrokeWidth", "(F)V");
-            env->CallVoidMethod(java_page_object, set_stroke_width, path_object->stroke_width);
-
+            java_page_object = ToJavaPdfPathObject(env, path_object, converter);
             break;
         }
         case PageObject::Type::Image: {
-            // Cast to ImageObject
             const ImageObject* image_object = static_cast<const ImageObject*>(page_object);
-
-            // Find Java ImageObject Class.
-            static jclass image_object_class = GetPermClassRef(env, kImageObject);
-            // Get Constructor Id.
-            static jmethodID init_image =
-                    env->GetMethodID(image_object_class, "<init>", funcsig("V", kBitmap).c_str());
-
-            // Get Bitmap readable buffer from ImageObject Data.
-            void* buffer = image_object->GetBitmapReadableBuffer();
-
-            // Create Java Bitmap from Native Bitmap Buffer.
-            jobject java_bitmap =
-                    ToJavaBitmap(env, buffer, image_object->width, image_object->height);
-
-            // Create Java ImageObject Instance.
-            java_page_object = env->NewObject(image_object_class, init_image, java_bitmap);
-
+            java_page_object = ToJavaPdfImageObject(env, image_object);
             break;
         }
         default:
@@ -655,13 +707,13 @@ jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object,
         return NULL;
     }
 
-    // Find Java PageObject class
+    // Find Java PageObject Class.
     static jclass page_object_class = GetPermClassRef(env, kPageObject);
 
-    // Set Java Matrix
+    // Set Java PdfPageObject Matrix.
     static jmethodID set_matrix =
             env->GetMethodID(page_object_class, "setMatrix", funcsig("V", kMatrix).c_str());
-    env->CallVoidMethod(java_page_object, set_matrix, ToJavaMatrix(env, page_object->matrix));
+    env->CallVoidMethod(java_page_object, set_matrix, ToJavaMatrix(env, page_object->matrix_));
 
     return java_page_object;
 }
@@ -692,6 +744,211 @@ Color ToNativeColor(JNIEnv* env, jobject java_color) {
     return ToNativeColor(java_color_int);
 }
 
+std::unique_ptr<TextObject> ToNativeTextObject(JNIEnv* env, jobject java_text_object) {
+    // Create TextObject Data Instance.
+    auto text_object = std::make_unique<TextObject>();
+
+    // Get Ref to Java PdfTextObject Class.
+    static jclass text_object_class = GetPermClassRef(env, kTextObject);
+
+    // Get Java PdfTextObject Font.
+    static jmethodID get_text_font =
+            env->GetMethodID(text_object_class, "getFont", funcsig(kTextFont).c_str());
+    jobject java_text_font = env->CallObjectMethod(java_text_object, get_text_font);
+
+    // Find Java PdfTextObjectFont Class.
+    static jclass text_font_class = GetPermClassRef(env, kTextFont);
+
+    // Get the Font Family for the PdfTextObjectFont.
+    static jmethodID get_font_family = env->GetMethodID(text_font_class, "getFontFamily", "()I");
+    jint font_family = env->CallIntMethod(java_text_font, get_font_family);
+
+    // Is PdfTextObjectFont Bold.
+    static jmethodID is_bold = env->GetMethodID(text_font_class, "isBold", "()Z");
+    jboolean bold = env->CallBooleanMethod(java_text_font, is_bold);
+
+    // Is PdfTextObjectFont Italic.
+    static jmethodID is_italic = env->GetMethodID(text_font_class, "isItalic", "()Z");
+    jboolean italic = env->CallBooleanMethod(java_text_font, is_italic);
+
+    // Set TextObject Data Font.
+    if (font_family < 0 || font_family >= font_names.size()) {
+        return nullptr;
+    }
+    text_object->font_ =
+            Font(font_names[font_family], static_cast<Font::Family>(font_family), bold, italic);
+
+    // Get Java PdfTextObject font size.
+    static jmethodID get_font_size = env->GetMethodID(text_object_class, "getFontSize", "()F");
+    jfloat font_size = env->CallFloatMethod(java_text_object, get_font_size);
+
+    // Set TextObject Data font size.
+    text_object->font_size_ = font_size;
+
+    // Get Java PdfTextObject Text.
+    static jmethodID get_text =
+            env->GetMethodID(text_object_class, "getText", funcsig(kString).c_str());
+    jstring java_text = static_cast<jstring>(env->CallObjectMethod(java_text_object, get_text));
+
+    // Set TextObject Data Text.
+    text_object->text_ = ToNativeWideString(env, java_text);
+
+    // Get Java PdfTextObject RenderMode.
+    static jmethodID get_render_mode = env->GetMethodID(text_object_class, "getRenderMode", "()I");
+    jint render_mode = env->CallIntMethod(java_text_object, get_render_mode);
+
+    // Set TextObject Data RenderMode.
+    switch (static_cast<TextObject::RenderMode>(render_mode)) {
+        case TextObject::RenderMode::Fill: {
+            text_object->render_mode_ = TextObject::RenderMode::Fill;
+            break;
+        }
+        case TextObject::RenderMode::Stroke: {
+            text_object->render_mode_ = TextObject::RenderMode::Stroke;
+            break;
+        }
+        case TextObject::RenderMode::FillStroke: {
+            text_object->render_mode_ = TextObject::RenderMode::FillStroke;
+            break;
+        }
+        default: {
+            text_object->render_mode_ = TextObject::RenderMode::Unknown;
+            break;
+        }
+    }
+
+    // Get Java PdfTextObject Fill Color.
+    static jmethodID get_fill_color = env->GetMethodID(text_object_class, "getFillColor", "()I");
+    jint java_fill_color = env->CallIntMethod(java_text_object, get_fill_color);
+
+    // Set TextObject Data Fill Color
+    text_object->fill_color_ = ToNativeColor(java_fill_color);
+
+    // Get Java PdfTextObject Stroke Color.
+    static jmethodID get_stroke_color =
+            env->GetMethodID(text_object_class, "getStrokeColor", "()I");
+    jint java_stroke_color = env->CallIntMethod(java_text_object, get_stroke_color);
+
+    // Set TextObject Data Stroke Color.
+    text_object->stroke_color_ = ToNativeColor(java_stroke_color);
+
+    // Get Java PdfTextObject Stroke Width.
+    static jmethodID get_stroke_width =
+            env->GetMethodID(text_object_class, "getStrokeWidth", "()F");
+    jfloat stroke_width = env->CallFloatMethod(java_text_object, get_stroke_width);
+
+    // Set TextObject Data Stroke Width.
+    text_object->stroke_width_ = stroke_width;
+
+    return text_object;
+}
+
+std::unique_ptr<PathObject> ToNativePathObject(JNIEnv* env, jobject java_path_object,
+                                               ICoordinateConverter* converter) {
+    // Create PathObject Data Instance.
+    auto path_object = std::make_unique<PathObject>();
+
+    // Get Ref to Java PathObject Class.
+    static jclass path_object_class = GetPermClassRef(env, kPathObject);
+
+    // Get Path from Java PathObject.
+    static jmethodID to_path =
+            env->GetMethodID(path_object_class, "toPath", funcsig(kPath).c_str());
+    jobject java_path = env->CallObjectMethod(java_path_object, to_path);
+
+    // Find Java Path Class.
+    static jclass path_class = GetPermClassRef(env, kPath);
+
+    // Get the Approximate Array for the Path.
+    static jmethodID approximate = env->GetMethodID(path_class, "approximate", "(F)[F");
+    // The acceptable error while approximating a Path Curve with a line.
+    static const float acceptable_error = 0.5f;
+    jfloatArray java_approximate =
+            (jfloatArray)env->CallObjectMethod(java_path, approximate, acceptable_error);
+    const jsize size = env->GetArrayLength(java_approximate);
+
+    // Copy Java Array to Native Array
+    float path_approximate[size];
+    env->GetFloatArrayRegion(java_approximate, 0, size, path_approximate);
+
+    // Set PathObject Data PathSegments.
+    auto& segments = path_object->segments_;
+    for (int i = 0; i < size; i += 3) {
+        // Get DeviceToPage Coordinates
+        Point_f output =
+                converter->DeviceToPage({path_approximate[i + 1], path_approximate[i + 2]});
+        if (i == 0 || path_approximate[i] == path_approximate[i - 3]) {
+            segments.emplace_back(PathObject::Segment::Command::Move, output.x, output.y);
+        } else {
+            segments.emplace_back(PathObject::Segment::Command::Line, output.x, output.y);
+        }
+    }
+
+    // Get Java PathObject Fill Color.
+    static jmethodID get_fill_color =
+            env->GetMethodID(path_object_class, "getFillColor", funcsig(kColor).c_str());
+    jobject java_fill_color = env->CallObjectMethod(java_path_object, get_fill_color);
+
+    // Set PathObject Data Fill Mode and Fill Color
+    path_object->is_fill_ = (java_fill_color != NULL);
+    if (path_object->is_fill_) {
+        path_object->fill_color_ = ToNativeColor(env, java_fill_color);
+    }
+
+    // Get Java PathObject Stroke Color.
+    static jmethodID get_stroke_color =
+            env->GetMethodID(path_object_class, "getStrokeColor", funcsig(kColor).c_str());
+    jobject java_stroke_color = env->CallObjectMethod(java_path_object, get_stroke_color);
+
+    // Set PathObject Data Stroke Mode and Stroke Color.
+    path_object->is_stroke_ = (java_stroke_color != NULL);
+    if (path_object->is_stroke_) {
+        path_object->stroke_color_ = ToNativeColor(env, java_stroke_color);
+    }
+
+    // Get Java PathObject Stroke Width.
+    static jmethodID get_stroke_width =
+            env->GetMethodID(path_object_class, "getStrokeWidth", funcsig("F").c_str());
+    jfloat stroke_width = env->CallFloatMethod(java_path_object, get_stroke_width);
+
+    // Set PathObject Data Stroke Width.
+    path_object->stroke_width_ = stroke_width;
+
+    return path_object;
+}
+
+std::unique_ptr<ImageObject> ToNativeImageObject(JNIEnv* env, jobject java_image_object) {
+    // Create ImageObject Data Instance.
+    auto image_object = std::make_unique<ImageObject>();
+
+    // Get Ref to Java ImageObject Class.
+    static jclass image_object_class = GetPermClassRef(env, kImageObject);
+
+    // Get the bitmap from the Java ImageObject.
+    static jmethodID get_bitmap =
+            env->GetMethodID(image_object_class, "getBitmap", funcsig(kBitmap).c_str());
+    jobject java_bitmap = env->CallObjectMethod(java_image_object, get_bitmap);
+
+    // Create an FPDF_BITMAP from the Android Bitmap.
+    void* bitmap_pixels;
+    if (AndroidBitmap_lockPixels(env, java_bitmap, &bitmap_pixels) < 0) {
+        return nullptr;
+    }
+
+    AndroidBitmapInfo bitmap_info;
+    AndroidBitmap_getInfo(env, java_bitmap, &bitmap_info);
+    const int stride = bitmap_info.width * 4;
+
+    // Set ImageObject Data Bitmap
+    image_object->bitmap_ = ScopedFPDFBitmap(FPDFBitmap_CreateEx(
+            bitmap_info.width, bitmap_info.height, FPDFBitmap_BGRA, bitmap_pixels, stride));
+
+    // Unlock the Android Bitmap
+    AndroidBitmap_unlockPixels(env, java_bitmap);
+
+    return image_object;
+}
+
 std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_object,
                                                ICoordinateConverter* converter) {
     // Find Java PageObject class and GetType
@@ -704,108 +961,11 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
 
     switch (static_cast<PageObject::Type>(page_object_type)) {
         case PageObject::Type::Path: {
-            // Create PathObject Data Instance.
-            auto path_object = std::make_unique<PathObject>();
-
-            // Get Ref to Java PathObject Class.
-            static jclass path_object_class = GetPermClassRef(env, kPathObject);
-
-            // Get Path from Java PathObject.
-            static jmethodID to_path =
-                    env->GetMethodID(path_object_class, "toPath", funcsig(kPath).c_str());
-            jobject java_path = env->CallObjectMethod(java_page_object, to_path);
-
-            // Find Java Path Class.
-            static jclass path_class = GetPermClassRef(env, kPath);
-
-            // Get the Approximate Array for the Path.
-            static jmethodID approximate = env->GetMethodID(path_class, "approximate", "(F)[F");
-            // The acceptable error while approximating a Path Curve with a line.
-            static const float acceptable_error = 0.5f;
-            jfloatArray java_approximate =
-                    (jfloatArray)env->CallObjectMethod(java_path, approximate, acceptable_error);
-            const jsize size = env->GetArrayLength(java_approximate);
-
-            // Copy Java Array to Native Array
-            float path_approximate[size];
-            env->GetFloatArrayRegion(java_approximate, 0, size, path_approximate);
-
-            // Set PathObject Data PathSegments.
-            auto& segments = path_object->segments;
-            for (int i = 0; i < size; i += 3) {
-                // Get DeviceToPage Coordinates
-                Point_f output =
-                        converter->DeviceToPage({path_approximate[i + 1], path_approximate[i + 2]});
-                if (i == 0 || path_approximate[i] == path_approximate[i - 3]) {
-                    segments.emplace_back(PathObject::Segment::Command::Move, output.x, output.y);
-                } else {
-                    segments.emplace_back(PathObject::Segment::Command::Line, output.x, output.y);
-                }
-            }
-
-            // Get Java PathObject Fill Color.
-            static jmethodID get_fill_color =
-                    env->GetMethodID(path_object_class, "getFillColor", funcsig(kColor).c_str());
-            jobject java_fill_color = env->CallObjectMethod(java_page_object, get_fill_color);
-
-            // Set PathObject Data Fill Mode and Fill Color
-            path_object->is_fill_mode = (java_fill_color != NULL);
-            if (path_object->is_fill_mode) {
-                path_object->fill_color = ToNativeColor(env, java_fill_color);
-            }
-
-            // Get Java PathObject Stroke Color.
-            static jmethodID get_stroke_color =
-                    env->GetMethodID(path_object_class, "getStrokeColor", funcsig(kColor).c_str());
-            jobject java_stroke_color = env->CallObjectMethod(java_page_object, get_stroke_color);
-
-            // Set PathObject Data Stroke Mode and Stroke Color.
-            path_object->is_stroke = (java_stroke_color != NULL);
-            if (path_object->is_stroke) {
-                path_object->stroke_color = ToNativeColor(env, java_stroke_color);
-            }
-
-            // Get Java PathObject Stroke Width.
-            static jmethodID get_stroke_width =
-                    env->GetMethodID(path_object_class, "getStrokeWidth", funcsig("F").c_str());
-            jfloat stroke_width = env->CallFloatMethod(java_page_object, get_stroke_width);
-
-            // Set PathObject Data Stroke Width.
-            path_object->stroke_width = stroke_width;
-
-            page_object = std::move(path_object);
+            page_object = ToNativePathObject(env, java_page_object, converter);
             break;
         }
         case PageObject::Type::Image: {
-            // Create ImageObject Data Instance.
-            auto image_object = std::make_unique<ImageObject>();
-
-            // Get Ref to Java ImageObject Class.
-            static jclass image_object_class = GetPermClassRef(env, kImageObject);
-
-            // Get the bitmap from the Java ImageObject
-            static jmethodID get_bitmap =
-                    env->GetMethodID(image_object_class, "getBitmap", funcsig(kBitmap).c_str());
-            jobject java_bitmap = env->CallObjectMethod(java_page_object, get_bitmap);
-
-            // Create an FPDF_BITMAP from the Android Bitmap
-            void* bitmap_pixels;
-            if (AndroidBitmap_lockPixels(env, java_bitmap, &bitmap_pixels) < 0) {
-                break;
-            }
-
-            AndroidBitmapInfo bitmap_info;
-            AndroidBitmap_getInfo(env, java_bitmap, &bitmap_info);
-            const int stride = bitmap_info.width * 4;
-
-            // Set ImageObject Data Bitmap
-            image_object->bitmap = ScopedFPDFBitmap(FPDFBitmap_CreateEx(
-                    bitmap_info.width, bitmap_info.height, FPDFBitmap_BGRA, bitmap_pixels, stride));
-
-            // Unlock the Android Bitmap
-            AndroidBitmap_unlockPixels(env, java_bitmap);
-
-            page_object = std::move(image_object);
+            page_object = ToNativeImageObject(env, java_page_object);
             break;
         }
         default:
@@ -826,9 +986,9 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
     env->GetFloatArrayRegion(java_matrix_array, 0, 9, transform);
 
     // Set PageObject Data Matrix.
-    page_object->matrix = {transform[0 /*kMScaleX*/], transform[3 /*kMSkewY*/],
-                           transform[1 /*kMSkewX*/],  transform[4 /*kMScaleY*/],
-                           transform[2 /*kMTransX*/], transform[5 /*kMTransY*/]};
+    page_object->matrix_ = {transform[0 /*kMScaleX*/], transform[3 /*kMSkewY*/],
+                            transform[1 /*kMSkewX*/],  transform[4 /*kMScaleY*/],
+                            transform[2 /*kMTransX*/], transform[5 /*kMTransY*/]};
 
     return page_object;
 }
@@ -909,7 +1069,7 @@ jobject ToJavaFreeTextAnnotation(JNIEnv* env, const Annotation* annotation,
                                              funcsig("V", kRectF, kString).c_str());
 
     // Get Java String for text content.
-    jobject java_string = wstringToJstringUTF16(env, freetext_annotation->GetTextContent());
+    jobject java_string = ToJavaString(env, freetext_annotation->GetTextContent());
     // Create Java FreeTextAnnotation Object.
     jobject java_freetext_annotation =
             env->NewObject(freetext_annotation_class, init, java_bounds, java_string);
@@ -1022,7 +1182,7 @@ std::unique_ptr<Annotation> ToNativeFreeTextAnnotation(JNIEnv* env, jobject java
             static_cast<jstring>(env->CallObjectMethod(java_annotation, get_text_content));
 
     // Set the TextContent
-    std::wstring native_text_content = jStringToWstring(env, java_text_content);
+    std::wstring native_text_content = ToNativeWideString(env, java_text_content);
     freetext_annotation->SetTextContent(native_text_content);
 
     // Get the text color

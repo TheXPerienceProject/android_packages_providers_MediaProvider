@@ -173,6 +173,7 @@ android_test {
     resource_dirs: [
         "main_res",
         "res",
+        "photopicker_res",
     ],
 
     srcs: [

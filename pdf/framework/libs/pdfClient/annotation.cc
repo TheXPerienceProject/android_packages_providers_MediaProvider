@@ -18,7 +18,9 @@
 
 #include <utils/pdf_strings.h>
 
+#include "image_object.h"
 #include "logging.h"
+#include "path_object.h"
 
 #define LOG_TAG "annotation"
 
@@ -33,7 +35,7 @@ std::vector<PageObject*> StampAnnotation::GetObjects() const {
     return page_objects;
 }
 
-bool StampAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) {
+bool StampAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) {
     int num_of_objects = FPDFAnnot_GetObjectCount(fpdf_annot);
 
     for (int object_index = 0; object_index < num_of_objects; object_index++) {
@@ -56,7 +58,7 @@ bool StampAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) {
             }
         }
 
-        if (page_object_ && !page_object_->PopulateFromFPDFInstance(page_object)) {
+        if (page_object_ && !page_object_->PopulateFromFPDFInstance(page_object, page)) {
             LOGE("Failed to get all the data corresponding to object with index "
                  "%d ",
                  object_index);
@@ -96,7 +98,7 @@ ScopedFPDFAnnotation StampAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT documen
 
     std::vector<PageObject*> pageObjects = GetObjects();
     for (auto pageObject : pageObjects) {
-        ScopedFPDFPageObject scoped_page_object = pageObject->CreateFPDFInstance(document);
+        ScopedFPDFPageObject scoped_page_object = pageObject->CreateFPDFInstance(document, page);
 
         if (!scoped_page_object) {
             LOGE("Failed to create page object to add in the stamp annotation");
@@ -112,7 +114,8 @@ ScopedFPDFAnnotation StampAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT documen
     return scoped_annot;
 }
 
-bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) {
+bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                                           FPDF_PAGE page) {
     if (FPDFAnnot_GetSubtype(fpdf_annot) != FPDF_ANNOT_STAMP) {
         LOGE("Unsupported operation - can't update a stamp annotation with some other type of "
              "annotation");
@@ -147,7 +150,7 @@ bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCU
     // Rewrite
     std::vector<PageObject*> newPageObjects = GetObjects();
     for (auto pageObject : newPageObjects) {
-        ScopedFPDFPageObject scoped_page_object = pageObject->CreateFPDFInstance(document);
+        ScopedFPDFPageObject scoped_page_object = pageObject->CreateFPDFInstance(document, page);
 
         if (!scoped_page_object) {
             LOGE("Failed to create new page object to add in the stamp annotation");
@@ -162,7 +165,7 @@ bool StampAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCU
     return true;
 }
 
-bool HighlightAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) {
+bool HighlightAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) {
     // Get color
     unsigned int R;
     unsigned int G;
@@ -189,14 +192,15 @@ ScopedFPDFAnnotation HighlightAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT doc
         return nullptr;
     }
 
-    if (!this->UpdatePdfiumInstance(scoped_annot.get(), document)) {
+    if (!this->UpdatePdfiumInstance(scoped_annot.get(), document, page)) {
         LOGE("Failed to create highlight annotation with given parameters");
     }
 
     return scoped_annot;
 }
 
-bool HighlightAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) {
+bool HighlightAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                                               FPDF_PAGE page) {
     if (FPDFAnnot_GetSubtype(fpdf_annot) != FPDF_ANNOT_HIGHLIGHT) {
         LOGE("Unsupported operation - can't update a highlight annotation with some other type of "
              "annotation");
@@ -236,7 +240,7 @@ bool FreeTextAnnotation::GetTextContentFromPdfium(FPDF_ANNOTATION fpdf_annot,
     return true;
 }
 
-bool FreeTextAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) {
+bool FreeTextAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) {
     // Pass a empty buffer to get the length of the text contents.
     unsigned long text_length = FPDFAnnot_GetStringValue(fpdf_annot, kContents, nullptr, 0);
     if (text_length == 0) {
@@ -274,14 +278,15 @@ ScopedFPDFAnnotation FreeTextAnnotation::CreatePdfiumInstance(FPDF_DOCUMENT docu
         return nullptr;
     }
 
-    if (!UpdatePdfiumInstance(scoped_annot.get(), document)) {
+    if (!UpdatePdfiumInstance(scoped_annot.get(), document, page)) {
         LOGE("Failed to create FreeText Annotation with given parameters");
     }
 
     return scoped_annot;
 }
 
-bool FreeTextAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) {
+bool FreeTextAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                                              FPDF_PAGE page) {
     if (FPDFAnnot_GetSubtype(fpdf_annot) != FPDF_ANNOT_FREETEXT) {
         LOGE("Unsupported operation - can't update a freetext annotation with some other type of "
              "annotation");

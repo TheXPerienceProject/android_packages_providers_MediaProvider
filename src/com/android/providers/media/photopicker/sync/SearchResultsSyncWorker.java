@@ -44,8 +44,8 @@ import androidx.work.ListenableWorker;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
+import com.android.providers.media.photopicker.v2.PhotopickerSyncHelper;
 import com.android.providers.media.photopicker.v2.PickerNotificationSender;
 import com.android.providers.media.photopicker.v2.model.SearchRequest;
 import com.android.providers.media.photopicker.v2.model.SearchSuggestionRequest;
@@ -73,6 +73,8 @@ public class SearchResultsSyncWorker extends Worker {
     private final Context mContext;
     private final CancellationSignal mCancellationSignal;
     private boolean mMarkedSyncWorkAsComplete = false;
+    private final PhotopickerSyncHelper mPhotopickerSyncHelper;
+    private final SQLiteDatabase mDatabase;
 
     /**
      * Creates an instance of the {@link Worker}.
@@ -87,6 +89,8 @@ public class SearchResultsSyncWorker extends Worker {
 
         mContext = context;
         mCancellationSignal = new CancellationSignal();
+        mPhotopickerSyncHelper = new PhotopickerSyncHelper();
+        mDatabase = mPhotopickerSyncHelper.getDatabase();
     }
 
     @NonNull
@@ -113,7 +117,7 @@ public class SearchResultsSyncWorker extends Worker {
                     syncSource, syncAuthority, searchRequestId));
 
             final SearchRequest searchRequest = SearchRequestDatabaseUtil
-                    .getSearchRequestDetails(getDatabase(), searchRequestId);
+                    .getSearchRequestDetails(mDatabase, searchRequestId);
             validateWorkInput(syncSource, syncAuthority, searchRequestId, searchRequest);
 
             syncWithSource(syncSource, syncAuthority, searchRequestId, searchRequest);
@@ -158,7 +162,7 @@ public class SearchResultsSyncWorker extends Worker {
                 maybeResetResumeKey(searchRequestId, searchRequest, authority, syncSource);
         if (resetResumeKey) {
             searchRequest = requireNonNull(SearchRequestDatabaseUtil
-                    .getSearchRequestDetails(getDatabase(), searchRequestId));
+                    .getSearchRequestDetails(mDatabase, searchRequestId));
         }
 
         final Pair<String, String> resumeKey = getResumeKey(searchRequest, syncSource);
@@ -187,13 +191,14 @@ public class SearchResultsSyncWorker extends Worker {
 
                     List<ContentValues> contentValues =
                             SearchResultsDatabaseUtil.extractContentValuesList(
-                                    searchRequestId, cursor, isLocal(authority));
+                                    searchRequestId, cursor,
+                                    mPhotopickerSyncHelper.isAuthorityLocal(authority));
 
                     throwIfWorkerStopped();
                     throwIfCloudProviderHasChanged(authority);
 
                     int numberOfRowsInserted = SearchResultsDatabaseUtil
-                            .cacheSearchResults(getDatabase(), authority, contentValues,
+                            .cacheSearchResults(mDatabase, authority, contentValues,
                                     mCancellationSignal);
 
                     nextPageToken = getResumePageToken(cursor.getExtras());
@@ -229,8 +234,8 @@ public class SearchResultsSyncWorker extends Worker {
                 throwIfWorkerStopped();
                 setResumeKey(searchRequest, nextPageToken, syncSource);
                 SearchRequestDatabaseUtil
-                        .updateResumeKey(getDatabase(), searchRequestId, SYNC_COMPLETE_RESUME_KEY,
-                                authority, isLocal(authority));
+                        .updateResumeKey(mDatabase, searchRequestId, SYNC_COMPLETE_RESUME_KEY,
+                                authority, mPhotopickerSyncHelper.isAuthorityLocal(authority));
             }
         }
     }
@@ -251,27 +256,29 @@ public class SearchResultsSyncWorker extends Worker {
                     authority));
 
             try {
-                getDatabase().beginTransaction();
+                mDatabase.beginTransaction();
 
                 SearchRequestDatabaseUtil.clearSyncResumeInfo(
-                        getDatabase(), List.of(searchRequestId), isLocal(authority));
+                        mDatabase, List.of(searchRequestId),
+                        mPhotopickerSyncHelper.isAuthorityLocal(authority));
                 SearchResultsDatabaseUtil.clearObsoleteSearchResults(
-                        getDatabase(), List.of(searchRequestId), isLocal(authority));
+                        mDatabase, List.of(searchRequestId),
+                        mPhotopickerSyncHelper.isAuthorityLocal(authority));
 
                 // Check if this worker has stopped and the current sync request is obsolete before
                 // committing the change.
                 throwIfWorkerStopped();
                 throwIfCloudProviderHasChanged(authority);
 
-                if (getDatabase().inTransaction()) {
-                    getDatabase().setTransactionSuccessful();
+                if (mDatabase.inTransaction()) {
+                    mDatabase.setTransactionSuccessful();
                 }
                 return true;
             } catch (RuntimeException e) {
                 Log.e(TAG, "Could not clear sync resume info", e);
             } finally {
-                if (getDatabase().inTransaction()) {
-                    getDatabase().endTransaction();
+                if (mDatabase.inTransaction()) {
+                    mDatabase.endTransaction();
                 }
             }
         }
@@ -380,7 +387,7 @@ public class SearchResultsSyncWorker extends Worker {
 
         // Check if the input authority matches the current provider.
         if (syncSource == SYNC_LOCAL_ONLY) {
-            final String localAuthority = getLocalProviderAuthority();
+            final String localAuthority = mPhotopickerSyncHelper.getLocalProviderAuthority();
             if (!authority.equals(localAuthority)) {
                 throw new RequestObsoleteException(String.format(
                         Locale.ROOT,
@@ -391,7 +398,7 @@ public class SearchResultsSyncWorker extends Worker {
                 );
             }
         } else {
-            final String cloudAuthority = getCurrentCloudProviderAuthority();
+            final String cloudAuthority = mPhotopickerSyncHelper.getCurrentCloudProviderAuthority();
             if (!authority.equals(cloudAuthority)) {
                 throw new RequestObsoleteException(String.format(
                         Locale.ROOT,
@@ -421,7 +428,8 @@ public class SearchResultsSyncWorker extends Worker {
             if (searchSuggestionRequest.getSearchSuggestion().getSearchSuggestionType()
                     == SEARCH_SUGGESTION_ALBUM) {
                 final boolean isLocal =
-                        isLocal(searchSuggestionRequest.getSearchSuggestion().getAuthority());
+                        mPhotopickerSyncHelper.isAuthorityLocal(
+                                searchSuggestionRequest.getSearchSuggestion().getAuthority());
 
                 if (isLocal && syncSource == SYNC_CLOUD_ONLY) {
                     throw new IllegalArgumentException(
@@ -439,11 +447,12 @@ public class SearchResultsSyncWorker extends Worker {
     private void throwIfCloudProviderHasChanged(@NonNull String authority)
             throws RequestObsoleteException {
         // Local provider's authority cannot change.
-        if (isLocal(authority)) {
+        if (mPhotopickerSyncHelper.isAuthorityLocal(authority)) {
             return;
         }
 
-        final String currentCloudAuthority = getCurrentCloudProviderAuthority();
+        final String currentCloudAuthority =
+                mPhotopickerSyncHelper.getCurrentCloudProviderAuthority();
         if (!authority.equals(currentCloudAuthority)) {
             throw new RequestObsoleteException("Cloud provider authority has changed. "
                     + " Current cloud provider authority: " + currentCloudAuthority
@@ -455,26 +464,6 @@ public class SearchResultsSyncWorker extends Worker {
         if (isStopped()) {
             throw new RequestObsoleteException("Work is stopped " + getId());
         }
-    }
-
-    private boolean isLocal(@NonNull String authority) {
-        final String localAuthority = getLocalProviderAuthority();
-        return localAuthority != null && localAuthority.equals(authority);
-    }
-
-    @Nullable
-    private String getLocalProviderAuthority() {
-        return PickerSyncController.getInstanceOrThrow().getLocalProvider();
-    }
-
-    @Nullable
-    private String getCurrentCloudProviderAuthority() {
-        return PickerSyncController.getInstanceOrThrow()
-                .getCloudProviderOrDefault(/* defaultValue */ null);
-    }
-
-    private SQLiteDatabase getDatabase() {
-        return PickerSyncController.getInstanceOrThrow().getDbFacade().getDatabase();
     }
 
     @Override

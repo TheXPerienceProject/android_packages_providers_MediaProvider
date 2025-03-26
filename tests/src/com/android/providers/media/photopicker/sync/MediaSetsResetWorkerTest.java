@@ -17,6 +17,10 @@
 package com.android.providers.media.photopicker.sync;
 
 import static com.android.providers.media.photopicker.PickerSyncController.LOCAL_PICKER_PROVIDER_AUTHORITY;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_CLOUD_ONLY;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_AUTHORITY;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_CATEGORY_ID;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_SYNC_SOURCE;
 import static com.android.providers.media.photopicker.sync.SyncWorkerTestUtils.initializeTestWorkManager;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.CLOUD_ID_1;
 import static com.android.providers.media.photopicker.util.PickerDbTestUtils.CLOUD_ID_2;
@@ -43,6 +47,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.provider.CloudMediaProviderContract;
 
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.work.Data;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
@@ -51,6 +56,7 @@ import com.android.providers.media.cloudproviders.SearchProvider;
 import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.data.PickerDatabaseHelper;
 import com.android.providers.media.photopicker.data.PickerDbFacade;
+import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
 import com.android.providers.media.photopicker.v2.sqlite.MediaInMediaSetsDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.MediaSetsDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.PickerSQLConstants;
@@ -64,6 +70,7 @@ import org.mockito.Mock;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 public class MediaSetsResetWorkerTest {
@@ -113,7 +120,7 @@ public class MediaSetsResetWorkerTest {
 
     @Test
     public void testMediaSetsAndMediaSetsContentCacheReset() throws
-            ExecutionException, InterruptedException   {
+            ExecutionException, InterruptedException, RequestObsoleteException {
         Cursor c = getCursorForMediaSetInsertionTest();
         List<String> mimeTypes = new ArrayList<>();
         mimeTypes.add(mMimeType);
@@ -146,6 +153,10 @@ public class MediaSetsResetWorkerTest {
         // Setup
         final OneTimeWorkRequest request =
                 new OneTimeWorkRequest.Builder(MediaSetsResetWorker.class)
+                        .setInputData(new Data(Map.of(
+                                SYNC_WORKER_INPUT_SYNC_SOURCE, SYNC_CLOUD_ONLY,
+                                SYNC_WORKER_INPUT_CATEGORY_ID, mCategoryId,
+                                SYNC_WORKER_INPUT_AUTHORITY, mAuthority)))
                         .build();
 
         final WorkManager workManager = WorkManager.getInstance(mContext);

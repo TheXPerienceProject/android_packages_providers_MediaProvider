@@ -16,8 +16,12 @@
 
 package com.android.providers.media.photopicker.sync;
 
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_AUTHORITY;
+import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_CATEGORY_ID;
 import static com.android.providers.media.photopicker.sync.PickerSyncManager.SYNC_WORKER_INPUT_SYNC_SOURCE;
 import static com.android.providers.media.photopicker.sync.SyncTrackerRegistry.markMediaSetsSyncAsComplete;
+
+import static java.util.Objects.requireNonNull;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
@@ -33,9 +37,11 @@ import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteEx
 import com.android.providers.media.photopicker.v2.sqlite.MediaInMediaSetsDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.MediaSetsDatabaseUtil;
 
+import java.util.List;
+
 /**
- * This worker is responsible for cleaning up the cached media sets or media sets content based
- * on the type input reset parameter received
+ * This worker is responsible for cleaning up the cached media sets or media sets content for the
+ * given categoryId
  */
 public class MediaSetsResetWorker extends Worker {
     private static final String TAG = "MediaSetsResetWorker";
@@ -50,6 +56,8 @@ public class MediaSetsResetWorker extends Worker {
 
         final int syncSource = getInputData().getInt(SYNC_WORKER_INPUT_SYNC_SOURCE,
                 /* defaultValue */ -1);
+        final String categoryId = getInputData().getString(SYNC_WORKER_INPUT_CATEGORY_ID);
+        final String authority = getInputData().getString(SYNC_WORKER_INPUT_AUTHORITY);
 
         // Do not allow endless re-runs of this worker, if this isn't the original run,
         // just fail and wait until the next scheduled run.
@@ -58,18 +66,24 @@ public class MediaSetsResetWorker extends Worker {
             return ListenableWorker.Result.failure();
         }
 
-        boolean isMediaSetsTableDeleted = clearMediaSetsCache(syncSource);
-        boolean isMediaInMediaSetsTabledDeleted = clearMediaSetsContentCache();
+        boolean isMediaInMediaSetsCacheDeleted = clearMediaSetsContentCache(categoryId, authority);
+        boolean isMediaSetsCacheDeleted = clearMediaSetsCache(syncSource, categoryId, authority);
 
         // Both the tables were cleared. Mark the worker's run as success
-        if (isMediaSetsTableDeleted && isMediaInMediaSetsTabledDeleted) {
+        if (isMediaSetsCacheDeleted && isMediaInMediaSetsCacheDeleted) {
             return ListenableWorker.Result.success();
         }
 
         return ListenableWorker.Result.failure();
     }
 
-    private boolean clearMediaSetsCache(int syncSource) {
+    private boolean clearMediaSetsCache(int syncSource,
+                                        @NonNull String categoryId,
+                                        @NonNull String authority) {
+
+        requireNonNull(categoryId);
+        requireNonNull(authority);
+
         SQLiteDatabase database = getDatabase();
 
         try {
@@ -77,7 +91,7 @@ public class MediaSetsResetWorker extends Worker {
 
             database.beginTransaction();
 
-            MediaSetsDatabaseUtil.clearMediaSetsCache(database);
+            MediaSetsDatabaseUtil.clearMediaSetsCache(database, categoryId, authority);
 
             if (database.inTransaction()) {
                 database.setTransactionSuccessful();
@@ -97,7 +111,12 @@ public class MediaSetsResetWorker extends Worker {
         }
     }
 
-    private boolean clearMediaSetsContentCache() {
+    private boolean clearMediaSetsContentCache(
+            @NonNull String categoryId,
+            @NonNull String authority) {
+
+        requireNonNull(categoryId);
+        requireNonNull(authority);
 
         SQLiteDatabase database = getDatabase();
 
@@ -106,7 +125,10 @@ public class MediaSetsResetWorker extends Worker {
 
             database.beginTransaction();
 
-            MediaInMediaSetsDatabaseUtil.clearMediaInMediaSetsCache(database);
+            List<String> mediaSetPickerIds = MediaSetsDatabaseUtil
+                    .getMediaSetPickerIdsForGivenCategoryId(database, categoryId, authority);
+            MediaInMediaSetsDatabaseUtil.clearMediaInMediaSetsCache(
+                    database, mediaSetPickerIds);
 
             if (database.inTransaction()) {
                 database.setTransactionSuccessful();

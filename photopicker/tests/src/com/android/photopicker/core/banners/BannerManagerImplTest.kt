@@ -77,6 +77,17 @@ import org.mockito.MockitoAnnotations
 @OptIn(ExperimentalCoroutinesApi::class)
 class BannerManagerImplTest {
 
+    /**
+     * Class that exposes the @hide api [targetUserId] in order to supply proper values for
+     * reflection based code that is inspecting this field.
+     *
+     * @property targetUserId
+     */
+    private class ReflectedResolveInfo(@JvmField val targetUserId: Int) : ResolveInfo() {
+
+        override fun isCrossProfileIntentForwarderActivity(): Boolean = true
+    }
+
     // Isolate the test device by providing a test wrapper around device config so that the
     // tests can control the flag values that are returned.
     val deviceConfigProxy = TestDeviceConfigProxyImpl()
@@ -149,8 +160,7 @@ class BannerManagerImplTest {
         whenever(mockUserManager.isManagedProfile(USER_ID_MANAGED)) { true }
         whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
 
-        val mockResolveInfo = mock(ResolveInfo::class.java)
-        whenever(mockResolveInfo.isCrossProfileIntentForwarderActivity()) { true }
+        val mockResolveInfo = ReflectedResolveInfo(USER_ID_MANAGED)
         whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
             listOf(mockResolveInfo)
         }
@@ -160,13 +170,13 @@ class BannerManagerImplTest {
                 resources.getDrawable(R.drawable.android, /* theme= */ null)
             }
             whenever(mockUserManager.getProfileLabel()) { PLATFORM_PROVIDED_PROFILE_LABEL }
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIMARY))
-            @JvmSerializableLambda {
-                UserProperties.Builder().build()
-            }
+            whenever(
+                mockUserManager.getUserProperties(USER_HANDLE_PRIMARY)
+            ) @JvmSerializableLambda { UserProperties.Builder().build() }
             // By default, allow managed profile to be available
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED))
-            @JvmSerializableLambda {
+            whenever(
+                mockUserManager.getUserProperties(USER_HANDLE_MANAGED)
+            ) @JvmSerializableLambda {
                 UserProperties.Builder()
                     .setCrossProfileContentSharingStrategy(
                         UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT

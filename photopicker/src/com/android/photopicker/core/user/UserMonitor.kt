@@ -311,6 +311,11 @@ class UserMonitor(
      */
     private fun getIsCrossProfileAllowedForHandle(handle: UserHandle): Boolean {
 
+        // Early exit conditions
+        if (handle == processOwnerUserHandle) {
+            return true
+        }
+
         // First, check if cross profile is delegated to parent profile
         if (SdkLevel.isAtLeastV()) {
             val properties: UserProperties = userManager.getUserProperties(handle)
@@ -323,14 +328,21 @@ class UserMonitor(
                 properties.getCrossProfileContentSharingStrategy() ==
                     UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
             ) {
-                return true
+                val parent = userManager.getProfileParent(handle)
+
+                parent?.let {
+                    return getIsCrossProfileAllowedForHandle(it)
+                }
+
+                // Couldn't resolve parent, fail closed.
+                return false
             }
         }
 
         // As a last resort, no applicable cross profile information found, so inspect the current
         // configuration and if there is an intent set, try to see
         // if there is a matching CrossProfileIntentForwarder
-        return configuration.value.doesCrossProfileIntentForwarderExists(packageManager)
+        return configuration.value.doesCrossProfileIntentForwarderExists(packageManager, handle)
     }
 
     /**

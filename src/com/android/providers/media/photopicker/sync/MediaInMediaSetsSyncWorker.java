@@ -29,6 +29,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.OperationCanceledException;
 import android.provider.CloudMediaProviderContract;
 import android.util.Log;
 import android.util.Pair;
@@ -40,8 +41,8 @@ import androidx.work.ListenableWorker;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import com.android.providers.media.photopicker.PickerSyncController;
 import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
+import com.android.providers.media.photopicker.v2.PhotopickerSyncHelper;
 import com.android.providers.media.photopicker.v2.PickerNotificationSender;
 import com.android.providers.media.photopicker.v2.sqlite.MediaInMediaSetsDatabaseUtil;
 import com.android.providers.media.photopicker.v2.sqlite.MediaSetsDatabaseUtil;
@@ -67,12 +68,14 @@ public class MediaInMediaSetsSyncWorker extends Worker {
     private final CancellationSignal mCancellationSignal;
     private final SQLiteDatabase mDatabase;
     private boolean mMarkedSyncWorkAsComplete = false;
+    private final PhotopickerSyncHelper mPhotopickerSyncHelper;
 
     public MediaInMediaSetsSyncWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
         mContext = context;
         mCancellationSignal = new CancellationSignal();
-        mDatabase = getDatabase();
+        mPhotopickerSyncHelper = new PhotopickerSyncHelper();
+        mDatabase = mPhotopickerSyncHelper.getDatabase();
     }
 
     @NonNull
@@ -133,7 +136,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
             int syncSource, @NonNull String mediaSetId,
             @NonNull Long mediaSetPickerId, @NonNull String mediaSetAuthority,
             @Nullable String[] mimeTypes)
-            throws RequestObsoleteException, IllegalArgumentException {
+            throws RequestObsoleteException, IllegalArgumentException, OperationCanceledException {
         final PickerSearchProviderClient searchClient =
                 PickerSearchProviderClient.create(mContext, mediaSetAuthority);
 
@@ -166,7 +169,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
                             MediaInMediaSetsDatabaseUtil.getMediaContentValuesFromCursor(
                                     mediaInMediaSetsCursor,
                                     mediaSetPickerId,
-                                    isAuthorityLocal(mediaSetAuthority)
+                                    mPhotopickerSyncHelper.isAuthorityLocal(mediaSetAuthority)
                             );
 
                     checkIfWorkerHasStopped();
@@ -223,7 +226,7 @@ public class MediaInMediaSetsSyncWorker extends Worker {
     private Cursor fetchMediaInMediaSetFromCmp(
             @NonNull PickerSearchProviderClient pickerSearchProviderClient,
             @NonNull String mediaSetId, @Nullable String resumePageToken,
-            @Nullable String[] mimeTypes) {
+            @Nullable String[] mimeTypes) throws OperationCanceledException {
         final Cursor cursor = pickerSearchProviderClient.fetchMediasInMediaSetFromCmp(
                 mediaSetId,
                 resumePageToken,
@@ -258,10 +261,11 @@ public class MediaInMediaSetsSyncWorker extends Worker {
 
     private void checkIfCurrentCloudProviderAuthorityHasChanged(@NonNull String authority)
             throws RequestObsoleteException {
-        if (isAuthorityLocal(authority)) {
+        if (mPhotopickerSyncHelper.isAuthorityLocal(authority)) {
             return;
         }
-        final String currentCloudAuthority = getCurrentCloudProviderAuthority();
+        final String currentCloudAuthority =
+                mPhotopickerSyncHelper.getCurrentCloudProviderAuthority();
         if (!authority.equals(currentCloudAuthority)) {
             throw new RequestObsoleteException("Cloud provider authority has changed."
                     + " Sync will not be continued."
@@ -291,23 +295,5 @@ public class MediaInMediaSetsSyncWorker extends Worker {
             Log.e(TAG, "Received empty mediaSetAuthority id to fetch media set items");
             throw new IllegalArgumentException("mediaSetPickerId was an empty string");
         }
-    }
-
-    private boolean isAuthorityLocal(@NonNull String authority) {
-        return getLocalProviderAuthority().equals(authority);
-    }
-
-    @Nullable
-    private String getLocalProviderAuthority() {
-        return PickerSyncController.getInstanceOrThrow().getLocalProvider();
-    }
-
-    @Nullable
-    private String getCurrentCloudProviderAuthority() {
-        return PickerSyncController.getInstanceOrThrow().getCloudProvider();
-    }
-
-    private SQLiteDatabase getDatabase() {
-        return PickerSyncController.getInstanceOrThrow().getDbFacade().getDatabase();
     }
 }

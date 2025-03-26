@@ -209,13 +209,13 @@ public class PermissionUtils {
     }
 
     public static boolean checkIsLegacyStorageGranted(@NonNull Context context, int uid,
-            String packageName, @Nullable String attributionTag, boolean isTargetSdkAtLeastV) {
+            String packageName, boolean isTargetSdkAtLeastV) {
         if (!isTargetSdkAtLeastV && context.getSystemService(AppOpsManager.class)
                 .unsafeCheckOp(OPSTR_LEGACY_STORAGE, uid, packageName) == MODE_ALLOWED) {
             return true;
         }
         // Check OPSTR_NO_ISOLATED_STORAGE app op.
-        return checkNoIsolatedStorageGranted(context, uid, packageName, attributionTag);
+        return checkNoIsolatedStorageGranted(context, uid, packageName);
     }
 
     public static boolean checkPermissionReadAudio(
@@ -385,13 +385,13 @@ public class PermissionUtils {
      * indicates the package is a system gallery.
      */
     public static boolean checkWriteImagesOrVideoAppOps(@NonNull Context context, int uid,
-            @NonNull String packageName, @Nullable String attributionTag) {
+            @NonNull String packageName, @Nullable String attributionTag, boolean forDataDelivery) {
         return checkAppOp(
                 context, OPSTR_WRITE_MEDIA_IMAGES, uid, packageName, attributionTag,
-                generateAppOpMessage(packageName, sOpDescription.get()))
+                generateAppOpMessage(packageName, sOpDescription.get()), forDataDelivery)
                 || checkAppOp(
                         context, OPSTR_WRITE_MEDIA_VIDEO, uid, packageName, attributionTag,
-                generateAppOpMessage(packageName, sOpDescription.get()));
+                generateAppOpMessage(packageName, sOpDescription.get()), forDataDelivery);
     }
 
     /**
@@ -401,7 +401,8 @@ public class PermissionUtils {
             int uid, @NonNull String[] sharedPackageNames, @Nullable String attributionTag) {
         for (String packageName : sharedPackageNames) {
             if (checkAppOp(context, OPSTR_REQUEST_INSTALL_PACKAGES, uid, packageName,
-                    attributionTag, generateAppOpMessage(packageName, sOpDescription.get()))) {
+                    attributionTag, generateAppOpMessage(packageName, sOpDescription.get()),
+                    /*forDataDelivery*/ false)) {
                 return true;
             }
         }
@@ -426,10 +427,9 @@ public class PermissionUtils {
 
     @VisibleForTesting
     static boolean checkNoIsolatedStorageGranted(@NonNull Context context, int uid,
-            @NonNull String packageName, @Nullable String attributionTag) {
+            @NonNull String packageName) {
         final AppOpsManager appOps = context.getSystemService(AppOpsManager.class);
-        int ret = appOps.noteOpNoThrow(OPSTR_NO_ISOLATED_STORAGE, uid, packageName, attributionTag,
-                generateAppOpMessage(packageName, "am instrument --no-isolated-storage"));
+        int ret = appOps.unsafeCheckOpNoThrow(OPSTR_NO_ISOLATED_STORAGE, uid, packageName);
         return ret == AppOpsManager.MODE_ALLOWED;
     }
 
@@ -466,9 +466,10 @@ public class PermissionUtils {
      */
     private static boolean checkAppOp(@NonNull Context context,
             @NonNull String op, int uid, @NonNull String packageName,
-            @Nullable String attributionTag, @Nullable String opMessage) {
+            @Nullable String attributionTag, @Nullable String opMessage, boolean forDataDelivery) {
         final AppOpsManager appOps = context.getSystemService(AppOpsManager.class);
-        final int mode = appOps.noteOpNoThrow(op, uid, packageName, attributionTag, opMessage);
+        final int mode = forDataDelivery ? appOps.noteOpNoThrow(op, uid, packageName,
+                attributionTag, opMessage) : appOps.unsafeCheckOpNoThrow(op, uid, packageName);
         switch (mode) {
             case AppOpsManager.MODE_ALLOWED:
                 return true;

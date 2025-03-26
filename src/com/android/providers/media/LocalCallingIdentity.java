@@ -430,7 +430,7 @@ public class LocalCallingIdentity {
                         context, pid, uid, getPackageName(), attributionTag, forDataDelivery);
             case PERMISSION_IS_SYSTEM_GALLERY:
                 return checkWriteImagesOrVideoAppOps(
-                        context, uid, getPackageName(), attributionTag);
+                        context, uid, getPackageName(), attributionTag, forDataDelivery);
             case PERMISSION_INSTALL_PACKAGES:
                 return checkPermissionInstallPackages(
                         context, pid, uid, getPackageName(), attributionTag);
@@ -475,8 +475,7 @@ public class LocalCallingIdentity {
         // To address b/338519249, we will check for sdk version V+
         boolean targetSdkIsAtLeastV =
                 getTargetSdkVersion() >= Build.VERSION_CODES.VANILLA_ICE_CREAM;
-        return checkIsLegacyStorageGranted(context, uid, getPackageName(), attributionTag,
-                targetSdkIsAtLeastV);
+        return checkIsLegacyStorageGranted(context, uid, getPackageName(), targetSdkIsAtLeastV);
     }
 
     private volatile boolean shouldBypass;
