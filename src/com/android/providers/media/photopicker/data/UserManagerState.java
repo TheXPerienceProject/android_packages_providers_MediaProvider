@@ -21,12 +21,13 @@ import static androidx.core.util.Preconditions.checkNotNull;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresApi;
+import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.pm.UserProperties;
-import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
@@ -44,6 +45,7 @@ import com.android.providers.media.photopicker.data.model.UserId;
 import com.android.providers.media.photopicker.ui.TabFragment;
 import com.android.providers.media.photopicker.util.CrossProfileUtils;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,9 +56,7 @@ import java.util.Map;
  * Interface to query user ids {@link UserId}
  */
 public interface UserManagerState {
-    /**
-     * Whether there are more than 1 user profiles associated with the current user.
-     */
+    /** Whether there are more than 1 user profiles associated with the current user. */
     boolean isMultiUserProfiles();
 
     /**
@@ -73,9 +73,9 @@ public interface UserManagerState {
 
     /**
      * A Map of all the profiles with their cross profile allowed status from current user.
-     * key : userId of a profile
-     * Value : cross profile allowed status of a user profile corresponding to user id with
-     * current user .
+     *
+     * <p>key : userId of a profile Value : cross profile allowed status of a user profile
+     * corresponding to user id with current user .
      */
     @NonNull
     Map<UserId, Boolean> getCrossProfileAllowedStatusForAll();
@@ -86,16 +86,13 @@ public interface UserManagerState {
      */
     int getProfileCount();
 
-    /**
-     *
-     * A {@link MutableLiveData} to check if cross profile interaction allowed or not.
-     */
+    /** A {@link MutableLiveData} to check if cross profile interaction allowed or not. */
     @NonNull
     MutableLiveData<Map<UserId, Boolean>> getCrossProfileAllowed();
 
     /**
-     * A list of all user profile ids including current user that need to be shown
-     * separately in PhotoPicker
+     * A list of all user profile ids including current user that need to be shown separately in
+     * PhotoPicker
      */
     @NonNull
     List<UserId> getAllUserProfileIds();
@@ -105,38 +102,32 @@ public interface UserManagerState {
      */
     void updateProfileOffValuesAndPostCrossProfileStatus();
 
-    /**
-     * Updates on/off values of all the user profiles
-     */
+    /** Updates on/off values of all the user profiles */
     void updateProfileOffValues();
 
-    /**
-     * Waits for Media Provider of the user profile corresponding to userId to be available.
-     */
+    /** Waits for Media Provider of the user profile corresponding to userId to be available. */
     void waitForMediaProviderToBeAvailable(UserId userId);
 
     /**
-     * Get if it is allowed to access the otherUser profile from current user ( current user :
-     * the user profile that started the photo picker activity)
-     **/
+     * Get if it is allowed to access the otherUser profile from current user ( current user : the
+     * user profile that started the photo picker activity)
+     */
     @NonNull
     boolean isCrossProfileAllowedToUser(UserId otherUser);
 
-    /**
-     * A {@link MutableLiveData} to check if there are multiple user profiles or not
-     */
+    /** A {@link MutableLiveData} to check if there are multiple user profiles or not */
     @NonNull
     MutableLiveData<Boolean> getIsMultiUserProfiles();
 
     /**
-     * Resets the user ids. This is usually called as a result of receiving broadcast that
-     * any profile has been added or removed.
+     * Resets the user ids. This is usually called as a result of receiving broadcast that any
+     * profile has been added or removed.
      */
     void resetUserIds();
 
     /**
-     * Resets the user ids and set their cross profile values. This is usually called as a result
-     * of receiving broadcast that any profile has been added or removed.
+     * Resets the user ids and set their cross profile values. This is usually called as a result of
+     * receiving broadcast that any profile has been added or removed.
      */
     void resetUserIdsAndSetCrossProfileValues(Intent intent);
 
@@ -152,39 +143,31 @@ public interface UserManagerState {
     void setIntentAndCheckRestrictions(Intent intent);
 
     /**
-     * Whether cross profile access corresponding to the userID is blocked
-     * by admin for the current user.
+     * Whether cross profile access corresponding to the userID is blocked by admin for the current
+     * user.
      */
     boolean isBlockedByAdmin(UserId userId);
 
-    /**
-     * Whether profile corresponding to the userID is on or off.
-     */
+    /** Whether profile corresponding to the userID is on or off. */
     boolean isProfileOff(UserId userId);
 
-    /**
-     * A map of all user profile labels corresponding to all profile userIds
-     */
+    /** A map of all user profile labels corresponding to all profile userIds */
     Map<UserId, String> getProfileLabelsForAll();
 
     /**
      * Returns whether a user should be shown in the PhotoPicker depending on its quite mode status.
      *
-     * @return One of {@link UserProperties.SHOW_IN_QUIET_MODE_PAUSED},
-     *         {@link UserProperties.SHOW_IN_QUIET_MODE_HIDDEN}, or
-     *         {@link UserProperties.SHOW_IN_QUIET_MODE_DEFAULT} depending on whether the profile
-     *         should be shown in quiet mode or not.
+     * @return One of {@link UserProperties.SHOW_IN_QUIET_MODE_PAUSED}, {@link
+     *     UserProperties.SHOW_IN_QUIET_MODE_HIDDEN}, or {@link
+     *     UserProperties.SHOW_IN_QUIET_MODE_DEFAULT} depending on whether the profile should be
+     *     shown in quiet mode or not.
      */
     int getShowInQuietMode(UserId userId);
 
-    /**
-     * A map of all user profile Icon ids corresponding to all profile userIds
-     */
+    /** A map of all user profile Icon ids corresponding to all profile userIds */
     Map<UserId, Drawable> getProfileBadgeForAll();
 
-    /**
-     * Set a user as a current user profile
-     **/
+    /** Set a user as a current user profile */
     void setUserAsCurrentUserProfile(UserId userId);
 
     /**
@@ -193,8 +176,7 @@ public interface UserManagerState {
     boolean isUserSelectedAsCurrentUserProfile(UserId userId);
 
     /**
-     * Creates an implementation of {@link UserManagerState}.
-     * Todo(b/319067964): make this singleton
+     * Creates an implementation of {@link UserManagerState}. Todo(b/319067964): make this singleton
      */
     static UserManagerState create(Context context) {
         return new RuntimeUserManagerState(context);
@@ -212,37 +194,37 @@ public interface UserManagerState {
         private static final int SHOW_IN_QUIET_MODE_DEFAULT = -1;
 
         private final Context mContext;
-        // This is the user profile that started the photo picker activity. That's why it cannot
-        // change in a UserIdManager instance.
+        // This is the user profile that started the photo picker activity. That's why
+        // it cannot change in a UserIdManager instance.
         private final UserId mCurrentUser;
         private final Handler mHandler;
         private Map<UserId, Runnable> mIsProviderAvailableRunnableMap = new HashMap<>();
 
-        // This is the user profile selected in the photo picker. Photo picker will display media
-        // for this user. It could be different from mCurrentUser.
+        // This is the user profile selected in the photo picker. Photo picker will
+        // display media for this user. It could be different from mCurrentUser.
         private UserId mCurrentUserProfile = null;
 
-        // A map of user profile ids (Except current user) with a Boolean value that represents
-        // whether corresponding user profile is blocked by admin or not.
-        private Map<UserId , Boolean> mIsProfileBlockedByAdminMap = new HashMap<>();
+        // A map of user profile ids (Except current user) with a Boolean value that
+        // represents whether corresponding user profile is blocked by admin or not.
+        private Map<UserId, Boolean> mIsProfileBlockedByAdminMap = new HashMap<>();
 
-        // A map of user profile ids (Except current user) with a Boolean value that represents
-        // whether corresponding user profile is on or off.
-        private Map<UserId , Boolean> mProfileOffStatus = new HashMap<>();
+        // A map of user profile ids (Except current user) with a Boolean value that
+        // represents whether corresponding user profile is on or off.
+        private Map<UserId, Boolean> mProfileOffStatus = new HashMap<>();
         private final MutableLiveData<Boolean> mIsMultiUserProfiles = new MutableLiveData<>();
 
-        // A list of all user profile Ids present on the device that require a separate tab to show
-        // in PhotoPicker. It also includes currentUser/contextUser.
+        // A list of all user profile Ids present on the device that require a separate
+        // tab to show in PhotoPicker. It also includes currentUser/contextUser.
         private List<UserId> mUserProfileIds = new ArrayList<>();
         private UserManager mUserManager;
 
         /**
          * This live data will be posted every time when a user profile change occurs in the
-         * background such as turning on/off/adding/removing a user profile. The complete map
-         * will be reinitiated again in {@link #getCrossProfileAllowedStatusForAll()} and will
-         * be posted into the below mutable live data. This live data will be observed later in
-         * {@link TabFragment}.
-         **/
+         * background such as turning on/off/adding/removing a user profile. The complete map will
+         * be reinitiated again in {@link #getCrossProfileAllowedStatusForAll()} and will be posted
+         * into the below mutable live data. This live data will be observed later in {@link
+         * TabFragment}.
+         */
         private final MutableLiveData<Map<UserId, Boolean>> mCrossProfileAllowedStatus =
                 new MutableLiveData<>();
 
@@ -277,8 +259,8 @@ public interface UserManagerState {
                 return;
             }
 
-            // Here there could be other profiles too , that we do not want to show  anywhere in
-            // photo picker at all.
+            // Here there could be other profiles too , that we do not want to show anywhere
+            // in photo picker at all.
             final List<UserHandle> userProfiles = mUserManager.getUserProfiles();
             if (SdkLevel.isAtLeastV()) {
                 for (UserHandle userHandle : userProfiles) {
@@ -289,13 +271,13 @@ public interface UserManagerState {
                     // an owner profile itself.
                     if (getSystemUser().getIdentifier() != userHandle.getIdentifier()
                             && userProperties.getShowInSharingSurfaces()
-                            == userProperties.SHOW_IN_SHARING_SURFACES_SEPARATE) {
+                                    == userProperties.SHOW_IN_SHARING_SURFACES_SEPARATE) {
                         mUserProfileIds.add(userId);
                     }
                 }
             } else {
-                // if sdk version is less than V, then maximum two profiles with separate tab could
-                // only be available
+                // if sdk version is less than V, then maximum two profiles with separate tab
+                // could only be available
                 for (UserHandle userHandle : userProfiles) {
                     if (mUserManager.isManagedProfile(userHandle.getIdentifier())) {
                         mUserProfileIds.add(UserId.of(userHandle));
@@ -311,7 +293,7 @@ public interface UserManagerState {
         }
 
         @Override
-        public  int getProfileCount() {
+        public int getProfileCount() {
             return mUserProfileIds.size();
         }
 
@@ -364,11 +346,11 @@ public interface UserManagerState {
         @Override
         public void setIntentAndCheckRestrictions(Intent intent) {
             assertMainThread();
-            // The below method should be called even if only one profile is present on the device
-            // because we want to have current profile off value and blocked by admin values in the
-            // corresponding maps
+            // The below method should be called even if only one profile is present on the
+            // device because we want to have current profile off value and blocked by admin
+            // values
+            // in the corresponding maps
             updateCrossProfileValues(intent);
-
         }
 
         @Override
@@ -431,13 +413,14 @@ public interface UserManagerState {
                 }
             }
         }
+
         @Override
         public void waitForMediaProviderToBeAvailable(UserId userId) {
             assertMainThread();
-            // Remove callbacks if any pre-available callbacks are present in the message queue for
-            // given user
+            // Remove callbacks if any pre-available callbacks are present in the message
+            // queue for given user
             stopWaitingForProviderToBeAvailableForUser(userId);
-            if (CrossProfileUtils.isMediaProviderAvailable(userId , mContext)) {
+            if (CrossProfileUtils.isMediaProviderAvailable(userId, mContext)) {
                 mProfileOffStatus.put(userId, false);
                 updateAndPostCrossProfileStatus();
                 return;
@@ -446,37 +429,49 @@ public interface UserManagerState {
         }
 
         private void waitForProviderToBeAvailable(UserId userId, int numOfTries) {
-            // The runnable should make sure to post update on the live data if it is changed.
-            Runnable runnable = () -> {
-                try {
-                    // We stop the recursive check when
-                    // 1. the provider is available
-                    // 2. the profile is in quiet mode, i.e. provider will not be available
-                    // 3. after maximum retries
-                    if (CrossProfileUtils.isMediaProviderAvailable(userId, mContext)) {
-                        mProfileOffStatus.put(userId, false);
-                        updateAndPostCrossProfileStatus();
-                        return;
-                    }
+            // The runnable should make sure to post update on the live data if it is
+            // changed.
+            Runnable runnable =
+                    () -> {
+                        try {
+                            // We stop the recursive check when
+                            // 1. the provider is available
+                            // 2. the profile is in quiet mode, i.e. provider will not be available
+                            // 3. after maximum retries
+                            if (CrossProfileUtils.isMediaProviderAvailable(userId, mContext)) {
+                                mProfileOffStatus.put(userId, false);
+                                updateAndPostCrossProfileStatus();
+                                return;
+                            }
 
-                    if (CrossProfileUtils.isQuietModeEnabled(userId, mContext)) {
-                        return;
-                    }
+                            if (CrossProfileUtils.isQuietModeEnabled(userId, mContext)) {
+                                return;
+                            }
 
-                    if (numOfTries <= PROVIDER_AVAILABILITY_MAX_RETRIES) {
-                        Log.d(TAG, "MediaProvider is not available. Retry after "
-                                + PROVIDER_AVAILABILITY_CHECK_DELAY);
-                        waitForProviderToBeAvailable(userId, numOfTries + 1);
-                        return;
-                    }
+                            if (numOfTries <= PROVIDER_AVAILABILITY_MAX_RETRIES) {
+                                Log.d(
+                                        TAG,
+                                        "MediaProvider is not available. Retry after "
+                                                + PROVIDER_AVAILABILITY_CHECK_DELAY);
+                                waitForProviderToBeAvailable(userId, numOfTries + 1);
+                                return;
+                            }
 
-                    Log.w(TAG, "Failed waiting for MediaProvider for user:" + userId
-                            + " to be available");
-                } catch (Exception e) {
-                    Log.e(TAG, "An error occurred in runnable while waiting for "
-                            + "MediaProvider for user:" + userId + " to be available", e);
-                }
-            };
+                            Log.w(
+                                    TAG,
+                                    "Failed waiting for MediaProvider for user:"
+                                            + userId
+                                            + " to be available");
+                        } catch (Exception e) {
+                            Log.e(
+                                    TAG,
+                                    "An error occurred in runnable while waiting for "
+                                            + "MediaProvider for user:"
+                                            + userId
+                                            + " to be available",
+                                    e);
+                        }
+                    };
             mIsProviderAvailableRunnableMap.put(userId, runnable);
             mHandler.postDelayed(runnable, PROVIDER_AVAILABILITY_CHECK_DELAY);
         }
@@ -536,80 +531,134 @@ public interface UserManagerState {
                 return null;
             }
             return isCrossProfileStrategyDelegatedToParent(userHandle)
-                    ? mUserManager.getProfileParent(userHandle) : userHandle;
+                    ? mUserManager.getProfileParent(userHandle)
+                    : userHandle;
         }
 
-
         /**
-         * {@link #setBlockedByAdminValue(Intent)} Based on  assumption that the only profiles with
-         * {@link UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION} could be systemUser
-         * and managedUser(if available).
+         * Updates Cross Profile access for all UserProfiles in {@code mUserProfileIds}
          *
-         * Todo(b/319567023):Refactor the below {@link #setBlockedByAdminValue(Intent)} to
-         * avoid assumptions mentioned above.
+         * <p>This method looks at a variety of situations for each Profile and decides if the
+         * profile's content is accessible by the current process owner user id.
+         *
+         * <p>- UserProperties attributes for CrossProfileDelegation are checked first -
+         * CrossProfileIntentForwardingActivitys are resolved via the process owner's
+         * PackageManager, and are considered when evaluating cross profile to the target profile.
+         *
+         * <p>- In the event none of the above checks succeeds, the profile is considered to be
+         * inaccessible to the current process user, and is thus marked as "BlockedByAdmin".
+         *
+         * @param intent The intent Photopicker is currently running under, for
+         *     CrossProfileForwardActivity checking.
          */
+        @SuppressLint("DiscouragedPrivateApi")
         private void setBlockedByAdminValue(Intent intent) {
             if (intent == null) {
-                Log.e(TAG, "No intent specified to check if cross profile forwarding is"
-                        + " allowed.");
+                Log.e(
+                        TAG,
+                        "No intent specified to check if cross profile forwarding is"
+                                + " allowed.");
                 return;
             }
 
-            // List of all user profile ids that context user cannot access
-            List<UserId> canNotForwardToUserProfiles = new ArrayList<>();
+            Map<UserId, Boolean> profileIsAccessibleToProcessOwner = new HashMap<>();
+            List<UserId> delegatedFromParent = new ArrayList<>();
 
-            /*
-             * List of all user profile ids that have cross profile access among themselves.
-             * It contains parent user and child profiles with user property
-             * {@link UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT}
-             */
-            List<UserId> parentOrDelegatedFromParent = new ArrayList<>();
+            final PackageManager pm = mContext.getPackageManager();
 
-            // Userprofile to check cross profile intentForwarderActivity for
-            UserHandle needToCheck = null;
-
-            if (mUserManager == null) {
-                Log.e(TAG, "Cannot obtain user manager");
-                return;
-            }
-
+            // Resolve CrossProfile activities for all user profiles that Photopicker is
+            // aware of.
             for (UserId userId : mUserProfileIds) {
-                /*
-                 * All user profiles with user property
-                 * {@link UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT}
-                 * can access each other including its parent.
-                 */
-                if (userId.equals(getSystemUser())
-                        || isCrossProfileStrategyDelegatedToParent(userId.getUserHandle())) {
-                    parentOrDelegatedFromParent.add(userId);
-                } else {
-                    needToCheck = userId.getUserHandle();
+
+                // If the UserId is the system user, exit early.
+                if (userId.getIdentifier() == mCurrentUser.getIdentifier()) {
+                    profileIsAccessibleToProcessOwner.put(userId, true);
+                    continue;
                 }
+
+                // This UserId delegates its strategy to the parent profile
+                if (isCrossProfileStrategyDelegatedToParent(userId.getUserHandle())) {
+                    delegatedFromParent.add(userId);
+                    continue;
+                }
+
+                // Clear out the component & package before attempting to match
+                Intent intentToCheck = (Intent) intent.clone();
+                intentToCheck.setComponent(null);
+                intentToCheck.setPackage(null);
+
+                for (ResolveInfo resolveInfo :
+                        pm.queryIntentActivities(
+                                intentToCheck, PackageManager.MATCH_DEFAULT_ONLY)) {
+
+                    // If the activity is a CrossProfileIntentForwardingActivity, inspect its
+                    // targetUserId to
+                    // see if it targets the user we are currently checking for.
+                    if (resolveInfo.isCrossProfileIntentForwarderActivity()) {
+
+                        /*
+                         * IMPORTANT: This is a reflection based hack to ensure the profile is
+                         * actually the installer of the CrossProfileIntentForwardingActivity.
+                         *
+                         * ResolveInfo.targetUserId exists, but is a hidden API not available to
+                         * mainline modules, and no such API exists, so it is accessed via
+                         * reflection below. All exceptions are caught to protect against
+                         * reflection related issues such as:
+                         * NoSuchFieldException / IllegalAccessException / SecurityException.
+                         *
+                         * In the event of an exception, the code fails "closed" for the current
+                         * profile to avoid showing content that should not be visible.
+                         */
+                        try {
+                            Field targetUserIdField =
+                                    resolveInfo.getClass().getDeclaredField("targetUserId");
+                            targetUserIdField.setAccessible(true);
+                            int targetUserId = (int) targetUserIdField.get(resolveInfo);
+
+                            if (targetUserId == userId.getIdentifier()) {
+                                profileIsAccessibleToProcessOwner.put(userId, true);
+
+                                // Don't need to look further, exit the loop.
+                                break;
+                            }
+
+                        } catch (NoSuchFieldException
+                                | IllegalAccessException
+                                | SecurityException ex) {
+                            // Couldn't check the targetUserId via reflection, so fail without
+                            // further
+                            // iterations.
+                            Log.e(TAG, "Could not access targetUserId via reflection.", ex);
+                            break;
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Exception occurred during cross profile checks", ex);
+                        }
+                    }
+                }
+                // Fail case, was unable to find a suitable Activity for this user.
+                profileIsAccessibleToProcessOwner.putIfAbsent(userId, false);
             }
 
-            // When context user is a managed user , then will replace needToCheck with its parent
-            // to check cross profile intentForwarderActivity for.
-            if (needToCheck != null && needToCheck.equals(mCurrentUser.getUserHandle())) {
-                needToCheck = mUserManager.getProfileParent(mCurrentUser.getUserHandle());
-            }
-
-            final PackageManager packageManager = mContext.getPackageManager();
-            if (needToCheck != null && !CrossProfileUtils.isIntentAllowedCrossProfileAccessFromUser(
-                    intent, packageManager,
-                    getProfileToCheckCrossProfileAccess(mCurrentUser.getUserHandle()))) {
-                if (parentOrDelegatedFromParent.contains(UserId.of(needToCheck))) {
-                    // if user profile cannot access its parent then all direct child profiles with
-                    // delegated from parent will also be inaccessible.
-                    canNotForwardToUserProfiles.addAll(parentOrDelegatedFromParent);
-                } else {
-                    canNotForwardToUserProfiles.add(UserId.of(needToCheck));
-                }
+            // For profiles that delegate their access to the parent, set the access for
+            // those profiles equal to the same as their parent.
+            for (UserId userId : delegatedFromParent) {
+                UserHandle parent =
+                        mUserManager.getProfileParent(UserHandle.of(userId.getIdentifier()));
+                profileIsAccessibleToProcessOwner.put(
+                        userId,
+                        profileIsAccessibleToProcessOwner.getOrDefault(
+                                UserId.of(parent), /* default= */ false));
             }
 
             mIsProfileBlockedByAdminMap.clear();
             for (UserId userId : mUserProfileIds) {
-                mIsProfileBlockedByAdminMap.put(userId,
-                        canNotForwardToUserProfiles.contains(userId));
+                mIsProfileBlockedByAdminMap.put(
+                        // Boolean inversion seems strange, but this map is the opposite of what was
+                        // calculated, (which are blocked, rather than which are accessible) so the
+                        // boolean needs to be inverted.
+                        userId,
+                        !profileIsAccessibleToProcessOwner.getOrDefault(
+                                userId, /* default= */ false));
             }
         }
 
@@ -617,68 +666,79 @@ public interface UserManagerState {
         public Map<UserId, String> getProfileLabelsForAll() {
             assertMainThread();
             Map<UserId, String> profileLabels = new HashMap<>();
-            String personalTabLabel = mContext.getString(R.string.picker_personal_profile_label);
-            profileLabels.put(getSystemUser(), personalTabLabel);
-            if (SdkLevel.isAtLeastV()) {
-                for (UserId userId : mUserProfileIds) {
-                    UserHandle userHandle = userId.getUserHandle();
-                    if (userHandle.getIdentifier() != getSystemUser().getIdentifier()) {
-                        profileLabels.put(userId, getProfileLabel(userHandle));
-                    }
-                }
+            for (UserId userId : mUserProfileIds) {
+                UserHandle userHandle = userId.getUserHandle();
+                profileLabels.put(userId, getProfileLabel(userHandle));
             }
 
             return profileLabels;
         }
+
         private String getProfileLabel(UserHandle userHandle) {
             if (SdkLevel.isAtLeastV()) {
-                Context userContext = mContext.createContextAsUser(userHandle, 0 /* flags */);
                 try {
+                    Context userContext = mContext.createContextAsUser(userHandle, 0 /* flags */);
                     UserManager userManager = userContext.getSystemService(UserManager.class);
                     if (userManager == null) {
                         Log.e(TAG, "Cannot obtain user manager");
                         return null;
                     }
                     return userManager.getProfileLabel();
-                } catch (Resources.NotFoundException e) {
-                    //Todo(b/318530691): Handle the label for the profile that is not defined
-                    // already
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "could not create user context for user.", e);
+                } catch (Exception e) {
+                    Log.e(TAG, "Exception while fetching profile badge", e);
                 }
             }
-            return null;
+
+            // Fall back case if not V, or an error encountered above, return hard coded strings.
+            boolean isPrimaryProfile = mUserManager.getProfileParent(userHandle) == null;
+            boolean isManagedProfile = mUserManager.isManagedProfile(userHandle.getIdentifier());
+
+            int resId;
+            if (isPrimaryProfile) {
+                resId = R.string.photopicker_profile_primary_label;
+            } else if (isManagedProfile) {
+                resId = R.string.photopicker_profile_managed_label;
+            } else {
+                resId = R.string.photopicker_profile_unknown_label;
+            }
+
+            return mContext.getString(resId);
         }
 
         @Override
         public Map<UserId, Drawable> getProfileBadgeForAll() {
             assertMainThread();
             Map<UserId, Drawable> profileBadges = new HashMap<>();
-            profileBadges.put(getSystemUser(), mContext.getDrawable(R.drawable.ic_personal_mode));
-            if (SdkLevel.isAtLeastV()) {
-                for (UserId userId : mUserProfileIds) {
-                    UserHandle userHandle = userId.getUserHandle();
-                    if (userHandle.getIdentifier() != getSystemUser().getIdentifier()) {
-                        profileBadges.put(userId, getProfileBadge(userHandle));
-                    }
-                }
+            for (UserId userId : mUserProfileIds) {
+                profileBadges.put(userId, getProfileBadge(userId.getUserHandle()));
             }
             return profileBadges;
         }
 
         private Drawable getProfileBadge(UserHandle userHandle) {
             if (SdkLevel.isAtLeastV()) {
-                Context userContext = mContext.createContextAsUser(userHandle, 0 /* flags */);
                 try {
+                    Context userContext = mContext.createContextAsUser(userHandle, 0 /* flags */);
                     UserManager userManager = userContext.getSystemService(UserManager.class);
                     if (userManager == null) {
                         Log.e(TAG, "Cannot obtain user manager");
                         return null;
                     }
                     return userManager.getUserBadge();
-                } catch (Resources.NotFoundException e) {
-                    //Todo(b/318530691): Handle the icon for the profile that is not defined already
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "could not create user context for user.", e);
+                } catch (Exception e) {
+                    Log.e(TAG, "Exception while fetching profile badge", e);
                 }
             }
-            return null;
+
+            // Fall back case if not V, or an error encountered above, return hard coded icons.
+            boolean isManagedProfile = mUserManager.isManagedProfile(userHandle.getIdentifier());
+            int drawable =
+                    isManagedProfile ? R.drawable.ic_work_outline : R.drawable.ic_personal_mode;
+            return mContext.getDrawable(drawable);
         }
 
         @Override
@@ -707,6 +767,7 @@ public interface UserManagerState {
             assertMainThread();
             return mIsProfileBlockedByAdminMap.get(userId);
         }
+
         @Override
         public boolean isProfileOff(UserId userId) {
             assertMainThread();
@@ -716,10 +777,15 @@ public interface UserManagerState {
         private void assertMainThread() {
             if (Looper.getMainLooper().isCurrentThread()) return;
 
-            throw new IllegalStateException("UserManagerState methods are expected to be called"
-                    + "from main thread. " + (Looper.myLooper() == null ? "" : "Current thread "
-                    + Looper.myLooper().getThread() + ", Main thread "
-                    + Looper.getMainLooper().getThread()));
+            throw new IllegalStateException(
+                    "UserManagerState methods are expected to be called"
+                            + "from main thread. "
+                            + (Looper.myLooper() == null
+                                    ? ""
+                                    : "Current thread "
+                                            + Looper.myLooper().getThread()
+                                            + ", Main thread "
+                                            + Looper.getMainLooper().getThread()));
         }
     }
 }

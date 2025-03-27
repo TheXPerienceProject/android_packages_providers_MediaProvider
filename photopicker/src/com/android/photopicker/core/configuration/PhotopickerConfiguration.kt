@@ -22,6 +22,7 @@ import android.content.pm.ResolveInfo
 import android.media.ApplicationMediaCapabilities
 import android.net.Uri
 import android.os.SystemProperties
+import android.os.UserHandle
 import android.provider.MediaStore
 import android.util.Log
 import com.android.photopicker.core.navigation.PhotopickerDestinations
@@ -88,16 +89,21 @@ data class PhotopickerConfiguration(
 
     /**
      * Use the internal Intent to see if the Intent can be resolved as a
-     * CrossProfileIntentForwarderActivity
+     * CrossProfileIntentForwarderActivity for the target user.
      *
      * This method exists to limit the visibility of the intent field, but [UserMonitor] requires
      * the intent to check for CrossProfileIntentForwarder's. Rather than exposing intent as a
      * public field, this method can be called to do the check, if an Intent exists.
      *
+     * @param packageManager the PM of the process owner
+     * @param handle the [UserHandle] of the target user
      * @return Whether the current Intent Photopicker may be running under has a matching
      *   CrossProfileIntentForwarderActivity
      */
-    fun doesCrossProfileIntentForwarderExists(packageManager: PackageManager): Boolean {
+    fun doesCrossProfileIntentForwarderExists(
+        packageManager: PackageManager,
+        targetUserHandle: UserHandle,
+    ): Boolean {
 
         val intentToCheck: Intent? =
             when (runtimeEnv) {
@@ -121,9 +127,61 @@ data class PhotopickerConfiguration(
                 packageManager.queryIntentActivities(it, PackageManager.MATCH_DEFAULT_ONLY)) {
                 info?.let {
                     if (it.isCrossProfileIntentForwarderActivity()) {
-                        // This profile can handle cross profile content
-                        // from the current context profile
-                        return true
+
+                        /*
+                         * IMPORTANT: This is a reflection based hack to ensure the profile is actually
+                         * the installer of the CrossProfileIntentForwardingActivity.
+                         *
+                         * ResolveInfo.targetUserId exists, but is a hidden API not available to
+                         * mainline modules, and no such API exists, so it is accessed via reflection
+                         * below. All exceptions are caught to protect against reflection related
+                         * issues such as:
+                         * NoSuchFieldException / IllegalAccessException / SecurityException.
+                         *
+                         * In the event of an exception, the code fails "closed" for the current
+                         * profile to avoid showing content that should not be visible.
+                         */
+                        val activityTargetUserId =
+                            try {
+                                val property =
+                                    it::class.java.getDeclaredField("targetUserId").apply {
+                                        isAccessible = true
+                                    }
+                                property?.get(it) as? Int
+                            } catch (e: Exception) {
+                                when (e) {
+                                    is NoSuchFieldException,
+                                    is IllegalAccessException,
+                                    is SecurityException -> {
+                                        Log.e(
+                                            ConfigurationManager.TAG,
+                                            "Could not reflect targetUserId field for cross " +
+                                                "profile checks.",
+                                        )
+                                        // Any time we are unable to obtain the cross profile
+                                        // targetUserId, fail closed by returning false.
+                                        return@doesCrossProfileIntentForwarderExists false
+                                    }
+                                    else -> {
+                                        Log.e(
+                                            ConfigurationManager.TAG,
+                                            "Exception occurred during cross profile checks",
+                                            e,
+                                        )
+                                        null
+                                    }
+                                }
+                            }
+                        if (activityTargetUserId == targetUserHandle.getIdentifier()) {
+                            Log.d(
+                                ConfigurationManager.TAG,
+                                "Found matching CrossProfileIntentForwarderActivity for " +
+                                    "targetUserId ${targetUserHandle.getIdentifier()}",
+                            )
+                            // This profile can handle cross profile content
+                            // from the current context profile
+                            return true
+                        }
                     }
                 }
             }

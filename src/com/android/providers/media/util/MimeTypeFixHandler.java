@@ -44,7 +44,10 @@ public final class MimeTypeFixHandler {
 
     private static final String TAG = "MimeTypeFixHandler";
     private static final Map<String, String> sExtToMimeType = new HashMap<>();
+    private static final Map<String, String> sMimeTypeToExt = new HashMap<>();
+
     private static final Map<String, String> sCorruptedExtToMimeType = new HashMap<>();
+    private static final Map<String, String> sCorruptedMimeTypeToExt = new HashMap<>();
 
     /**
      * Loads MIME type mappings from the classpath resource if not already loaded.
@@ -58,13 +61,14 @@ public final class MimeTypeFixHandler {
         }
 
         if (sExtToMimeType.isEmpty()) {
-            parseTypes(context, R.raw.mime_types, sExtToMimeType);
+            parseTypes(context, R.raw.mime_types, sExtToMimeType, sMimeTypeToExt);
             // this will add or override the extension to mime type mapping
-            parseTypes(context, R.raw.android_mime_types, sExtToMimeType);
+            parseTypes(context, R.raw.android_mime_types, sExtToMimeType, sMimeTypeToExt);
             Log.v(TAG, "MIME types loaded");
         }
         if (sCorruptedExtToMimeType.isEmpty()) {
-            parseTypes(context, R.raw.corrupted_mime_types, sCorruptedExtToMimeType);
+            parseTypes(context, R.raw.corrupted_mime_types, sCorruptedExtToMimeType,
+                    sCorruptedMimeTypeToExt);
             Log.v(TAG, "Corrupted MIME types loaded");
         }
 
@@ -77,7 +81,8 @@ public final class MimeTypeFixHandler {
      * @param resource the mime.type resource
      * @param mapping  the map to populate with file extension (key) to MIME type (value) mappings
      */
-    private static void parseTypes(Context context, int resource, Map<String, String> mapping) {
+    private static void parseTypes(Context context, int resource, Map<String, String> extToMimeType,
+            Map<String, String> mimeTypeToExt) {
         try (InputStream inputStream = context.getResources().openRawResource(resource)) {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
                 String line;
@@ -92,10 +97,24 @@ public final class MimeTypeFixHandler {
                     if (tokens.length < 2) {
                         continue;
                     }
-                    String mimeType = tokens[0];
+                    String mimeType = tokens[0].toLowerCase(Locale.ROOT);
+                    String firstExt = tokens[1].toLowerCase(Locale.ROOT);
+                    if (firstExt.startsWith("?")) {
+                        firstExt = firstExt.substring(1);
+                        if (firstExt.isEmpty()) {
+                            continue;
+                        }
+                    }
+
                     // ?mime ext1 ?ext2 ext3
                     if (mimeType.toLowerCase(Locale.ROOT).startsWith("?")) {
                         mimeType = mimeType.substring(1); // Remove the "?"
+                        if (mimeType.isEmpty()) {
+                            continue;
+                        }
+                        mimeTypeToExt.putIfAbsent(mimeType, firstExt);
+                    } else {
+                        mimeTypeToExt.put(mimeType, firstExt);
                     }
 
                     for (int i = 1; i < tokens.length; i++) {
@@ -103,11 +122,9 @@ public final class MimeTypeFixHandler {
                         boolean putIfAbsent = extension.startsWith("?");
                         if (putIfAbsent) {
                             extension = extension.substring(1); // Remove the "?"
-                            if (!mapping.containsKey(extension)) {
-                                mapping.put(extension, mimeType);
-                            }
+                            extToMimeType.putIfAbsent(extension, mimeType);
                         } else {
-                            mapping.put(extension, mimeType);
+                            extToMimeType.put(extension, mimeType);
                         }
                     }
                 }
@@ -137,6 +154,31 @@ public final class MimeTypeFixHandler {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Gets file extension from MIME type.
+     *
+     * @param mimeType The MIME type.
+     * @return Optional file extension, or empty.
+     */
+    static Optional<String> getExtFromMimeType(String mimeType) {
+        mimeType = mimeType.toLowerCase(Locale.ROOT);
+        return Optional.ofNullable(sMimeTypeToExt.get(mimeType));
+    }
+
+    /**
+     * Checks if a MIME type is corrupted.
+     *
+     * @param mimeType The MIME type.
+     * @return {@code true} if corrupted, {@code false} otherwise.
+     */
+    static boolean isCorruptedMimeType(String mimeType) {
+        if (sMimeTypeToExt.containsKey(mimeType)) {
+            return false;
+        }
+
+        return sCorruptedMimeTypeToExt.containsKey(mimeType);
     }
 
 

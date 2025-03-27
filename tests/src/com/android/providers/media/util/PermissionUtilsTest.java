@@ -162,7 +162,7 @@ public class PermissionUtilsTest {
         final Context context = getContext();
         final int uid = android.os.Process.myUid();
         final String packageName = context.getPackageName();
-        assertThat(checkNoIsolatedStorageGranted(context, uid, packageName, null)).isFalse();
+        assertThat(checkNoIsolatedStorageGranted(context, uid, packageName)).isFalse();
     }
 
     @Test
@@ -177,7 +177,7 @@ public class PermissionUtilsTest {
             assertThat(checkPermissionShell(testAppUid)).isFalse();
             assertThat(
                     checkIsLegacyStorageGranted(getContext(), testAppUid, packageName,
-                            null, /* isTargetSdkAtLeastS */ false)).isFalse();
+                            /* isTargetSdkAtLeastS */ false)).isFalse();
             assertThat(
                     checkPermissionInstallPackages(getContext(), TEST_APP_PID, testAppUid,
                             packageName, null)).isFalse();
@@ -212,7 +212,7 @@ public class PermissionUtilsTest {
             assertThat(checkPermissionSelf(getContext(), TEST_APP_PID, testAppUid)).isFalse();
             assertThat(checkPermissionShell(testAppUid)).isFalse();
             assertThat(checkIsLegacyStorageGranted(getContext(), testAppUid, packageName,
-                        null,  /* isTargetSdkAtLeastV */ false)).isFalse();
+                    /* isTargetSdkAtLeastV */ false)).isFalse();
             assertThat(checkPermissionInstallPackages(
                         getContext(), TEST_APP_PID, testAppUid, packageName, null)).isFalse();
             assertThat(checkPermissionAccessMtp(
@@ -242,7 +242,7 @@ public class PermissionUtilsTest {
             assertThat(checkPermissionSelf(getContext(), TEST_APP_PID, testAppUid)).isFalse();
             assertThat(checkPermissionShell(testAppUid)).isFalse();
             assertThat(checkIsLegacyStorageGranted(getContext(), testAppUid, packageName,
-                    null,  /* isTargetSdkAtLeastV */ true)).isFalse();
+                    /* isTargetSdkAtLeastV */ true)).isFalse();
             assertThat(checkPermissionInstallPackages(
                     getContext(), TEST_APP_PID, testAppUid, packageName, null)).isFalse();
             assertThat(checkPermissionAccessMtp(
@@ -279,7 +279,7 @@ public class PermissionUtilsTest {
 
             assertThat(
                     checkIsLegacyStorageGranted(getContext(), testAppUid, packageName,
-                            null, /* isTargetSdkAtLeastS */ false)).isFalse();
+                            /* isTargetSdkAtLeastS */ false)).isFalse();
             assertThat(
                     checkPermissionInstallPackages(getContext(), TEST_APP_PID, testAppUid,
                         packageName, null)).isFalse();
@@ -328,7 +328,7 @@ public class PermissionUtilsTest {
 
             assertThat(
                     checkIsLegacyStorageGranted(getContext(), testAppUid, packageName,
-                            null, /* isTargetSdkAtLeastS */ false)).isTrue();
+                            /* isTargetSdkAtLeastS */ false)).isTrue();
             assertThat(
                     checkPermissionInstallPackages(getContext(), TEST_APP_PID, testAppUid,
                             packageName, null)).isFalse();
@@ -429,18 +429,15 @@ public class PermissionUtilsTest {
 
         try {
             assertThat(
-                    checkNoIsolatedStorageGranted(getContext(), testAppUid, packageName,
-                            null)).isFalse();
+                    checkNoIsolatedStorageGranted(getContext(), testAppUid, packageName)).isFalse();
 
             modifyAppOp(testAppUid, OPSTR_NO_ISOLATED_STORAGE, AppOpsManager.MODE_ALLOWED);
             assertThat(
-                    checkNoIsolatedStorageGranted(getContext(), testAppUid, packageName,
-                            null)).isTrue();
+                    checkNoIsolatedStorageGranted(getContext(), testAppUid, packageName)).isTrue();
 
             modifyAppOp(testAppUid, OPSTR_NO_ISOLATED_STORAGE, AppOpsManager.MODE_ERRORED);
             assertThat(
-                    checkNoIsolatedStorageGranted(getContext(), testAppUid, packageName,
-                            null)).isFalse();
+                    checkNoIsolatedStorageGranted(getContext(), testAppUid, packageName)).isFalse();
         } finally {
             dropShellPermission();
         }
@@ -689,7 +686,8 @@ public class PermissionUtilsTest {
     static private void checkPermissionsForGallery(int uid, int pid, String packageName,
             boolean expected) {
         assertEquals(expected,
-                checkWriteImagesOrVideoAppOps(getContext(), uid, packageName, null));
+                checkWriteImagesOrVideoAppOps(getContext(), uid, packageName, null,
+                        /* forDataDelivery */ true));
         assertEquals(expected,
                 checkPermissionWriteImages(getContext(), pid, uid, packageName, null,
                         /* forDataDelivery */ true));

@@ -117,6 +117,7 @@ import com.android.providers.media.photopicker.data.PickerDatabaseHelper;
 import com.android.providers.media.photopicker.data.PickerDbFacade;
 import com.android.providers.media.photopicker.data.model.UserId;
 import com.android.providers.media.photopicker.sync.PickerSyncLockManager;
+import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
 import com.android.providers.media.photopicker.v2.model.MediaGroup;
 import com.android.providers.media.photopicker.v2.model.MediaInMediaSetSyncRequestParams;
 import com.android.providers.media.photopicker.v2.model.MediaSetsSyncRequestParams;
@@ -815,7 +816,7 @@ public class PickerDataLayerV2Test {
     }
 
     @Test
-    public void testQueryMediaSets() {
+    public void testQueryMediaSets() throws RequestObsoleteException {
         List<String> mimeTypes = new ArrayList<>();
         mimeTypes.add("image/*");
         String mediaSetId1 = "mediaSetId1";
@@ -1030,7 +1031,7 @@ public class PickerDataLayerV2Test {
     }
 
     @Test
-    public void testQueryMediaInMediaSet() {
+    public void testQueryMediaInMediaSet() throws RequestObsoleteException {
         final Cursor cursor1 = getLocalMediaCursor(LOCAL_ID_1, 0);
         assertAddMediaOperation(mFacade, LOCAL_PROVIDER, cursor1, 1);
         final Cursor cursor2 = getLocalMediaCursor(LOCAL_ID_2, 0);

@@ -26,6 +26,7 @@
 #include "form_widget_info.h"
 #include "page.h"
 #include "page_object.h"
+#include "path_object.h"
 #include "rect.h"
 
 using pdfClient::Annotation;

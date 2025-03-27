@@ -61,6 +61,7 @@ android_app {
 
     resource_dirs: [
         "res",
+        "photopicker/res",
     ],
     srcs: [
         ":mediaprovider-sources",

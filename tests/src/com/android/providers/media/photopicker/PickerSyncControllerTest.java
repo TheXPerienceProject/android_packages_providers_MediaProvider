@@ -25,6 +25,7 @@ import static com.android.providers.media.util.BackgroundThreadUtils.waitForIdle
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -59,6 +60,7 @@ import com.android.providers.media.photopicker.data.CloudProviderInfo;
 import com.android.providers.media.photopicker.data.PickerDatabaseHelper;
 import com.android.providers.media.photopicker.data.PickerDbFacade;
 import com.android.providers.media.photopicker.sync.PickerSyncLockManager;
+import com.android.providers.media.photopicker.util.exceptions.RequestObsoleteException;
 import com.android.providers.media.photopicker.util.exceptions.UnableToAcquireLockException;
 import com.android.providers.media.photopicker.v2.model.ProviderCollectionInfo;
 
@@ -2099,6 +2101,70 @@ public class PickerSyncControllerTest {
         waitForIdle();
         assertWithMessage("Cloud media queries should be enabled.")
                 .that(mFacade.getCloudProvider()).isEqualTo(CLOUD_PRIMARY_PROVIDER_AUTHORITY);
+    }
+
+    @Test
+    public void testIsFullSyncPending() throws RequestObsoleteException {
+        mController.setCloudProvider(/* authority */ CLOUD_PRIMARY_PROVIDER_AUTHORITY);
+        assertWithMessage("Full sync should be pending after setting the CMP.")
+                .that(mController.isFullSyncPending(CLOUD_PRIMARY_PROVIDER_AUTHORITY, false))
+                .isTrue();
+
+        mController.syncAllMedia();
+        assertWithMessage("Full sync should be completed after syncing with the CMP.")
+                .that(mController.isFullSyncPending(CLOUD_PRIMARY_PROVIDER_AUTHORITY, false))
+                .isFalse();
+
+        // First Page of data
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_1);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_2);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_3);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_4);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_5);
+        // Second Page of data
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_6);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_7);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_8);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_9);
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_10);
+        // Third Page of data
+        addMedia(mCloudFlakyMediaGenerator, CLOUD_ONLY_11);
+
+        mController.setCloudProvider(/* authority */ FLAKY_CLOUD_PROVIDER_AUTHORITY);
+        assertWithMessage("Full sync should be pending after setting the CMP.")
+                .that(mController.isFullSyncPending(FLAKY_CLOUD_PROVIDER_AUTHORITY, false))
+                .isTrue();
+
+        // FlakyCloudMediaProvider will throw errors on 2 out of 3 requests, if we sync once, it
+        // should not be able to complete the sync.
+        mController.syncAllMedia();
+        assertWithMessage("Full sync should still be pending because it was stopped in between.")
+                .that(mController.isFullSyncPending(FLAKY_CLOUD_PROVIDER_AUTHORITY, false))
+                .isTrue();
+
+        mController.syncAllMedia();
+        mController.syncAllMedia();
+        mController.syncAllMedia();
+        assertWithMessage("Full sync should be complete now.")
+                .that(mController.isFullSyncPending(FLAKY_CLOUD_PROVIDER_AUTHORITY, false))
+                .isFalse();
+    }
+
+    @Test
+    public void testIsFullSyncPendingForStaleCMP() throws RequestObsoleteException {
+        mController.setCloudProvider(/* authority */ CLOUD_PRIMARY_PROVIDER_AUTHORITY);
+        assertWithMessage("Full sync should be pending after setting the CMP.")
+                .that(mController.isFullSyncPending(CLOUD_PRIMARY_PROVIDER_AUTHORITY, false))
+                .isTrue();
+
+        mController.syncAllMedia();
+        assertWithMessage("Full sync should be completed after syncing with the CMP.")
+                .that(mController.isFullSyncPending(CLOUD_PRIMARY_PROVIDER_AUTHORITY, false))
+                .isFalse();
+
+        assertThrows(RequestObsoleteException.class,
+                () -> mController.isFullSyncPending(
+                        CLOUD_SECONDARY_PROVIDER_AUTHORITY, false));
     }
 
     private static void addMedia(MediaGenerator generator, Pair<String, String> media) {
