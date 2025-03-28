@@ -42,9 +42,10 @@ class Annotation {
     Rectangle_f GetBounds() const { return bounds_; }
     void SetBounds(Rectangle_f bounds) { bounds_ = bounds; }
 
-    virtual bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) = 0;
+    virtual bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) = 0;
     virtual ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) = 0;
-    virtual bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) = 0;
+    virtual bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                                      FPDF_PAGE page) = 0;
 
   private:
     Type type_;
@@ -73,9 +74,10 @@ class StampAnnotation : public Annotation {
         pageObjects_.erase(it);
     }
 
-    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) override;
+    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) override;
     ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) override;
-    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) override;
+    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                              FPDF_PAGE page) override;
 
   private:
     std::vector<std::unique_ptr<PageObject>> pageObjects_;
@@ -88,9 +90,10 @@ class HighlightAnnotation : public Annotation {
     Color GetColor() const { return color_; }
     void SetColor(Color color) { color_ = color; }
 
-    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) override;
+    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) override;
     ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) override;
-    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) override;
+    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                              FPDF_PAGE page) override;
 
   private:
     Color color_;
@@ -110,9 +113,10 @@ class FreeTextAnnotation : public Annotation {
     Color GetBackgroundColor() const { return background_color_; }
     void SetBackgroundColor(Color color) { background_color_ = color; }
 
-    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot) override;
+    bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) override;
     ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) override;
-    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document) override;
+    bool UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_DOCUMENT document,
+                              FPDF_PAGE page) override;
 
   private:
     std::wstring text_content_;

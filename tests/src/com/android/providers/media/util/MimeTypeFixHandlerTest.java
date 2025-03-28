@@ -17,6 +17,7 @@
 package com.android.providers.media.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -94,6 +95,35 @@ public class MimeTypeFixHandlerTest {
         Optional<String> ecmascriptMimeType = MimeTypeFixHandler.getMimeType("es");
         assertTrue(ecmascriptMimeType.isPresent());
         assertEquals("application/ecmascript", ecmascriptMimeType.get());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MIME_TYPE_FIX_FOR_ANDROID_15)
+    public void testIsCorruptedMimeType() {
+        // jpeg present in mime.types mapping
+        assertFalse(MimeTypeFixHandler.isCorruptedMimeType("image/jpeg"));
+
+        // avif present in android.mime.types mapping
+        assertFalse(MimeTypeFixHandler.isCorruptedMimeType("image/avif"));
+
+        // dwg in corrupted mapping
+        assertTrue(MimeTypeFixHandler.isCorruptedMimeType("image/vnd.dwg"));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MIME_TYPE_FIX_FOR_ANDROID_15)
+    public void testGetExtFromMimeType() {
+        // jpeg present in mime.types mapping
+        Optional<String> jpegExtension = MimeTypeFixHandler.getExtFromMimeType("image/jpeg");
+        assertTrue(jpegExtension.isPresent());
+
+        // avif present in android.mime.types mapping
+        Optional<String> avifExtension = MimeTypeFixHandler.getExtFromMimeType("image/avif");
+        assertTrue(avifExtension.isPresent());
+
+        // dwg in corrupted mapping
+        Optional<String> dwgExtension = MimeTypeFixHandler.getExtFromMimeType("image/vnd.dwg");
+        assertFalse(dwgExtension.isPresent());
     }
 
     @Test

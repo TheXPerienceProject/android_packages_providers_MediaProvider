@@ -289,20 +289,76 @@ public class MediaSetsDatabaseUtil {
     /**
      * Deletes all the rows from the MediaSets table
      */
-    public static void clearMediaSetsCache(@NonNull SQLiteDatabase database) {
+    public static void clearMediaSetsCache(
+            @NonNull SQLiteDatabase database,
+            @NonNull String categoryId,
+            @NonNull String authority) {
 
         requireNonNull(database);
+        requireNonNull(categoryId);
+        requireNonNull(authority);
 
+        String whereClause = PickerSQLConstants.MediaSetsTableColumns.CATEGORY_ID.getColumnName()
+                + " = ? AND "
+                + PickerSQLConstants.MediaSetsTableColumns.MEDIA_SET_AUTHORITY.getColumnName()
+                + " = ?";
+        String[] whereArgs = new String[] { categoryId, authority };
         try {
             int deletedRows = database.delete(
                     PickerSQLConstants.Table.MEDIA_SETS.name(),
-                    /*whereClause*/ null,
-                    /*whereClauseArgs*/ null);
+                    whereClause,
+                    whereArgs);
 
             Log.d(TAG, "Deleted " + deletedRows + " rows from the media sets table.");
         } catch (Exception exception) {
             Log.e(TAG, "couldn't clear the media sets table due to " + exception);
         }
+    }
+
+    /**
+     * Fetches the generated database ids, also called media_set_picker_id for the given
+     * categoryId
+     */
+    public static List<String> getMediaSetPickerIdsForGivenCategoryId(
+            @NonNull SQLiteDatabase database,
+            @NonNull String categoryId,
+            @NonNull String authority) {
+
+        requireNonNull(database);
+        requireNonNull(categoryId);
+        requireNonNull(authority);
+
+        List<String> mediaSetPickerIds = new ArrayList<>();
+
+        final List<String> projection = List.of(
+                PickerSQLConstants.MediaSetsTableColumns.PICKER_ID
+                        .getColumnName());
+        final SelectSQLiteQueryBuilder queryBuilder = new SelectSQLiteQueryBuilder(database)
+                .setTables(PickerSQLConstants.Table.MEDIA_SETS.name())
+                .setProjection(projection);
+        queryBuilder.appendWhereStandalone(
+                String.format(Locale.ROOT, " %s = '%s' ",
+                        PickerSQLConstants.MediaSetsTableColumns.CATEGORY_ID.getColumnName(),
+                        categoryId)
+        );
+        queryBuilder.appendWhereStandalone(
+                String.format(Locale.ROOT, " %s = '%s' ",
+                        PickerSQLConstants.MediaSetsTableColumns.MEDIA_SET_AUTHORITY
+                                .getColumnName(),
+                        authority)
+        );
+
+        try (Cursor cursor = database.rawQuery(queryBuilder.buildQuery(), /*selectionArgs*/ null)) {
+            if (cursor.moveToFirst()) {
+                do {
+                    int pickerIdIndex = cursor.getColumnIndex(
+                            PickerSQLConstants.MediaSetsTableColumns.PICKER_ID.getColumnName());
+                    String pickerId = cursor.getString(pickerIdIndex);
+                    mediaSetPickerIds.add(pickerId);
+                } while (cursor.moveToNext());
+            }
+        }
+        return mediaSetPickerIds;
     }
 
     private static List<ContentValues> getMediaSetContentValues(

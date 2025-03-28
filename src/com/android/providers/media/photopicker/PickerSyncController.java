@@ -1469,6 +1469,38 @@ public class PickerSyncController {
         return bundle;
     }
 
+    /**
+     * Checks if full sync is pending for the given CMP.
+     *
+     * @param authority Authority of the CMP that uniquely identifies it.
+     * @param isLocal true of the authority belongs to the local provider, else false.
+     * @return true if full sync is pending for the CMP, else false.
+     * @throws RequestObsoleteException if the input authority is different than the authority of
+     * the current cloud provider.
+     */
+    public boolean isFullSyncPending(@NonNull String authority, boolean isLocal)
+            throws RequestObsoleteException {
+        final ProviderCollectionInfo latestCollectionInfo = isLocal
+                ? getLocalProviderLatestCollectionInfo()
+                : getCloudProviderLatestCollectionInfo();
+
+        if (!authority.equals(latestCollectionInfo.getAuthority())) {
+            throw new RequestObsoleteException(
+                    "Authority has changed to " + latestCollectionInfo.getAuthority());
+        }
+
+        final Bundle cachedPreviousCollectionInfo = getCachedMediaCollectionInfo(isLocal);
+        final String cachedPreviousCollectionId =
+                cachedPreviousCollectionInfo.getString(MEDIA_COLLECTION_ID);
+        final long cachedPreviousGeneration =
+                cachedPreviousCollectionInfo.getLong(LAST_MEDIA_SYNC_GENERATION);
+
+        return isFullSyncRequired(
+                latestCollectionInfo.getCollectionId(),
+                cachedPreviousCollectionId,
+                cachedPreviousGeneration);
+    }
+
     @NonNull
     private SyncRequestParams getSyncRequestParams(@Nullable String authority,
             boolean isLocal) throws RequestObsoleteException, UnableToAcquireLockException {
@@ -1523,7 +1555,7 @@ public class PickerSyncController {
                         + "ID/Gen=" + latestCollectionId + "/" + latestGeneration);
             }
 
-            if (!Objects.equals(latestCollectionId, cachedCollectionId)) {
+            if (isFullSyncWithResetRequired(latestCollectionId, cachedCollectionId)) {
                 result = SyncRequestParams.forFullMediaWithReset(latestMediaCollectionInfo);
 
                 // Update collection info cache.
@@ -1535,7 +1567,8 @@ public class PickerSyncController {
                         new ProviderCollectionInfo(authority, latestCollectionId, latestAccountName,
                                 latestAccountConfigurationIntent);
                 updateLatestKnownCollectionInfoLocked(isLocal, latestCollectionInfo);
-            } else if (cachedGeneration == DEFAULT_GENERATION) {
+            } else if (isFullSyncWithoutResetRequired(
+                    latestCollectionId, cachedCollectionId, cachedGeneration)) {
                 result = SyncRequestParams.forFullMedia(latestMediaCollectionInfo);
             } else if (cachedGeneration == latestGeneration) {
                 result = SyncRequestParams.forNone();
@@ -1546,6 +1579,49 @@ public class PickerSyncController {
         }
         Log.d(TAG, "   RESULT=" + result);
         return result;
+    }
+
+    /**
+     * @param latestCollectionId The latest collection id of the CMP library.
+     * @param cachedCollectionId The last collection id Picker DB was synced with, either fully
+     *                           or partially.
+     * @param cachedGenerationId The last generation id Picker DB was synced with.
+     * @return true if a full sync is pending, else false.
+     */
+    private boolean isFullSyncRequired(
+            @Nullable String latestCollectionId,
+            @Nullable String cachedCollectionId,
+            long cachedGenerationId) {
+        return isFullSyncWithResetRequired(latestCollectionId, cachedCollectionId)
+                || isFullSyncWithoutResetRequired(latestCollectionId, cachedCollectionId,
+                cachedGenerationId);
+    }
+
+    /**
+     * @param latestCollectionId The latest collection id of the CMP library.
+     * @param cachedCollectionId The last collection id Picker DB was synced with, either fully
+     *                           or partially.
+     * @return true if a full sync with reset is pending, else false.
+     */
+    private boolean isFullSyncWithResetRequired(
+            @Nullable String latestCollectionId,
+            @Nullable String cachedCollectionId) {
+        return !Objects.equals(latestCollectionId, cachedCollectionId);
+    }
+
+    /**
+     * @param latestCollectionId The latest collection id of the CMP library.
+     * @param cachedCollectionId The last collection id Picker DB was synced with, either fully
+     *                           or partially.
+     * @param cachedGenerationId The last generation id Picker DB was synced with.
+     * @return true if a resumable full sync is pending, else false.
+     */
+    private boolean isFullSyncWithoutResetRequired(
+            @Nullable String latestCollectionId,
+            @Nullable String cachedCollectionId,
+            long cachedGenerationId) {
+        return Objects.equals(latestCollectionId, cachedCollectionId)
+                && cachedGenerationId == DEFAULT_GENERATION;
     }
 
     private void updateLatestKnownCollectionInfoLocked(

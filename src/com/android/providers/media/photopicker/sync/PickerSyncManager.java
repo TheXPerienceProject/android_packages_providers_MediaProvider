@@ -650,9 +650,10 @@ public class PickerSyncManager {
 
     /**
      * Creates OneTimeWork request for syncing media sets with the given provider.
-     * The existing media sets cache and the media sets content cache is cleared before a new media
-     * sets sync is triggered to ensure accuracy of the media sets metadata stored in the database.
-     * The reset cache and sync requests are chained to ensure correctness of the entire operation.
+     * The existing media sets cache and the media sets content cache for the given categoryId
+     * is cleared before a new media sets sync is triggered to ensure accuracy of the media sets
+     * metadata stored in the database. The reset cache and sync requests are chained to ensure
+     * correctness of the entire operation.
      * @param requestParams The MediaSetsSyncRequestsParams object containing all input parameters
      *                      for creating a sync request
      * @param syncSource Indicates whether the sync is required with the local provider or
@@ -675,15 +676,18 @@ public class PickerSyncManager {
                 buildOneTimeWorkerRequest(MediaSetsSyncWorker.class, syncRequestInputData);
 
         // Create media sets reset request. MediaSets sync are non-resumable.
-        // It's fine to delete the entire cache before a new set is triggered.
-        // The media sets content cache is also completely cleared before we start syncing
-        // any particular media set for its content.
+        // It's fine to delete the entire cache before a new set is triggered for the given
+        // categoryId.
+        // The media sets content cache for media sets belonging to the given categoryId
+        // is also cleared before we start syncing any particular media set for its content.
         // These tables are cleared once per picker session before the media sets sync for this
         // session is triggered. This ensures that the data read from the cache in every session
         // is always in sync with the cloud provider.
-        final Data resetRequestInputData = new Data(Map.of(
-                SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource
-        ));
+        final Map<String, Object> resetRequestInputMap = new HashMap<>();
+        resetRequestInputMap.put(SYNC_WORKER_INPUT_SYNC_SOURCE, syncSource);
+        resetRequestInputMap.put(SYNC_WORKER_INPUT_CATEGORY_ID, requestParams.getCategoryId());
+        resetRequestInputMap.put(SYNC_WORKER_INPUT_AUTHORITY, requestParams.getAuthority());
+        final Data resetRequestInputData = new Data(resetRequestInputMap);
         final OneTimeWorkRequest resetRequest =
                 buildOneTimeWorkerRequest(MediaSetsResetWorker.class, resetRequestInputData);
 

@@ -62,13 +62,23 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.any
 import org.mockito.Mockito.anyInt
-import org.mockito.Mockito.mock
 import org.mockito.MockitoAnnotations
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileSelectorViewModelTest {
+
+    /**
+     * Class that exposes the @hide api [targetUserId] in order to supply proper values for
+     * reflection based code that is inspecting this field.
+     *
+     * @property targetUserId
+     */
+    private class ReflectedResolveInfo(@JvmField val targetUserId: Int) : ResolveInfo() {
+
+        override fun isCrossProfileIntentForwarderActivity(): Boolean = true
+    }
 
     @Mock lateinit var mockContext: Context
     @Mock lateinit var mockUserManager: UserManager
@@ -142,8 +152,9 @@ class ProfileSelectorViewModelTest {
         }
 
         if (SdkLevel.isAtLeastV()) {
-            whenever(mockUserManager.getUserProperties(any(UserHandle::class.java)))
-            @JvmSerializableLambda {
+            whenever(
+                mockUserManager.getUserProperties(any(UserHandle::class.java))
+            ) @JvmSerializableLambda {
                 UserProperties.Builder()
                     .setCrossProfileContentSharingStrategy(
                         UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
@@ -158,8 +169,7 @@ class ProfileSelectorViewModelTest {
             }
             whenever(mockUserManager.getProfileLabel()) { "label" }
         }
-        val mockResolveInfo = mock(ResolveInfo::class.java)
-        whenever(mockResolveInfo.isCrossProfileIntentForwarderActivity()) { true }
+        val mockResolveInfo = ReflectedResolveInfo(USER_ID_MANAGED)
         whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
             listOf(mockResolveInfo)
         }

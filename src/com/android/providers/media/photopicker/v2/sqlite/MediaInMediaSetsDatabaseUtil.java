@@ -61,8 +61,7 @@ public class MediaInMediaSetsDatabaseUtil {
      */
     public static int cacheMediaOfMediaSet(
             @NonNull SQLiteDatabase database,
-            @Nullable List<ContentValues> mediaListToInsert,
-            @NonNull String authority) {
+            @Nullable List<ContentValues> mediaListToInsert, @NonNull String authority) {
 
         requireNonNull(database);
         requireNonNull(authority);
@@ -342,19 +341,41 @@ public class MediaInMediaSetsDatabaseUtil {
     /**
      * Deletes all the rows from the MediaInMediaSets table
      */
-    public static void clearMediaInMediaSetsCache(@NonNull SQLiteDatabase database) {
+    public static void clearMediaInMediaSetsCache(
+            @NonNull SQLiteDatabase database, @NonNull List<String> mediaSetPickerIds) {
 
         requireNonNull(database);
+        requireNonNull(mediaSetPickerIds);
+
+        if (mediaSetPickerIds.isEmpty()) {
+            return;
+        }
+
+        String whereClause =
+                PickerSQLConstants.MediaInMediaSetsTableColumns.MEDIA_SETS_PICKER_ID.getColumnName()
+                        + " IN (" + generatePlaceholders(mediaSetPickerIds.size()) + ")";
+        String[] whereArgs = mediaSetPickerIds.toArray(new String[0]);
 
         try {
             int deletedRows = database.delete(
                     PickerSQLConstants.Table.MEDIA_IN_MEDIA_SETS.name(),
-                    /*whereClause*/ null,
-                    /*whereArgs*/ null);
+                    whereClause,
+                    whereArgs);
 
             Log.d(TAG, "Deleted " + deletedRows + " rows from the media in media sets table");
         } catch (Exception e) {
             Log.d(TAG, "Couldn't clear the media in media sets table due to " + e);
         }
+    }
+
+    private static String generatePlaceholders(int size) {
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < size; i++) {
+            placeholders.append("?");
+            if (i < size - 1) {
+                placeholders.append(",");
+            }
+        }
+        return placeholders.toString();
     }
 }

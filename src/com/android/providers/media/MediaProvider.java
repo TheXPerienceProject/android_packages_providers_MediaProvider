@@ -564,7 +564,7 @@ public class MediaProvider extends ContentProvider {
      * Attempting to send more than 2000 uris will result in an IllegalArgumentException.
      */
     @ChangeId
-    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.BAKLAVA)
+    @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     static final long LIMIT_CREATE_REQUEST_URIS = 203408344L;
 
     @GuardedBy("mPendingOpenInfo")
@@ -7773,7 +7773,8 @@ public class MediaProvider extends ContentProvider {
             String packageName = arg;
             int uid = extras.getInt(MediaStore.EXTRA_IS_SYSTEM_GALLERY_UID);
             boolean isSystemGallery = PermissionUtils.checkWriteImagesOrVideoAppOps(
-                    getContext(), uid, packageName, getContext().getAttributionTag());
+                    getContext(), uid, packageName, getContext().getAttributionTag(),
+                    /*forDataDelivery*/ false);
             Bundle res = new Bundle();
             res.putBoolean(MediaStore.EXTRA_IS_SYSTEM_GALLERY_RESPONSE, isSystemGallery);
             return res;
@@ -11888,14 +11889,15 @@ public class MediaProvider extends ContentProvider {
         final ContentResolver resolver = getContext().getContentResolver();
         final Uri uri = getBaseContentUri(volumeName);
         // TODO(b/182396009) we probably also want to notify clone profile (and vice versa)
-        resolver.notifyChange(getBaseContentUri(volumeName), null);
+        ForegroundThread.getExecutor().execute(() -> {
+            resolver.notifyChange(getBaseContentUri(volumeName), null);
+        });
 
         if (LOGV) Log.v(TAG, "Attached volume: " + volume);
         if (!MediaStore.VOLUME_INTERNAL.equals(volumeName)) {
-            // Also notify on synthetic view of all devices
-            resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
-
             ForegroundThread.getExecutor().execute(() -> {
+                // Also notify on synthetic view of all devices
+                resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
                 mExternalDatabase.runWithTransaction((db) -> {
                     ensureNecessaryFolders(volume, db);
                     return null;
@@ -11956,11 +11958,15 @@ public class MediaProvider extends ContentProvider {
         }
 
         final ContentResolver resolver = getContext().getContentResolver();
-        resolver.notifyChange(getBaseContentUri(volumeName), null);
+        ForegroundThread.getExecutor().execute(() -> {
+            resolver.notifyChange(getBaseContentUri(volumeName), null);
+        });
 
         if (!MediaStore.VOLUME_INTERNAL.equals(volumeName)) {
-            // Also notify on synthetic view of all devices
-            resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
+            ForegroundThread.getExecutor().execute(() -> {
+                // Also notify on synthetic view of all devices
+                resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
+            });
         }
 
         if (LOGV) Log.v(TAG, "Detached volume: " + volumeName);

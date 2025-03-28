@@ -67,6 +67,17 @@ import org.mockito.MockitoAnnotations
 @OptIn(ExperimentalCoroutinesApi::class)
 class UserMonitorTest {
 
+    /**
+     * Class that exposes the @hide api [targetUserId] in order to supply proper values for
+     * reflection based code that is inspecting this field.
+     *
+     * @property targetUserId
+     */
+    private class ReflectedResolveInfo(@JvmField val targetUserId: Int) : ResolveInfo() {
+
+        override fun isCrossProfileIntentForwarderActivity(): Boolean = true
+    }
+
     private val PLATFORM_PROVIDED_PROFILE_LABEL = "Platform Label"
 
     private val USER_HANDLE_PRIMARY: UserHandle
@@ -148,10 +159,10 @@ class UserMonitorTest {
         whenever(mockUserManager.isManagedProfile(USER_ID_MANAGED)) { true }
         whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
 
-        val mockResolveInfo = mock(ResolveInfo::class.java)
-        whenever(mockResolveInfo.isCrossProfileIntentForwarderActivity()) { true }
+        // Fake for a CrossProfileIntentForwarderActivity for the managed profile
+        val resolveInfoForManagedUser = ReflectedResolveInfo(USER_HANDLE_MANAGED.getIdentifier())
         whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
-            listOf(mockResolveInfo)
+            listOf(resolveInfoForManagedUser)
         }
 
         if (SdkLevel.isAtLeastV()) {
@@ -159,13 +170,13 @@ class UserMonitorTest {
                 resources.getDrawable(R.drawable.android, /* theme= */ null)
             }
             whenever(mockUserManager.getProfileLabel()) { PLATFORM_PROVIDED_PROFILE_LABEL }
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIMARY))
-            @JvmSerializableLambda {
-                UserProperties.Builder().build()
-            }
+            whenever(
+                mockUserManager.getUserProperties(USER_HANDLE_PRIMARY)
+            ) @JvmSerializableLambda { UserProperties.Builder().build() }
             // By default, allow managed profile to be available
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED))
-            @JvmSerializableLambda {
+            whenever(
+                mockUserManager.getUserProperties(USER_HANDLE_MANAGED)
+            ) @JvmSerializableLambda {
                 UserProperties.Builder()
                     .setCrossProfileContentSharingStrategy(
                         UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
@@ -208,19 +219,17 @@ class UserMonitorTest {
     fun testProfilesForCrossProfileIntentForwardingVPlus() {
 
         assumeTrue(SdkLevel.isAtLeastV())
-        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED))
-        @JvmSerializableLambda {
+
+        // Since the UserProperties here will return no delegation, this will
+        // have to rely on CrossProfileIntentForwarderActivity found for the managed
+        // user in order to enable cross profile for this profile.
+        // This is already setup in the base setup method.
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) @JvmSerializableLambda {
             UserProperties.Builder()
                 .setCrossProfileContentSharingStrategy(
                     UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
                 )
                 .build()
-        }
-
-        val mockResolveInfo = mock(ResolveInfo::class.java)
-        whenever(mockResolveInfo.isCrossProfileIntentForwarderActivity()) { true }
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
-            listOf(mockResolveInfo)
         }
 
         runTest { // this: TestScope
@@ -250,13 +259,7 @@ class UserMonitorTest {
     /** Ensures profiles with a cross profile forwarding intent are active */
     @Test
     fun testProfilesForCrossProfileIntentForwardingUMinus() {
-
         assumeFalse(SdkLevel.isAtLeastV())
-        val mockResolveInfo = mock(ResolveInfo::class.java)
-        whenever(mockResolveInfo.isCrossProfileIntentForwarderActivity()) { true }
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
-            listOf(mockResolveInfo)
-        }
 
         runTest { // this: TestScope
             userMonitor =
@@ -282,6 +285,468 @@ class UserMonitorTest {
         }
     }
 
+    /** Ensures profiles without a cross profile forwarding intent are disabled */
+    @Test
+    fun testProfilesForCrossProfileIntentManagedDoesNotSupportVPlus() {
+
+        assumeTrue(SdkLevel.isAtLeastV())
+
+        // Since the UserProperties here will return no delegation, this will
+        // have to rely on CrossProfileIntentForwarderActivity found for the managed
+        // user in order to enable cross profile for this profile.
+        // This is already setup in the base setup method.
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
+                )
+                .build()
+        }
+        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+            emptyList<ResolveInfo>()
+        }
+
+        val expectedStatus =
+            UserStatus(
+                activeUserProfile = PRIMARY_PROFILE_BASE,
+                allProfiles =
+                    listOf(
+                        PRIMARY_PROFILE_BASE,
+                        MANAGED_PROFILE_BASE.copy(
+                            disabledReasons =
+                                setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                        ),
+                    ),
+                activeContentResolver = mockContentResolver,
+            )
+
+        runTest { // this: TestScope
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            launch {
+                val reportedStatus = userMonitor.userStatus.first()
+                assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            }
+        }
+    }
+
+    /** Ensures profiles without a cross profile forwarding intent are disabled */
+    @Test
+    fun testProfilesForCrossProfileIntentManagedDoesNotSupportUMinus() {
+
+        assumeFalse(SdkLevel.isAtLeastV())
+
+        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+            emptyList<ResolveInfo>()
+        }
+
+        val expectedStatus =
+            UserStatus(
+                activeUserProfile = PRIMARY_PROFILE_BASE,
+                allProfiles =
+                    listOf(
+                        PRIMARY_PROFILE_BASE,
+                        MANAGED_PROFILE_BASE.copy(
+                            disabledReasons =
+                                setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                        ),
+                    ),
+                activeContentResolver = mockContentResolver,
+            )
+
+        runTest { // this: TestScope
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            launch {
+                val reportedStatus = userMonitor.userStatus.first()
+                assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            }
+        }
+    }
+
+    @Test
+    fun testProfilesForCrossProfileMultipleManagedProfilesOneAllowedVPlus() {
+
+        assumeTrue(SdkLevel.isAtLeastV())
+
+        // Create a second managed profile, apparently that's a thing on some devices.
+        val userIdManagedUnknown = 11
+        val parcel1 = Parcel.obtain()
+        parcel1.writeInt(userIdManagedUnknown)
+        parcel1.setDataPosition(0)
+        val userHandleUnknownManaged = UserHandle(parcel1)
+        parcel1.recycle()
+
+        // Initial setup state: Three profiles (Personal/Work/Work???), all enabled
+        whenever(mockUserManager.userProfiles) {
+            listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, userHandleUnknownManaged)
+        }
+
+        // Default responses for relevant UserManager apis
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_PRIMARY)) { false }
+        whenever(mockUserManager.isManagedProfile(USER_ID_PRIMARY)) { false }
+
+        // Managed 1
+        whenever(mockUserManager.isManagedProfile(USER_ID_MANAGED)) { true }
+        whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_MANAGED)) { false }
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
+                )
+                .build()
+        }
+
+        // Managed 2
+        whenever(mockUserManager.isManagedProfile(userIdManagedUnknown)) { true }
+        whenever(mockUserManager.getProfileParent(userHandleUnknownManaged)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(userHandleUnknownManaged)) { false }
+
+        whenever(
+            mockUserManager.getUserProperties(userHandleUnknownManaged)
+        ) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
+                )
+                .build()
+        }
+
+        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+            listOf(ReflectedResolveInfo(USER_HANDLE_MANAGED.getIdentifier()))
+        }
+
+        val unknownManagedProfileBase =
+            UserProfile(
+                handle = userHandleUnknownManaged,
+                profileType = UserProfile.ProfileType.MANAGED,
+                label = PLATFORM_PROVIDED_PROFILE_LABEL,
+                disabledReasons = setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED),
+            )
+
+        val expectedStatus =
+            UserStatus(
+                activeUserProfile = PRIMARY_PROFILE_BASE,
+                allProfiles =
+                    listOf(PRIMARY_PROFILE_BASE, MANAGED_PROFILE_BASE, unknownManagedProfileBase),
+                activeContentResolver = mockContentResolver,
+            )
+
+        runTest { // this: TestScope
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            launch {
+                val reportedStatus = userMonitor.userStatus.first()
+                assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            }
+        }
+    }
+
+    @Test
+    fun testProfilesForCrossProfileMultipleManagedProfilesOneAllowedUMinus() {
+
+        assumeFalse(SdkLevel.isAtLeastV())
+
+        // Create a second managed profile, apparently that's a thing on some devices.
+        val userIdManagedUnknown = 11
+        val parcel1 = Parcel.obtain()
+        parcel1.writeInt(userIdManagedUnknown)
+        parcel1.setDataPosition(0)
+        val userHandleUnknownManaged = UserHandle(parcel1)
+        parcel1.recycle()
+
+        // Initial setup state: Three profiles (Personal/Work/Work???), all enabled
+        whenever(mockUserManager.userProfiles) {
+            listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, userHandleUnknownManaged)
+        }
+
+        // Default responses for relevant UserManager apis
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_PRIMARY)) { false }
+        whenever(mockUserManager.isManagedProfile(USER_ID_PRIMARY)) { false }
+
+        // Managed 1
+        whenever(mockUserManager.isManagedProfile(USER_ID_MANAGED)) { true }
+        whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_MANAGED)) { false }
+
+        // Managed 2
+        whenever(mockUserManager.isManagedProfile(userIdManagedUnknown)) { true }
+        whenever(mockUserManager.getProfileParent(userHandleUnknownManaged)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(userHandleUnknownManaged)) { false }
+
+        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+            listOf(ReflectedResolveInfo(USER_HANDLE_MANAGED.getIdentifier()))
+        }
+
+        val unknownManagedProfileBase =
+            UserProfile(
+                handle = userHandleUnknownManaged,
+                profileType = UserProfile.ProfileType.MANAGED,
+                label = PLATFORM_PROVIDED_PROFILE_LABEL,
+                disabledReasons = setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED),
+            )
+
+        val expectedStatus =
+            UserStatus(
+                activeUserProfile = PRIMARY_PROFILE_BASE,
+                allProfiles =
+                    listOf(PRIMARY_PROFILE_BASE, MANAGED_PROFILE_BASE, unknownManagedProfileBase),
+                activeContentResolver = mockContentResolver,
+            )
+
+        runTest { // this: TestScope
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            launch {
+                val reportedStatus = userMonitor.userStatus.first()
+                assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            }
+        }
+    }
+
+    @Test
+    fun testProfilesForCrossProfileMultipleManagedProfilesAllManagedDisabledVPlus() {
+
+        assumeTrue(SdkLevel.isAtLeastV())
+
+        // Create a second managed profile, apparently that's a thing on some devices.
+        val userIdManagedUnknown = 11
+        val parcel1 = Parcel.obtain()
+        parcel1.writeInt(userIdManagedUnknown)
+        parcel1.setDataPosition(0)
+        val userHandleUnknownManaged = UserHandle(parcel1)
+        parcel1.recycle()
+
+        // Initial setup state: Three profiles (Personal/Work/Work???), all enabled
+        whenever(mockUserManager.userProfiles) {
+            listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, userHandleUnknownManaged)
+        }
+
+        // Default responses for relevant UserManager apis
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_PRIMARY)) { false }
+        whenever(mockUserManager.isManagedProfile(USER_ID_PRIMARY)) { false }
+
+        // Managed 1
+        whenever(mockUserManager.isManagedProfile(USER_ID_MANAGED)) { true }
+        whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_MANAGED)) { false }
+
+        // Since the UserProperties here will return no delegation, this will
+        // have to rely on CrossProfileIntentForwarderActivity found for the managed
+        // user in order to enable cross profile for this profile.
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_MANAGED)) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
+                )
+                .build()
+        }
+
+        // Managed 2
+        whenever(mockUserManager.isManagedProfile(userIdManagedUnknown)) { true }
+        whenever(mockUserManager.getProfileParent(userHandleUnknownManaged)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(userHandleUnknownManaged)) { false }
+        whenever(
+            mockUserManager.getUserProperties(userHandleUnknownManaged)
+        ) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
+                )
+                .build()
+        }
+
+        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+            emptyList<ResolveInfo>()
+        }
+
+        val unknownManagedProfileBase =
+            UserProfile(
+                handle = userHandleUnknownManaged,
+                profileType = UserProfile.ProfileType.MANAGED,
+                label = PLATFORM_PROVIDED_PROFILE_LABEL,
+                disabledReasons = setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED),
+            )
+
+        val expectedStatus =
+            UserStatus(
+                activeUserProfile = PRIMARY_PROFILE_BASE,
+                allProfiles =
+                    listOf(
+                        PRIMARY_PROFILE_BASE,
+                        MANAGED_PROFILE_BASE.copy(
+                            disabledReasons =
+                                setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                        ),
+                        unknownManagedProfileBase,
+                    ),
+                activeContentResolver = mockContentResolver,
+            )
+
+        runTest { // this: TestScope
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            launch {
+                val reportedStatus = userMonitor.userStatus.first()
+                assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            }
+        }
+    }
+
+    @Test
+    fun testProfilesForCrossProfileMultipleManagedProfilesAllManagedDisabledUMinus() {
+
+        assumeFalse(SdkLevel.isAtLeastV())
+
+        // Create a second managed profile, apparently that's a thing on some devices.
+        val userIdManagedUnknown = 11
+        val parcel1 = Parcel.obtain()
+        parcel1.writeInt(userIdManagedUnknown)
+        parcel1.setDataPosition(0)
+        val userHandleUnknownManaged = UserHandle(parcel1)
+        parcel1.recycle()
+
+        // Initial setup state: Three profiles (Personal/Work/Work???), all enabled
+        whenever(mockUserManager.userProfiles) {
+            listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, userHandleUnknownManaged)
+        }
+
+        // Default responses for relevant UserManager apis
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_PRIMARY)) { false }
+        whenever(mockUserManager.isManagedProfile(USER_ID_PRIMARY)) { false }
+
+        // Managed 1
+        whenever(mockUserManager.isManagedProfile(USER_ID_MANAGED)) { true }
+        whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_MANAGED)) { false }
+
+        // Managed 2
+        whenever(mockUserManager.isManagedProfile(userIdManagedUnknown)) { true }
+        whenever(mockUserManager.getProfileParent(userHandleUnknownManaged)) { USER_HANDLE_PRIMARY }
+        whenever(mockUserManager.isQuietModeEnabled(userHandleUnknownManaged)) { false }
+
+        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+            emptyList<ResolveInfo>()
+        }
+
+        val unknownManagedProfileBase =
+            UserProfile(
+                handle = userHandleUnknownManaged,
+                profileType = UserProfile.ProfileType.MANAGED,
+                label = PLATFORM_PROVIDED_PROFILE_LABEL,
+                disabledReasons = setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED),
+            )
+
+        val expectedStatus =
+            UserStatus(
+                activeUserProfile = PRIMARY_PROFILE_BASE,
+                allProfiles =
+                    listOf(
+                        PRIMARY_PROFILE_BASE,
+                        MANAGED_PROFILE_BASE.copy(
+                            disabledReasons =
+                                setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                        ),
+                        unknownManagedProfileBase,
+                    ),
+                activeContentResolver = mockContentResolver,
+            )
+
+        runTest { // this: TestScope
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            launch {
+                val reportedStatus = userMonitor.userStatus.first()
+                assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            }
+        }
+    }
+
     /**
      * Ensures that profiles that explicitly request not to be shown in sharing surfaces are not
      * included
@@ -300,8 +765,7 @@ class UserMonitorTest {
         whenever(mockUserManager.userProfiles) {
             listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, disabledSharingProfile)
         }
-        whenever(mockUserManager.getUserProperties(disabledSharingProfile))
-        @JvmSerializableLambda {
+        whenever(mockUserManager.getUserProperties(disabledSharingProfile)) @JvmSerializableLambda {
             UserProperties.Builder()
                 .setShowInSharingSurfaces(UserProperties.SHOW_IN_SHARING_SURFACES_NO)
                 .build()
