@@ -20,11 +20,15 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.UserProperties
+import android.media.ApplicationMediaCapabilities
+import android.media.MediaFeature.HdrType
 import android.net.Uri
+import android.os.Build
 import android.os.Parcel
 import android.os.UserHandle
 import android.os.UserManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.modules.utils.build.SdkLevel
@@ -39,6 +43,7 @@ import com.android.photopicker.core.events.dispatchPhotopickerExpansionStateChan
 import com.android.photopicker.core.events.dispatchReportPhotopickerApiInfoEvent
 import com.android.photopicker.core.events.dispatchReportPhotopickerMediaItemStatusEvent
 import com.android.photopicker.core.events.dispatchReportPhotopickerSessionInfoEvent
+import com.android.photopicker.core.events.dispatchReportPickerAppMediaCapabilities
 import com.android.photopicker.core.events.generatePickerSessionId
 import com.android.photopicker.core.features.FeatureManager
 import com.android.photopicker.core.features.FeatureToken
@@ -154,10 +159,9 @@ class DispatchersTest {
         mockSystemService(mockContext, UserManager::class.java) { mockUserManager }
 
         if (SdkLevel.isAtLeastV()) {
-            whenever(mockUserManager.getUserProperties(any(UserHandle::class.java)))
-            @JvmSerializableLambda {
-                UserProperties.Builder().build()
-            }
+            whenever(
+                mockUserManager.getUserProperties(any(UserHandle::class.java))
+            ) @JvmSerializableLambda { UserProperties.Builder().build() }
             whenever(mockUserManager.getUserBadge()) {
                 InstrumentationRegistry.getInstrumentation()
                     .context
@@ -358,12 +362,23 @@ class DispatchersTest {
     }
 
     @Test
-    fun testDispatchReportPhotopickerApiInfoEvent() = runTest {
+    fun testDispatchReportPhotopickerApiInfoEventWithPhotoMimeType() = runTest {
         // Setup
         setup(testScope = this)
 
+        val mimeTypeList = arrayListOf("image/jpg")
+        val telemetryMimeTypeMapping = Telemetry.MediaType.PHOTO
+
         val pickerIntentAction = Telemetry.PickerIntentAction.ACTION_PICK_IMAGES
         val cloudSearch = lazyFeatureManager.get().isFeatureEnabled(SearchFeature::class.java)
+        val photopickerConfiguration =
+            TestPhotopickerConfiguration.build {
+                action(value = "")
+                sessionId(value = sessionId)
+                callingPackageUid(value = packageUid)
+                runtimeEnv(value = PhotopickerRuntimeEnv.EMBEDDED)
+                mimeTypes(mimeTypeList)
+            }
 
         val expectedEvent =
             Event.ReportPhotopickerApiInfo(
@@ -371,7 +386,7 @@ class DispatchersTest {
                 sessionId = sessionId,
                 pickerIntentAction = pickerIntentAction,
                 pickerSize = Telemetry.PickerSize.COLLAPSED,
-                mediaFilter = Telemetry.MediaType.PHOTO,
+                mediaFilter = telemetryMimeTypeMapping,
                 maxPickedItemsCount = 1,
                 selectedTab = Telemetry.SelectedTab.UNSET_SELECTED_TAB,
                 selectedAlbum = Telemetry.SelectedAlbum.UNSET_SELECTED_ALBUM,
@@ -380,6 +395,7 @@ class DispatchersTest {
                 isDefaultTabSet = false,
                 isCloudSearchEnabled = cloudSearch,
                 isLocalSearchEnabled = false,
+                isTranscodingRequested = false,
             )
 
         // Action
@@ -394,5 +410,201 @@ class DispatchersTest {
 
         // Assert
         assertThat(eventsDispatched).contains(expectedEvent)
+        assertThat(expectedEvent.mediaFilter).isEqualTo(telemetryMimeTypeMapping)
+    }
+
+    @Test
+    fun testDispatchReportPhotopickerApiInfoEventWithVideoMimeType() = runTest {
+        // Setup
+        setup(testScope = this)
+
+        val mimeTypeList = arrayListOf("video/jpg")
+        val telemetryMimeTypeMapping = Telemetry.MediaType.VIDEO
+
+        val pickerIntentAction = Telemetry.PickerIntentAction.ACTION_PICK_IMAGES
+        val cloudSearch = lazyFeatureManager.get().isFeatureEnabled(SearchFeature::class.java)
+        val photopickerConfiguration =
+            TestPhotopickerConfiguration.build {
+                action(value = "")
+                sessionId(value = sessionId)
+                callingPackageUid(value = packageUid)
+                runtimeEnv(value = PhotopickerRuntimeEnv.EMBEDDED)
+                mimeTypes(mimeTypeList)
+            }
+
+        val expectedEvent =
+            Event.ReportPhotopickerApiInfo(
+                dispatcherToken = FeatureToken.CORE.token,
+                sessionId = sessionId,
+                pickerIntentAction = pickerIntentAction,
+                pickerSize = Telemetry.PickerSize.COLLAPSED,
+                mediaFilter = telemetryMimeTypeMapping,
+                maxPickedItemsCount = 1,
+                selectedTab = Telemetry.SelectedTab.UNSET_SELECTED_TAB,
+                selectedAlbum = Telemetry.SelectedAlbum.UNSET_SELECTED_ALBUM,
+                isOrderedSelectionSet = false,
+                isAccentColorSet = false,
+                isDefaultTabSet = false,
+                isCloudSearchEnabled = cloudSearch,
+                isLocalSearchEnabled = false,
+                isTranscodingRequested = false,
+            )
+
+        // Action
+        dispatchReportPhotopickerApiInfoEvent(
+            coroutineScope = backgroundScope,
+            lazyEvents = lazyEvents,
+            photopickerConfiguration = photopickerConfiguration,
+            pickerIntentAction = pickerIntentAction,
+            lazyFeatureManager = lazyFeatureManager,
+        )
+        advanceTimeBy(delayTimeMillis = 50)
+
+        // Assert
+        assertThat(eventsDispatched).contains(expectedEvent)
+        assertThat(expectedEvent.mediaFilter).isEqualTo(telemetryMimeTypeMapping)
+    }
+
+    @Test
+    fun testDispatchReportPhotopickerApiInfoEventWithBothPhotoAndVideoMimeType() = runTest {
+        // Setup
+        setup(testScope = this)
+
+        val mimeTypeList = arrayListOf("image/jpg", "video/mp4")
+        val telemetryMimeTypeMapping = Telemetry.MediaType.PHOTO_VIDEO
+
+        val pickerIntentAction = Telemetry.PickerIntentAction.ACTION_PICK_IMAGES
+        val cloudSearch = lazyFeatureManager.get().isFeatureEnabled(SearchFeature::class.java)
+        val photopickerConfiguration =
+            TestPhotopickerConfiguration.build {
+                action(value = "")
+                sessionId(value = sessionId)
+                callingPackageUid(value = packageUid)
+                runtimeEnv(value = PhotopickerRuntimeEnv.EMBEDDED)
+                mimeTypes(mimeTypeList)
+            }
+
+        val expectedEvent =
+            Event.ReportPhotopickerApiInfo(
+                dispatcherToken = FeatureToken.CORE.token,
+                sessionId = sessionId,
+                pickerIntentAction = pickerIntentAction,
+                pickerSize = Telemetry.PickerSize.COLLAPSED,
+                mediaFilter = telemetryMimeTypeMapping,
+                maxPickedItemsCount = 1,
+                selectedTab = Telemetry.SelectedTab.UNSET_SELECTED_TAB,
+                selectedAlbum = Telemetry.SelectedAlbum.UNSET_SELECTED_ALBUM,
+                isOrderedSelectionSet = false,
+                isAccentColorSet = false,
+                isDefaultTabSet = false,
+                isCloudSearchEnabled = cloudSearch,
+                isLocalSearchEnabled = false,
+                isTranscodingRequested = false,
+            )
+
+        // Action
+        dispatchReportPhotopickerApiInfoEvent(
+            coroutineScope = backgroundScope,
+            lazyEvents = lazyEvents,
+            photopickerConfiguration = photopickerConfiguration,
+            pickerIntentAction = pickerIntentAction,
+            lazyFeatureManager = lazyFeatureManager,
+        )
+        advanceTimeBy(delayTimeMillis = 50)
+
+        // Assert
+        assertThat(eventsDispatched).contains(expectedEvent)
+        assertThat(expectedEvent.mediaFilter).isEqualTo(telemetryMimeTypeMapping)
+    }
+
+    @Test
+    fun testDispatchReportPhotopickerApiInfoEventWithDefaultPhotoAndVideoMimeType() = runTest {
+        // Setup
+        setup(testScope = this)
+
+        val mimeTypeList = arrayListOf("image/*", "video/*")
+        val telemetryMimeTypeMapping = Telemetry.MediaType.PHOTO_VIDEO
+
+        val pickerIntentAction = Telemetry.PickerIntentAction.ACTION_PICK_IMAGES
+        val cloudSearch = lazyFeatureManager.get().isFeatureEnabled(SearchFeature::class.java)
+        val photopickerConfiguration =
+            TestPhotopickerConfiguration.build {
+                action(value = "")
+                sessionId(value = sessionId)
+                callingPackageUid(value = packageUid)
+                runtimeEnv(value = PhotopickerRuntimeEnv.EMBEDDED)
+                mimeTypes(mimeTypeList)
+            }
+
+        val expectedEvent =
+            Event.ReportPhotopickerApiInfo(
+                dispatcherToken = FeatureToken.CORE.token,
+                sessionId = sessionId,
+                pickerIntentAction = pickerIntentAction,
+                pickerSize = Telemetry.PickerSize.COLLAPSED,
+                mediaFilter = telemetryMimeTypeMapping,
+                maxPickedItemsCount = 1,
+                selectedTab = Telemetry.SelectedTab.UNSET_SELECTED_TAB,
+                selectedAlbum = Telemetry.SelectedAlbum.UNSET_SELECTED_ALBUM,
+                isOrderedSelectionSet = false,
+                isAccentColorSet = false,
+                isDefaultTabSet = false,
+                isCloudSearchEnabled = cloudSearch,
+                isLocalSearchEnabled = false,
+                isTranscodingRequested = false,
+            )
+
+        // Action
+        dispatchReportPhotopickerApiInfoEvent(
+            coroutineScope = backgroundScope,
+            lazyEvents = lazyEvents,
+            photopickerConfiguration = photopickerConfiguration,
+            pickerIntentAction = pickerIntentAction,
+            lazyFeatureManager = lazyFeatureManager,
+        )
+        advanceTimeBy(delayTimeMillis = 50)
+
+        // Assert
+        assertThat(eventsDispatched).contains(expectedEvent)
+        assertThat(expectedEvent.mediaFilter).isEqualTo(telemetryMimeTypeMapping)
+    }
+
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
+    @Test
+    fun testDispatchReportPickerAppMediaCapabilities() = runTest {
+        // Setup
+        setup(testScope = this)
+
+        val capabilities =
+            ApplicationMediaCapabilities.Builder().addUnsupportedHdrType(HdrType.HDR10).build()
+
+        val photopickerConfiguration =
+            TestPhotopickerConfiguration.build {
+                action(value = "")
+                sessionId(value = sessionId)
+                callingPackageUid(value = packageUid)
+                runtimeEnv(value = PhotopickerRuntimeEnv.EMBEDDED)
+                appMediaCapabilities(capabilities)
+            }
+
+        val expectedEvent =
+            Event.ReportPickerAppMediaCapabilities(
+                dispatcherToken = FeatureToken.CORE.token,
+                sessionId = sessionId,
+                supportedHdrTypes = intArrayOf(),
+                unsupportedHdrTypes = intArrayOf(Telemetry.HdrTypes.HDR10_UNSUPPORTED.type),
+            )
+
+        // Action
+        dispatchReportPickerAppMediaCapabilities(
+            coroutineScope = backgroundScope,
+            lazyEvents = lazyEvents,
+            photopickerConfiguration = photopickerConfiguration,
+        )
+        advanceTimeBy(delayTimeMillis = 50)
+
+        // Assert
+        assertThat(eventsDispatched.size).isEqualTo(1)
+        assertThat(eventsDispatched.get(0).toString()).isEqualTo(expectedEvent.toString())
     }
 }

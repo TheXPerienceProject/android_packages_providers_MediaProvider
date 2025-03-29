@@ -768,6 +768,11 @@ public final class PdfRendererPreV implements AutoCloseable {
         /**
          * Update the given {@link PdfPageObject} to the page.
          * <p>
+         * Note: This method only updates the parameters of the PageObject whose setters
+         * are available. Attempting to update fields with no corresponding setters will
+         * have no effect.
+         *
+         * <p>
          * {@link PdfRenderer#write} needs to be called to get the updated PDF stream after calling
          * this method. {@link PdfRenderer.Page} instance can be closed before calling
          * {@link PdfRenderer#write}.

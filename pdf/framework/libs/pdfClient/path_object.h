@@ -60,6 +60,10 @@ class PathObject : public PageObject {
     bool is_stroke_ = false;
 
     std::vector<Segment> segments_;
+
+  protected:
+    bool GetPageToDeviceMatrix(FPDF_PAGEOBJECT path_object, FPDF_PAGE page) override;
+    bool SetDeviceToPageMatrix(FPDF_PAGEOBJECT path_object, FPDF_PAGE page) override;
 };
 
 }  // namespace pdfClient

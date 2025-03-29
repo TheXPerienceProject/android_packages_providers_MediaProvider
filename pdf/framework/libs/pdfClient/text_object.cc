@@ -180,8 +180,8 @@ bool TextObject::UpdateFPDFInstance(FPDF_PAGEOBJECT text_object, FPDF_PAGE page)
         return false;
     }
 
-    // Set the updated matrix.
-    if (!FPDFPageObj_SetMatrix(text_object, reinterpret_cast<FS_MATRIX*>(&matrix_))) {
+    // Set the updated device matrix.
+    if (!SetDeviceToPageMatrix(text_object, page)) {
         LOGE("SetMatrix failed");
         return false;
     }
@@ -239,8 +239,8 @@ bool TextObject::PopulateFromFPDFInstance(FPDF_PAGEOBJECT text_object, FPDF_PAGE
         return false;
     }
 
-    // Get matrix.
-    if (!FPDFPageObj_GetMatrix(text_object, reinterpret_cast<FS_MATRIX*>(&matrix_))) {
+    // Get device matrix.
+    if (!GetPageToDeviceMatrix(text_object, page)) {
         LOGE("GetMatrix failed");
         return false;
     }

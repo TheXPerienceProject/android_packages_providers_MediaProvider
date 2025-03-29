@@ -95,13 +95,14 @@ data class PhotopickerConfiguration(
      * the intent to check for CrossProfileIntentForwarder's. Rather than exposing intent as a
      * public field, this method can be called to do the check, if an Intent exists.
      *
-     * @param packageManager the PM of the process owner
-     * @param handle the [UserHandle] of the target user
+     * @param packageManager the PM of the "from" user
+     * @param targetUserHandle the [UserHandle] of the target user
      * @return Whether the current Intent Photopicker may be running under has a matching
      *   CrossProfileIntentForwarderActivity
      */
     fun doesCrossProfileIntentForwarderExists(
         packageManager: PackageManager,
+        fromUserHandle: UserHandle,
         targetUserHandle: UserHandle,
     ): Boolean {
 
@@ -124,7 +125,11 @@ data class PhotopickerConfiguration(
             it.setPackage(null)
 
             for (info: ResolveInfo? in
-                packageManager.queryIntentActivities(it, PackageManager.MATCH_DEFAULT_ONLY)) {
+                packageManager.queryIntentActivitiesAsUser(
+                    it,
+                    PackageManager.MATCH_DEFAULT_ONLY,
+                    fromUserHandle,
+                )) {
                 info?.let {
                     if (it.isCrossProfileIntentForwarderActivity()) {
 
@@ -147,7 +152,7 @@ data class PhotopickerConfiguration(
                                     it::class.java.getDeclaredField("targetUserId").apply {
                                         isAccessible = true
                                     }
-                                property?.get(it) as? Int
+                                property.get(it) as? Int
                             } catch (e: Exception) {
                                 when (e) {
                                     is NoSuchFieldException,
@@ -192,6 +197,7 @@ data class PhotopickerConfiguration(
                 "No intent available for checking cross-profile access.",
             )
 
+        // Nothing left to check
         return false
     }
 

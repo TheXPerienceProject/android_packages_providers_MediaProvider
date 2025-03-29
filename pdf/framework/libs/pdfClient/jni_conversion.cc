@@ -25,6 +25,7 @@
 #include "text_object.h"
 
 using pdfClient::Annotation;
+using pdfClient::BitmapFormat;
 using pdfClient::Color;
 using pdfClient::Document;
 using pdfClient::Font;
@@ -174,6 +175,22 @@ jobject ToJavaList(JNIEnv* env, const vector<T>& input,
     jobject java_list = env->NewObject(arraylist_class, init, input.size());
     for (size_t i = 0; i < input.size(); i++) {
         jobject java_object = ToJavaObject(env, input[i]);
+        env->CallBooleanMethod(java_list, add, java_object);
+        env->DeleteLocalRef(java_object);
+    }
+    return java_list;
+}
+
+template <class T>
+jobject ToJavaList(JNIEnv* env, const vector<T>& input, ICoordinateConverter* converter,
+                   jobject (*ToJavaObject)(JNIEnv* env, const T&, ICoordinateConverter* converter)) {
+    static jclass arraylist_class = GetPermClassRef(env, kArrayList);
+    static jmethodID init = env->GetMethodID(arraylist_class, "<init>", "(I)V");
+    static jmethodID add = env->GetMethodID(arraylist_class, "add", funcsig("Z", kObject).c_str());
+
+    jobject java_list = env->NewObject(arraylist_class, init, input.size());
+    for (size_t i = 0; i < input.size(); i++) {
+        jobject java_object = ToJavaObject(env, input[i], converter);
         env->CallBooleanMethod(java_list, add, java_object);
         env->DeleteLocalRef(java_object);
     }
@@ -434,7 +451,41 @@ jobject ToJavaGotoLinks(JNIEnv* env, const vector<GotoLink>& links) {
     return ToJavaList(env, links, &ToJavaGotoLink);
 }
 
-jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height) {
+void ConvertBgrToRgba(uint32_t* rgba_pixel_array, uint8_t* bgr_pixel_array, size_t rgba_stride,
+                      size_t bgr_stride, size_t width, size_t height) {
+    for (size_t y = 0; y < height; y++) {
+        uint32_t* rgba_row_ptr = rgba_pixel_array + y * (rgba_stride / 4);
+        uint8_t* bgr_row_ptr = bgr_pixel_array + y * (bgr_stride);
+        for (size_t x = 0; x < width; x++) {
+            // Extract BGR components stored.
+            uint8_t blue = bgr_row_ptr[x * 3];
+            uint8_t green = bgr_row_ptr[x * 3 + 1];
+            uint8_t red = bgr_row_ptr[x * 3 + 2];
+            // Storing java bitmap components RGBA in little-endian.
+            rgba_row_ptr[x] = (0xFF << 24) | (blue << 16) | (green << 8) | red;
+        }
+    }
+}
+
+void ConvertBgraToRgba(uint32_t* rgba_pixel_array, uint8_t* bgra_pixel_array, size_t rgba_stride,
+                       size_t bgra_stride, size_t width, size_t height, bool ignore_alpha) {
+    for (size_t y = 0; y < height; y++) {
+        uint32_t* rgba_row_ptr = rgba_pixel_array + y * (rgba_stride / 4);
+        uint8_t* bgra_row_ptr = bgra_pixel_array + y * (bgra_stride);
+        for (size_t x = 0; x < width; x++) {
+            // Extract BGR components and determine alpha based on ignore_alpha flag.
+            uint8_t blue = bgra_row_ptr[x * 4];
+            uint8_t green = bgra_row_ptr[x * 4 + 1];
+            uint8_t red = bgra_row_ptr[x * 4 + 2];
+            uint8_t alpha = ignore_alpha ? 0xFF : bgra_row_ptr[x * 4 + 3];
+            // Storing java bitmap components RGBA in little-endian.
+            rgba_row_ptr[x] = (alpha << 24) | (blue << 16) | (green << 8) | red;
+        }
+    }
+}
+
+jobject ToJavaBitmap(JNIEnv* env, void* buffer, BitmapFormat bitmap_format, size_t width,
+                     size_t height, size_t native_stride) {
     // Find Java Bitmap class
     static jclass bitmap_class = GetPermClassRef(env, kBitmap);
 
@@ -453,16 +504,41 @@ jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height) {
     jobject java_bitmap =
             env->CallStaticObjectMethod(bitmap_class, create_bitmap, width, height, argb8888);
 
-    // Lock the Bitmap pixels for copying
+    // Copy the buffer data into java bitmap.
+    AndroidBitmapInfo bitmap_info;
+    AndroidBitmap_getInfo(env, java_bitmap, &bitmap_info);
+    size_t java_stride = bitmap_info.stride;
+
     void* bitmap_pixels;
     if (AndroidBitmap_lockPixels(env, java_bitmap, &bitmap_pixels) < 0) {
         return NULL;
     }
 
-    // Copy the buffer data into java Bitmap.
-    std::memcpy(bitmap_pixels, buffer, width * height);  // 4 bytes per pixel (ARGB_8888)
+    uint32_t* java_pixel_array = static_cast<uint32_t*>(bitmap_pixels);
+    uint8_t* native_pixel_array = static_cast<uint8_t*>(buffer);
+    switch (bitmap_format) {
+        case BitmapFormat::BGR: {
+            ConvertBgrToRgba(java_pixel_array, native_pixel_array, java_stride, native_stride,
+                             width, height);
+            break;
+        }
+        case BitmapFormat::BGRA: {
+            ConvertBgraToRgba(java_pixel_array, native_pixel_array, java_stride, native_stride,
+                              width, height, false);
+            break;
+        }
+        case BitmapFormat::BGRx: {
+            ConvertBgraToRgba(java_pixel_array, native_pixel_array, java_stride, native_stride,
+                              width, height, true);
+            break;
+        }
+        default: {
+            LOGE("Bitmap format unknown!");
+            AndroidBitmap_unlockPixels(env, java_bitmap);
+            return NULL;
+        }
+    }
 
-    // Unlock the Bitmap pixels
     AndroidBitmap_unlockPixels(env, java_bitmap);
 
     return java_bitmap;
@@ -636,19 +712,19 @@ jobject ToJavaPdfPathObject(JNIEnv* env, const PathObject* path_object,
     // Set Java PdfPathObject FillColor.
     if (path_object->is_fill_) {
         static jmethodID set_fill_color =
-                env->GetMethodID(path_object_class, "setFillColor", funcsig("V", kColor).c_str());
+                env->GetMethodID(path_object_class, "setFillColor", funcsig("V", "I").c_str());
 
         env->CallVoidMethod(java_path_object, set_fill_color,
-                            ToJavaColor(env, path_object->fill_color_));
+                            ToJavaColorInt(path_object->fill_color_));
     }
 
     // Set Java PdfPathObject StrokeColor.
     if (path_object->is_stroke_) {
         static jmethodID set_stroke_color =
-                env->GetMethodID(path_object_class, "setStrokeColor", funcsig("V", kColor).c_str());
+                env->GetMethodID(path_object_class, "setStrokeColor", funcsig("V", "I").c_str());
 
         env->CallVoidMethod(java_path_object, set_stroke_color,
-                            ToJavaColor(env, path_object->stroke_color_));
+                            ToJavaColorInt(path_object->stroke_color_));
     }
 
     // Set Java Stroke Width.
@@ -666,11 +742,17 @@ jobject ToJavaPdfImageObject(JNIEnv* env, const ImageObject* image_object) {
     static jmethodID init_image =
             env->GetMethodID(image_object_class, "<init>", funcsig("V", kBitmap).c_str());
 
-    // Get Bitmap readable buffer from ImageObject Data.
-    void* buffer = image_object->GetBitmapReadableBuffer();
-
     // Create Java Bitmap from Native Bitmap Buffer.
-    jobject java_bitmap = ToJavaBitmap(env, buffer, image_object->width_, image_object->height_);
+    void* buffer = image_object->GetBitmapBuffer();
+    BitmapFormat bitmap_format = image_object->bitmap_format_;
+    size_t width = image_object->width_;
+    size_t height = image_object->height_;
+    int stride = FPDFBitmap_GetStride(image_object->bitmap_.get());
+    jobject java_bitmap = ToJavaBitmap(env, buffer, bitmap_format, width, height, stride);
+    if (java_bitmap == NULL) {
+        LOGE("To java bitmap conversion failed!");
+        return NULL;
+    }
 
     // Create Java PdfImageObject Instance.
     jobject java_image_object = env->NewObject(image_object_class, init_image, java_bitmap);
@@ -713,7 +795,8 @@ jobject ToJavaPdfPageObject(JNIEnv* env, const PageObject* page_object,
     // Set Java PdfPageObject Matrix.
     static jmethodID set_matrix =
             env->GetMethodID(page_object_class, "setMatrix", funcsig("V", kMatrix).c_str());
-    env->CallVoidMethod(java_page_object, set_matrix, ToJavaMatrix(env, page_object->matrix_));
+    env->CallVoidMethod(java_page_object, set_matrix,
+                        ToJavaMatrix(env, page_object->device_matrix_));
 
     return java_page_object;
 }
@@ -886,24 +969,24 @@ std::unique_ptr<PathObject> ToNativePathObject(JNIEnv* env, jobject java_path_ob
 
     // Get Java PathObject Fill Color.
     static jmethodID get_fill_color =
-            env->GetMethodID(path_object_class, "getFillColor", funcsig(kColor).c_str());
-    jobject java_fill_color = env->CallObjectMethod(java_path_object, get_fill_color);
+            env->GetMethodID(path_object_class, "getFillColor", funcsig("I").c_str());
+    jint java_fill_color = env->CallIntMethod(java_path_object, get_fill_color);
 
     // Set PathObject Data Fill Mode and Fill Color
-    path_object->is_fill_ = (java_fill_color != NULL);
+    path_object->is_fill_ = (java_fill_color != 0);
     if (path_object->is_fill_) {
-        path_object->fill_color_ = ToNativeColor(env, java_fill_color);
+        path_object->fill_color_ = ToNativeColor(java_fill_color);
     }
 
     // Get Java PathObject Stroke Color.
     static jmethodID get_stroke_color =
-            env->GetMethodID(path_object_class, "getStrokeColor", funcsig(kColor).c_str());
-    jobject java_stroke_color = env->CallObjectMethod(java_path_object, get_stroke_color);
+            env->GetMethodID(path_object_class, "getStrokeColor", funcsig("I").c_str());
+    jint java_stroke_color = env->CallIntMethod(java_path_object, get_stroke_color);
 
     // Set PathObject Data Stroke Mode and Stroke Color.
-    path_object->is_stroke_ = (java_stroke_color != NULL);
+    path_object->is_stroke_ = (java_stroke_color != 0);
     if (path_object->is_stroke_) {
-        path_object->stroke_color_ = ToNativeColor(env, java_stroke_color);
+        path_object->stroke_color_ = ToNativeColor(java_stroke_color);
     }
 
     // Get Java PathObject Stroke Width.
@@ -915,6 +998,23 @@ std::unique_ptr<PathObject> ToNativePathObject(JNIEnv* env, jobject java_path_ob
     path_object->stroke_width_ = stroke_width;
 
     return path_object;
+}
+
+void CopyRgbaToBgra(uint8_t* rgba_pixel_array, size_t rgba_stride, uint32_t* bgra_pixel_array,
+                    size_t bgra_stride, size_t width, size_t height) {
+    for (size_t y = 0; y < height; y++) {
+        uint8_t* rgba_row_ptr = rgba_pixel_array + y * rgba_stride;
+        uint32_t* bgra_row_ptr = bgra_pixel_array + y * (bgra_stride / 4);
+        for (size_t x = 0; x < width; x++) {
+            // Extract RGBA components stored.
+            uint8_t red = rgba_row_ptr[x * 4];
+            uint8_t green = rgba_row_ptr[x * 4 + 1];
+            uint8_t blue = rgba_row_ptr[x * 4 + 2];
+            uint8_t alpha = rgba_row_ptr[x * 4 + 3];
+            // Storing native bitmap components BGRA in little-endian.
+            bgra_row_ptr[x] = (alpha << 24) | (red << 16) | (green << 8) | blue;
+        }
+    }
 }
 
 std::unique_ptr<ImageObject> ToNativeImageObject(JNIEnv* env, jobject java_image_object) {
@@ -929,21 +1029,34 @@ std::unique_ptr<ImageObject> ToNativeImageObject(JNIEnv* env, jobject java_image
             env->GetMethodID(image_object_class, "getBitmap", funcsig(kBitmap).c_str());
     jobject java_bitmap = env->CallObjectMethod(java_image_object, get_bitmap);
 
-    // Create an FPDF_BITMAP from the Android Bitmap.
+    // Get android bitmap info.
+    AndroidBitmapInfo bitmap_info;
+    AndroidBitmap_getInfo(env, java_bitmap, &bitmap_info);
+    if (bitmap_info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) {
+        LOGE("Android bitmap is not in RGBA_8888 format");
+        return nullptr;
+    }
+    size_t bitmap_width = bitmap_info.width;
+    size_t bitmap_height = bitmap_info.height;
+    size_t java_stride = bitmap_info.stride;
+
+    // Create ImageObject data bitmap.
+    image_object->bitmap_ = ScopedFPDFBitmap(FPDFBitmap_Create(bitmap_width, bitmap_height, 1));
+    size_t native_stride = FPDFBitmap_GetStride(image_object->bitmap_.get());
+
+    // Copy pixels from android bitmap.
     void* bitmap_pixels;
     if (AndroidBitmap_lockPixels(env, java_bitmap, &bitmap_pixels) < 0) {
+        LOGE("Android bitmap lock pixels failed!");
         return nullptr;
     }
 
-    AndroidBitmapInfo bitmap_info;
-    AndroidBitmap_getInfo(env, java_bitmap, &bitmap_info);
-    const int stride = bitmap_info.width * 4;
+    uint8_t* java_pixel_array = static_cast<uint8_t*>(bitmap_pixels);
+    uint32_t* native_pixel_array = static_cast<uint32_t*>(image_object->GetBitmapBuffer());
 
-    // Set ImageObject Data Bitmap
-    image_object->bitmap_ = ScopedFPDFBitmap(FPDFBitmap_CreateEx(
-            bitmap_info.width, bitmap_info.height, FPDFBitmap_BGRA, bitmap_pixels, stride));
+    CopyRgbaToBgra(java_pixel_array, java_stride, native_pixel_array, native_stride, bitmap_width,
+                   bitmap_height);
 
-    // Unlock the Android Bitmap
     AndroidBitmap_unlockPixels(env, java_bitmap);
 
     return image_object;
@@ -986,9 +1099,9 @@ std::unique_ptr<PageObject> ToNativePageObject(JNIEnv* env, jobject java_page_ob
     env->GetFloatArrayRegion(java_matrix_array, 0, 9, transform);
 
     // Set PageObject Data Matrix.
-    page_object->matrix_ = {transform[0 /*kMScaleX*/], transform[3 /*kMSkewY*/],
-                            transform[1 /*kMSkewX*/],  transform[4 /*kMScaleY*/],
-                            transform[2 /*kMTransX*/], transform[5 /*kMTransY*/]};
+    page_object->device_matrix_ = {transform[0 /*kMScaleX*/], transform[3 /*kMSkewY*/],
+                                   transform[1 /*kMSkewX*/],  transform[4 /*kMScaleY*/],
+                                   transform[2 /*kMTransX*/], transform[5 /*kMTransY*/]};
 
     return page_object;
 }
@@ -1000,9 +1113,9 @@ jobject ToJavaPageAnnotations(JNIEnv* env, const vector<Annotation*>& annotation
 
 jobject ToJavaStampAnnotation(JNIEnv* env, const Annotation* annotation,
                               ICoordinateConverter* converter) {
-    jobject java_bounds = ToJavaRectF(env, annotation->GetBounds(), converter);
     // Cast to StampAnnotation
     const StampAnnotation* stamp_annotation = static_cast<const StampAnnotation*>(annotation);
+    jobject java_bounds = ToJavaRectF(env, stamp_annotation->GetBounds(), converter);
 
     // Find Java StampAnnotation Class.
     static jclass stamp_annotation_class = GetPermClassRef(env, kStampAnnotation);
@@ -1030,16 +1143,17 @@ jobject ToJavaStampAnnotation(JNIEnv* env, const Annotation* annotation,
 
 jobject ToJavaHighlightAnnotation(JNIEnv* env, const Annotation* annotation,
                                   ICoordinateConverter* converter) {
-    jobject java_bounds = ToJavaRectF(env, annotation->GetBounds(), converter);
     // Cast to HighlightAnnotation
     const HighlightAnnotation* highlight_annotation =
             static_cast<const HighlightAnnotation*>(annotation);
+    jobject java_bounds =
+            ToJavaList(env, highlight_annotation->GetBounds(), converter, &ToJavaRectF);
 
     // Find Java HighlightAnnotation Class.
     static jclass highlight_annotation_class = GetPermClassRef(env, kHighlightAnnotation);
     // Get Constructor Id.
     static jmethodID init =
-            env->GetMethodID(highlight_annotation_class, "<init>", funcsig("V", kRectF).c_str());
+            env->GetMethodID(highlight_annotation_class, "<init>", funcsig("V", kList).c_str());
 
     // Create Java HighlightAnnotation Instance.
     jobject java_annotation = env->NewObject(highlight_annotation_class, init, java_bounds);
@@ -1057,11 +1171,11 @@ jobject ToJavaHighlightAnnotation(JNIEnv* env, const Annotation* annotation,
 
 jobject ToJavaFreeTextAnnotation(JNIEnv* env, const Annotation* annotation,
                                  ICoordinateConverter* converter) {
-    jobject java_bounds = ToJavaRectF(env, annotation->GetBounds(), converter);
-
     // Cast to FreeText Annotation
     const FreeTextAnnotation* freetext_annotation =
             static_cast<const FreeTextAnnotation*>(annotation);
+
+    jobject java_bounds = ToJavaRectF(env, freetext_annotation->GetBounds(), converter);
     // Find Java FreeTextAnnotation class.
     static jclass freetext_annotation_class = GetPermClassRef(env, kFreeTextAnnotation);
     // Get Constructor Id.
@@ -1120,13 +1234,17 @@ jobject ToJavaPageAnnotation(JNIEnv* env, const Annotation* annotation,
 }
 
 std::unique_ptr<Annotation> ToNativeStampAnnotation(JNIEnv* env, jobject java_annotation,
-                                                    Rectangle_f native_bounds,
                                                     ICoordinateConverter* converter) {
-    // Create StampAnnotation Instance.
-    auto stamp_annotation = std::make_unique<StampAnnotation>(native_bounds);
-
     // Get Ref to Java StampAnnotation Class.
     static jclass stamp_annotation_class = GetPermClassRef(env, kStampAnnotation);
+
+    jmethodID get_bounds =
+            env->GetMethodID(stamp_annotation_class, "getBounds", funcsig(kRectF).c_str());
+    jobject java_bounds = env->CallObjectMethod(java_annotation, get_bounds);
+    Rectangle_f native_bounds = ToNativeRectF(env, java_bounds, converter);
+
+    // Create StampAnnotation Instance.
+    auto stamp_annotation = std::make_unique<StampAnnotation>(native_bounds);
 
     // Get PdfPageObjects from stamp annotation
     static jmethodID get_objects =
@@ -1148,12 +1266,29 @@ std::unique_ptr<Annotation> ToNativeStampAnnotation(JNIEnv* env, jobject java_an
 }
 
 std::unique_ptr<Annotation> ToNativeHighlightAnnotation(JNIEnv* env, jobject java_annotation,
-                                                        Rectangle_f native_bounds) {
-    // Create HighlightAnnotation Instance.
-    auto highlight_annotation = std::make_unique<HighlightAnnotation>(native_bounds);
-
+                                                        ICoordinateConverter* converter) {
     // Get Ref to Java HighlightAnnotation Class.
     static jclass highlight_annotation_class = GetPermClassRef(env, kHighlightAnnotation);
+
+    jmethodID get_bounds =
+            env->GetMethodID(highlight_annotation_class, "getBounds", funcsig(kList).c_str());
+    jobject java_bounds = env->CallObjectMethod(java_annotation, get_bounds);
+
+    vector<Rectangle_f> native_bounds;
+
+    jclass list_class = env->FindClass(kList);
+    jmethodID size_method = env->GetMethodID(list_class, "size", funcsig("I").c_str());
+    jmethodID get_method = env->GetMethodID(list_class, "get", funcsig(kObject, "I").c_str());
+
+    jint listSize = env->CallIntMethod(java_bounds, size_method);
+    for (int i = 0; i < listSize; i++) {
+        jobject java_bound = env->CallObjectMethod(java_bounds, get_method, i);
+        Rectangle_f native_bound = ToNativeRectF(env, java_bound, converter);
+        native_bounds.push_back(native_bound);
+    }
+
+    // Create HighlightAnnotation Instance.
+    auto highlight_annotation = std::make_unique<HighlightAnnotation>(native_bounds);
 
     // Get and set highlight color
 
@@ -1168,12 +1303,17 @@ std::unique_ptr<Annotation> ToNativeHighlightAnnotation(JNIEnv* env, jobject jav
 }
 
 std::unique_ptr<Annotation> ToNativeFreeTextAnnotation(JNIEnv* env, jobject java_annotation,
-                                                       Rectangle_f native_bounds) {
-    // Create FreeTextAnnotation Instance.
-    auto freetext_annotation = std::make_unique<FreeTextAnnotation>(native_bounds);
-
+                                                       ICoordinateConverter* converter) {
     // Get Ref to Java FreeTextAnnotation Class.
     static jclass freetext_annotation_class = GetPermClassRef(env, kFreeTextAnnotation);
+
+    jmethodID get_bounds =
+            env->GetMethodID(freetext_annotation_class, "getBounds", funcsig(kRectF).c_str());
+    jobject java_bounds = env->CallObjectMethod(java_annotation, get_bounds);
+    Rectangle_f native_bounds = ToNativeRectF(env, java_bounds, converter);
+
+    // Create FreeTextAnnotation Instance.
+    auto freetext_annotation = std::make_unique<FreeTextAnnotation>(native_bounds);
 
     // Get the TextContent from Java layer.
     static jmethodID get_text_content =
@@ -1210,24 +1350,19 @@ std::unique_ptr<Annotation> ToNativePageAnnotation(JNIEnv* env, jobject java_ann
             env->GetMethodID(annotation_class, "getPdfAnnotationType", funcsig("I").c_str());
     jint annotation_type = env->CallIntMethod(java_annotation, get_type);
 
-    // 2. Get bounds
-    jmethodID get_bounds = env->GetMethodID(annotation_class, "getBounds", funcsig(kRectF).c_str());
-    jobject java_bounds = env->CallObjectMethod(java_annotation, get_bounds);
-    Rectangle_f native_bounds = ToNativeRectF(env, java_bounds, converter);
-
     std::unique_ptr<Annotation> annotation = nullptr;
 
     switch (static_cast<Annotation::Type>(annotation_type)) {
         case Annotation::Type::Stamp: {
-            annotation = ToNativeStampAnnotation(env, java_annotation, native_bounds, converter);
+            annotation = ToNativeStampAnnotation(env, java_annotation, converter);
             break;
         }
         case Annotation::Type::Highlight: {
-            annotation = ToNativeHighlightAnnotation(env, java_annotation, native_bounds);
+            annotation = ToNativeHighlightAnnotation(env, java_annotation, converter);
             break;
         }
         case Annotation::Type::FreeText: {
-            annotation = ToNativeFreeTextAnnotation(env, java_annotation, native_bounds);
+            annotation = ToNativeFreeTextAnnotation(env, java_annotation, converter);
             break;
         }
         default:

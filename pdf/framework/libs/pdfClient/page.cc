@@ -858,25 +858,48 @@ void Page::PopulateAnnotations() {
         ScopedFPDFAnnotation scoped_annot(FPDFPage_GetAnnot(page_.get(), annotation_index));
         int annotationType = FPDFAnnot_GetSubtype(scoped_annot.get());
 
-        FS_RECTF rect;
-        if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
-            LOGE("Failed to get the bounds of the annotation");
-            break;
-        }
-        Rectangle_f bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
-
         std::unique_ptr<Annotation> annotation = nullptr;
 
         switch (annotationType) {
             case FPDF_ANNOT_STAMP: {
+                FS_RECTF rect;
+                if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
+                    LOGE("Failed to get the bounds of the annotation");
+                    break;
+                }
+                auto bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
                 annotation = std::make_unique<StampAnnotation>(bounds);
                 break;
             }
             case FPDF_ANNOT_HIGHLIGHT: {
+                vector<Rectangle_f> bounds;
+                auto num_bounds = FPDFAnnot_CountAttachmentPoints(scoped_annot.get());
+                if (num_bounds > 0) {
+                    bounds.resize(num_bounds);
+                    for (auto bound_index = 0; bound_index < num_bounds; bound_index++) {
+                        FS_QUADPOINTSF quad_points;
+                        if (!FPDFAnnot_GetAttachmentPoints(scoped_annot.get(), bound_index,
+                                                           &quad_points)) {
+                            LOGD("Failed to get quad points from pdfium");
+                            break;
+                        }
+
+                        bounds[bound_index] = Rectangle_f(quad_points.x1, quad_points.y1,
+                                                          quad_points.x2, quad_points.y4);
+                    }
+                } else {
+                    LOGD("Failed to find bounds for highlight annotation");
+                }
                 annotation = std::make_unique<HighlightAnnotation>(bounds);
                 break;
             }
             case FPDF_ANNOT_FREETEXT: {
+                FS_RECTF rect;
+                if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
+                    LOGE("Failed to get the bounds of the annotation");
+                    break;
+                }
+                auto bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
                 annotation = std::make_unique<FreeTextAnnotation>(bounds);
                 break;
             }

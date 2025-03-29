@@ -18,9 +18,12 @@ package com.android.photopicker.features.profileselector
 
 import android.content.ContentResolver
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.os.UserHandle
 import android.os.UserManager
+import android.provider.MediaStore
 import android.test.mock.MockContentResolver
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
@@ -73,6 +76,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 
@@ -86,6 +92,17 @@ import org.mockito.MockitoAnnotations
 @HiltAndroidTest
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTestApi::class)
 class SwitchProfileBannerTest : PhotopickerFeatureBaseTest() {
+
+    /**
+     * Class that exposes the @hide api [targetUserId] in order to supply proper values for
+     * reflection based code that is inspecting this field.
+     *
+     * @property targetUserId
+     */
+    private class ReflectedResolveInfo(@JvmField val targetUserId: Int) : ResolveInfo() {
+
+        override fun isCrossProfileIntentForwarderActivity(): Boolean = true
+    }
 
     companion object {
         val USER_ID_PRIMARY: Int = 0
@@ -147,6 +164,18 @@ class SwitchProfileBannerTest : PhotopickerFeatureBaseTest() {
         whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
         whenever(mockUserManager.getProfileParent(USER_HANDLE_PRIMARY)) { null }
 
+        // Fake for a CrossProfileIntentForwarderActivity for the managed profile
+        val resolveInfoForPrimaryUser = ReflectedResolveInfo(USER_HANDLE_PRIMARY.getIdentifier())
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                eq(USER_HANDLE_MANAGED),
+            )
+        ) {
+            listOf(resolveInfoForPrimaryUser)
+        }
+
         val resources = getTestableContext().getResources()
         if (SdkLevel.isAtLeastV()) {
             whenever(mockUserManager.getProfileLabel())
@@ -159,6 +188,9 @@ class SwitchProfileBannerTest : PhotopickerFeatureBaseTest() {
                     resources.getString(R.string.photopicker_profile_managed_label),
                 )
         }
+
+        // Ensure an intent is set for cross profile checking
+        configurationManager.get().setIntent(Intent(MediaStore.ACTION_PICK_IMAGES))
     }
 
     @Test

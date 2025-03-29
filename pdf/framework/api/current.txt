@@ -80,23 +80,25 @@ package android.graphics.pdf.component {
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_text_annotations") public final class FreeTextAnnotation extends android.graphics.pdf.component.PdfAnnotation {
     ctor public FreeTextAnnotation(@NonNull android.graphics.RectF, @NonNull String);
     method @ColorInt public int getBackgroundColor();
+    method @NonNull public android.graphics.RectF getBounds();
     method @ColorInt public int getTextColor();
     method @NonNull public String getTextContent();
     method public void setBackgroundColor(@ColorInt int);
+    method public void setBounds(@NonNull android.graphics.RectF);
     method public void setTextColor(@ColorInt int);
     method public void setTextContent(@NonNull String);
   }
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public final class HighlightAnnotation extends android.graphics.pdf.component.PdfAnnotation {
-    ctor public HighlightAnnotation(@NonNull android.graphics.RectF);
+    ctor public HighlightAnnotation(@NonNull java.util.List<android.graphics.RectF>);
+    method @NonNull public java.util.List<android.graphics.RectF> getBounds();
     method @ColorInt public int getColor();
+    method public void setBounds(@NonNull java.util.List<android.graphics.RectF>);
     method public void setColor(@ColorInt int);
   }
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public abstract class PdfAnnotation {
-    method @NonNull public android.graphics.RectF getBounds();
     method public int getPdfAnnotationType();
-    method public void setBounds(@NonNull android.graphics.RectF);
   }
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_annotations") public final class PdfAnnotationType {
@@ -119,6 +121,13 @@ package android.graphics.pdf.component {
     method public void transform(float, float, float, float, float, float);
   }
 
+  @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") public final class PdfPageObjectRenderMode {
+    field public static final int FILL = 0; // 0x0
+    field public static final int FILL_STROKE = 2; // 0x2
+    field public static final int STROKE = 1; // 0x1
+    field public static final int UNKNOWN = -1; // 0xffffffff
+  }
+
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") public final class PdfPageObjectType {
     method public static boolean isValidType(int);
     field public static final int IMAGE = 3; // 0x3
@@ -129,36 +138,58 @@ package android.graphics.pdf.component {
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_page_objects") public final class PdfPagePathObject extends android.graphics.pdf.component.PdfPageObject {
     ctor public PdfPagePathObject(@NonNull android.graphics.Path);
-    method @Nullable public android.graphics.Color getFillColor();
-    method @Nullable public android.graphics.Color getStrokeColor();
+    method @ColorInt public int getFillColor();
+    method public int getRenderMode();
+    method @ColorInt public int getStrokeColor();
     method public float getStrokeWidth();
-    method public void setFillColor(@Nullable android.graphics.Color);
-    method public void setStrokeColor(@Nullable android.graphics.Color);
+    method public void setFillColor(@ColorInt int);
+    method public void setRenderMode(int);
+    method public void setStrokeColor(@ColorInt int);
     method public void setStrokeWidth(float);
     method @NonNull public android.graphics.Path toPath();
   }
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_text_objects") public final class PdfPageTextObject extends android.graphics.pdf.component.PdfPageObject {
-    ctor public PdfPageTextObject(@NonNull String, @NonNull android.graphics.Typeface, float);
-    method @Nullable public android.graphics.Color getFillColor();
+    ctor public PdfPageTextObject(@NonNull String, @NonNull android.graphics.pdf.component.PdfPageTextObjectFont, float);
+    method @ColorInt public int getFillColor();
+    method @NonNull public android.graphics.pdf.component.PdfPageTextObjectFont getFont();
     method public float getFontSize();
-    method @NonNull public android.graphics.Color getStrokeColor();
+    method public int getRenderMode();
+    method @ColorInt public int getStrokeColor();
     method public float getStrokeWidth();
     method @NonNull public String getText();
-    method @NonNull public android.graphics.Typeface getTypeface();
-    method public void setFillColor(@Nullable android.graphics.Color);
-    method public void setFontSize(float);
-    method public void setStrokeColor(@NonNull android.graphics.Color);
+    method public void setFillColor(@ColorInt int);
+    method public void setRenderMode(int);
+    method public void setStrokeColor(@ColorInt int);
     method public void setStrokeWidth(float);
     method public void setText(@NonNull String);
-    method public void setTypeface(@NonNull android.graphics.Typeface);
+  }
+
+  @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_text_objects") public class PdfPageTextObjectFont {
+    ctor public PdfPageTextObjectFont(int, boolean, boolean);
+    ctor public PdfPageTextObjectFont(@NonNull android.graphics.pdf.component.PdfPageTextObjectFont);
+    method public int getFontFamily();
+    method public boolean isBold();
+    method public boolean isItalic();
+    method public void setBold(boolean);
+    method public void setFontFamily(int);
+    method public void setItalic(boolean);
+  }
+
+  @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_text_objects") public class PdfPageTextObjectFontFamily {
+    field public static final int COURIER = 0; // 0x0
+    field public static final int HELVETICA = 1; // 0x1
+    field public static final int SYMBOL = 2; // 0x2
+    field public static final int TIMES_NEW_ROMAN = 3; // 0x3
   }
 
   @FlaggedApi("android.graphics.pdf.flags.enable_edit_pdf_stamp_annotations") public final class StampAnnotation extends android.graphics.pdf.component.PdfAnnotation {
     ctor public StampAnnotation(@NonNull android.graphics.RectF);
     method public void addObject(@NonNull android.graphics.pdf.component.PdfPageObject);
+    method @NonNull public android.graphics.RectF getBounds();
     method @NonNull public java.util.List<android.graphics.pdf.component.PdfPageObject> getObjects();
     method public void removeObject(@IntRange(from=0) int);
+    method public void setBounds(@NonNull android.graphics.RectF);
   }
 
 }

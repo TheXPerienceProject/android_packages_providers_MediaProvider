@@ -121,6 +121,8 @@ class FeatureManager(
                 Event.ReportPhotopickerSearchInfo::class.java,
                 Event.ReportSearchDataExtractionDetails::class.java,
                 Event.ReportEmbeddedPhotopickerInfo::class.java,
+                Event.ReportPickerAppMediaCapabilities::class.java,
+                Event.ReportTranscodingVideoDetails::class.java,
             )
     }
 

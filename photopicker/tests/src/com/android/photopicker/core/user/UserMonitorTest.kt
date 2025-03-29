@@ -55,6 +55,7 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.mock
@@ -87,6 +88,10 @@ class UserMonitorTest {
     private val USER_HANDLE_MANAGED: UserHandle
     private val USER_ID_MANAGED: Int = 10
     private val MANAGED_PROFILE_BASE: UserProfile
+
+    private val USER_HANDLE_PRIVATE: UserHandle
+    private val USER_ID_PRIVATE: Int = 11
+    private val PRIVATE_PROFILE_BASE: UserProfile
 
     private val initialExpectedStatus: UserStatus
     private val mockContentResolver: ContentResolver = mock(ContentResolver::class.java)
@@ -128,6 +133,19 @@ class UserMonitorTest {
                 label = PLATFORM_PROVIDED_PROFILE_LABEL,
             )
 
+        val parcel3 = Parcel.obtain()
+        parcel2.writeInt(USER_ID_PRIVATE)
+        parcel2.setDataPosition(0)
+        USER_HANDLE_PRIVATE = UserHandle(parcel3)
+        parcel3.recycle()
+
+        PRIVATE_PROFILE_BASE =
+            UserProfile(
+                handle = USER_HANDLE_PRIVATE,
+                profileType = UserProfile.ProfileType.UNKNOWN,
+                label = PLATFORM_PROVIDED_PROFILE_LABEL,
+            )
+
         initialExpectedStatus =
             UserStatus(
                 activeUserProfile = PRIMARY_PROFILE_BASE,
@@ -161,7 +179,13 @@ class UserMonitorTest {
 
         // Fake for a CrossProfileIntentForwarderActivity for the managed profile
         val resolveInfoForManagedUser = ReflectedResolveInfo(USER_HANDLE_MANAGED.getIdentifier())
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                eq(USER_HANDLE_PRIMARY),
+            )
+        ) {
             listOf(resolveInfoForManagedUser)
         }
 
@@ -211,6 +235,242 @@ class UserMonitorTest {
                 val reportedStatus = userMonitor.userStatus.first()
                 assertUserStatusIsEqualIgnoringFields(reportedStatus, initialExpectedStatus)
             }
+        }
+    }
+
+    @Test
+    fun testProfilesForCrossProfileNoDelegationVPlus() {
+        assumeTrue(SdkLevel.isAtLeastV())
+
+        // Add a third profile (private) to the list of profiles
+        whenever(mockUserManager.userProfiles) {
+            listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, USER_HANDLE_PRIVATE)
+        }
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_PRIVATE)) { false }
+        whenever(mockUserManager.isManagedProfile(USER_ID_PRIVATE)) { false }
+        whenever(mockUserManager.getProfileParent(USER_HANDLE_PRIVATE)) { USER_HANDLE_PRIMARY }
+
+        // The private profile should delegate its access to the parent
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIVATE)) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_NO_DELEGATION
+                )
+                .build()
+        }
+
+        runTest { // this: TestScope
+
+            // When the primary profile is the process owner
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            var reportedStatus = userMonitor.userStatus.first()
+            var expectedStatus =
+                UserStatus(
+                    activeUserProfile = PRIMARY_PROFILE_BASE,
+                    allProfiles =
+                        listOf(
+                            PRIMARY_PROFILE_BASE,
+                            MANAGED_PROFILE_BASE,
+                            PRIVATE_PROFILE_BASE.copy(
+                                disabledReasons =
+                                    setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                            ),
+                        ),
+                    activeContentResolver = mockContentResolver,
+                )
+            assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+
+            // Reset user monitor, private user is now the process owner
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIVATE,
+                )
+
+            reportedStatus = userMonitor.userStatus.first()
+            expectedStatus =
+                UserStatus(
+                    activeUserProfile = PRIVATE_PROFILE_BASE,
+                    allProfiles =
+                        listOf(
+                            PRIMARY_PROFILE_BASE.copy(
+                                disabledReasons =
+                                    setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                            ),
+                            MANAGED_PROFILE_BASE.copy(
+                                disabledReasons =
+                                    setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                            ),
+                            PRIVATE_PROFILE_BASE,
+                        ),
+                    activeContentResolver = mockContentResolver,
+                )
+            assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            //
+            // Reset user monitor, managed user is now the process owner
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_MANAGED,
+                )
+
+            reportedStatus = userMonitor.userStatus.first()
+            expectedStatus =
+                UserStatus(
+                    activeUserProfile = MANAGED_PROFILE_BASE,
+                    allProfiles =
+                        listOf(
+                            PRIMARY_PROFILE_BASE,
+                            MANAGED_PROFILE_BASE,
+                            PRIVATE_PROFILE_BASE.copy(
+                                disabledReasons =
+                                    setOf(UserProfile.DisabledReason.CROSS_PROFILE_NOT_ALLOWED)
+                            ),
+                        ),
+                    activeContentResolver = mockContentResolver,
+                )
+            assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+        }
+    }
+
+    @Test
+    fun testProfilesForCrossProfileDelegationVPlus() {
+        assumeTrue(SdkLevel.isAtLeastV())
+
+        // Add a third profile (private) to the list of profiles
+        whenever(mockUserManager.userProfiles) {
+            listOf(USER_HANDLE_PRIMARY, USER_HANDLE_MANAGED, USER_HANDLE_PRIVATE)
+        }
+        whenever(mockUserManager.isQuietModeEnabled(USER_HANDLE_PRIVATE)) { false }
+        whenever(mockUserManager.isManagedProfile(USER_ID_PRIVATE)) { false }
+        whenever(mockUserManager.getProfileParent(USER_HANDLE_PRIVATE)) { USER_HANDLE_PRIMARY }
+
+        // The private profile should delegate its access to the parent
+        whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIVATE)) @JvmSerializableLambda {
+            UserProperties.Builder()
+                .setCrossProfileContentSharingStrategy(
+                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
+                )
+                .build()
+        }
+
+        runTest { // this: TestScope
+
+            // When the primary profile is the process owner
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIMARY,
+                )
+
+            var reportedStatus = userMonitor.userStatus.first()
+            var expectedStatus =
+                UserStatus(
+                    activeUserProfile = PRIMARY_PROFILE_BASE,
+                    allProfiles =
+                        listOf(PRIMARY_PROFILE_BASE, MANAGED_PROFILE_BASE, PRIVATE_PROFILE_BASE),
+                    activeContentResolver = mockContentResolver,
+                )
+            assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+
+            // Reset user monitor, private user is now the process owner
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_PRIVATE,
+                )
+
+            reportedStatus = userMonitor.userStatus.first()
+            expectedStatus =
+                UserStatus(
+                    activeUserProfile = PRIVATE_PROFILE_BASE,
+                    allProfiles =
+                        listOf(PRIMARY_PROFILE_BASE, MANAGED_PROFILE_BASE, PRIVATE_PROFILE_BASE),
+                    activeContentResolver = mockContentResolver,
+                )
+            assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
+            //
+            // Reset user monitor, managed user is now the process owner
+            userMonitor =
+                UserMonitor(
+                    mockContext,
+                    provideTestConfigurationFlow(
+                        scope = this.backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action(MediaStore.ACTION_PICK_IMAGES)
+                                intent(Intent(MediaStore.ACTION_PICK_IMAGES))
+                            },
+                    ),
+                    this.backgroundScope,
+                    StandardTestDispatcher(this.testScheduler),
+                    USER_HANDLE_MANAGED,
+                )
+
+            reportedStatus = userMonitor.userStatus.first()
+            expectedStatus =
+                UserStatus(
+                    activeUserProfile = MANAGED_PROFILE_BASE,
+                    allProfiles =
+                        listOf(PRIMARY_PROFILE_BASE, MANAGED_PROFILE_BASE, PRIVATE_PROFILE_BASE),
+                    activeContentResolver = mockContentResolver,
+                )
+            assertUserStatusIsEqualIgnoringFields(reportedStatus, expectedStatus)
         }
     }
 
@@ -302,7 +562,13 @@ class UserMonitorTest {
                 )
                 .build()
         }
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                any(UserHandle::class.java),
+            )
+        ) {
             emptyList<ResolveInfo>()
         }
 
@@ -350,7 +616,13 @@ class UserMonitorTest {
 
         assumeFalse(SdkLevel.isAtLeastV())
 
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                any(UserHandle::class.java),
+            )
+        ) {
             emptyList<ResolveInfo>()
         }
 
@@ -441,7 +713,13 @@ class UserMonitorTest {
                 .build()
         }
 
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                eq(USER_HANDLE_PRIMARY),
+            )
+        ) {
             listOf(ReflectedResolveInfo(USER_HANDLE_MANAGED.getIdentifier()))
         }
 
@@ -517,7 +795,13 @@ class UserMonitorTest {
         whenever(mockUserManager.getProfileParent(userHandleUnknownManaged)) { USER_HANDLE_PRIMARY }
         whenever(mockUserManager.isQuietModeEnabled(userHandleUnknownManaged)) { false }
 
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                eq(USER_HANDLE_PRIMARY),
+            )
+        ) {
             listOf(ReflectedResolveInfo(USER_HANDLE_MANAGED.getIdentifier()))
         }
 
@@ -613,7 +897,13 @@ class UserMonitorTest {
                 .build()
         }
 
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                any(UserHandle::class.java),
+            )
+        ) {
             emptyList<ResolveInfo>()
         }
 
@@ -696,7 +986,13 @@ class UserMonitorTest {
         whenever(mockUserManager.getProfileParent(userHandleUnknownManaged)) { USER_HANDLE_PRIMARY }
         whenever(mockUserManager.isQuietModeEnabled(userHandleUnknownManaged)) { false }
 
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                any(UserHandle::class.java),
+            )
+        ) {
             emptyList<ResolveInfo>()
         }
 

@@ -34,13 +34,10 @@ class Annotation {
   public:
     enum class Type { UNKNOWN = 0, FreeText = 1, Highlight = 2, Stamp = 3 };
 
-    Annotation(Type type, const Rectangle_f& bounds) : type_(type), bounds_(bounds) {}
+    Annotation(Type type) : type_(type) {}
     virtual ~Annotation() = default;
 
     Type GetType() const { return type_; }
-
-    Rectangle_f GetBounds() const { return bounds_; }
-    void SetBounds(Rectangle_f bounds) { bounds_ = bounds; }
 
     virtual bool PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) = 0;
     virtual ScopedFPDFAnnotation CreatePdfiumInstance(FPDF_DOCUMENT document, FPDF_PAGE page) = 0;
@@ -49,7 +46,6 @@ class Annotation {
 
   private:
     Type type_;
-    Rectangle_f bounds_;
 };
 
 // This class represents a stamp annotation on a page of the pdf document. It doesn't take the
@@ -57,7 +53,10 @@ class Annotation {
 // underlying pdfium page objects
 class StampAnnotation : public Annotation {
   public:
-    StampAnnotation(const Rectangle_f& bounds) : Annotation(Type::Stamp, bounds) {}
+    StampAnnotation(const Rectangle_f& bounds) : Annotation(Type::Stamp) { bounds_ = bounds; }
+
+    Rectangle_f GetBounds() const { return bounds_; }
+    void SetBounds(Rectangle_f bounds) { bounds_ = bounds; }
 
     // Return a const reference to the list
     // Stamp annotation will have the ownership of the page objects inside it
@@ -80,12 +79,18 @@ class StampAnnotation : public Annotation {
                               FPDF_PAGE page) override;
 
   private:
+    Rectangle_f bounds_;
     std::vector<std::unique_ptr<PageObject>> pageObjects_;
 };
 
 class HighlightAnnotation : public Annotation {
   public:
-    HighlightAnnotation(const Rectangle_f& bounds) : Annotation(Type::Highlight, bounds) {}
+    HighlightAnnotation(const std::vector<Rectangle_f>& bounds) : Annotation(Type::Highlight) {
+        bounds_ = bounds;
+    }
+
+    std::vector<Rectangle_f> GetBounds() const { return bounds_; }
+    void SetBounds(std::vector<Rectangle_f> bounds) { bounds_ = bounds; }
 
     Color GetColor() const { return color_; }
     void SetColor(Color color) { color_ = color; }
@@ -96,13 +101,17 @@ class HighlightAnnotation : public Annotation {
                               FPDF_PAGE page) override;
 
   private:
+    std::vector<Rectangle_f> bounds_;
     Color color_;
 };
 
 class FreeTextAnnotation : public Annotation {
   public:
     static constexpr const char* kContents = "Contents";
-    FreeTextAnnotation(const Rectangle_f& bounds) : Annotation(Type::FreeText, bounds) {}
+    FreeTextAnnotation(const Rectangle_f& bounds) : Annotation(Type::FreeText) { bounds_ = bounds; }
+
+    Rectangle_f GetBounds() const { return bounds_; }
+    void SetBounds(Rectangle_f bounds) { bounds_ = bounds; }
 
     std::wstring GetTextContent() const { return text_content_; }
     void SetTextContent(std::wstring textContent) { text_content_ = textContent; }
@@ -119,6 +128,7 @@ class FreeTextAnnotation : public Annotation {
                               FPDF_PAGE page) override;
 
   private:
+    Rectangle_f bounds_;
     std::wstring text_content_;
     Color text_color_;
     Color background_color_;

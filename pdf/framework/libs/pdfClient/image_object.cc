@@ -26,6 +26,23 @@
 
 namespace pdfClient {
 
+BitmapFormat GetBitmapFormat(int bitmap_format) {
+    switch (bitmap_format) {
+        case FPDFBitmap_BGR: {
+            return BitmapFormat::BGR;
+        }
+        case FPDFBitmap_BGRA: {
+            return BitmapFormat::BGRA;
+        }
+        case FPDFBitmap_BGRx: {
+            return BitmapFormat::BGRx;
+        }
+        default: {
+            return BitmapFormat::Unknown;
+        }
+    }
+}
+
 ImageObject::ImageObject() : PageObject(Type::Image) {}
 
 ScopedFPDFPageObject ImageObject::CreateFPDFInstance(FPDF_DOCUMENT document, FPDF_PAGE page) {
@@ -57,35 +74,46 @@ bool ImageObject::UpdateFPDFInstance(FPDF_PAGEOBJECT image_object, FPDF_PAGE pag
     }
 
     // Set the updated matrix.
-    if (!FPDFPageObj_SetMatrix(image_object, reinterpret_cast<FS_MATRIX*>(&matrix_))) {
+    if (!SetDeviceToPageMatrix(image_object, page)) {
         return false;
     }
 
+    // Set the updated dimensions.
     width_ = FPDFBitmap_GetWidth(bitmap_.get());
     height_ = FPDFBitmap_GetHeight(bitmap_.get());
+
+    // Set the updated bitmap format.
+    bitmap_format_ = GetBitmapFormat(FPDFBitmap_GetFormat(bitmap_.get()));
 
     return true;
 }
 
 bool ImageObject::PopulateFromFPDFInstance(FPDF_PAGEOBJECT image_object, FPDF_PAGE page) {
-    // Get Bitmap
+    // Get bitmap.
     bitmap_ = ScopedFPDFBitmap(FPDFImageObj_GetBitmap(image_object));
     if (bitmap_.get() == nullptr) {
         return false;
     }
 
-    // Get Matrix
-    if (!FPDFPageObj_GetMatrix(image_object, reinterpret_cast<FS_MATRIX*>(&matrix_))) {
+    // Get matrix.
+    if (!GetPageToDeviceMatrix(image_object, page)) {
         return false;
     }
 
+    // Get dimensions.
     width_ = FPDFBitmap_GetWidth(bitmap_.get());
     height_ = FPDFBitmap_GetHeight(bitmap_.get());
 
+    // Get bitmap format.
+    bitmap_format_ = GetBitmapFormat(FPDFBitmap_GetFormat(bitmap_.get()));
+    if (bitmap_format_ == BitmapFormat::Unknown) {
+        LOGE("Bitmap format unknown");
+        return false;
+    }
     return true;
 }
 
-void* ImageObject::GetBitmapReadableBuffer() const {
+void* ImageObject::GetBitmapBuffer() const {
     return FPDFBitmap_GetBuffer(bitmap_.get());
 }
 

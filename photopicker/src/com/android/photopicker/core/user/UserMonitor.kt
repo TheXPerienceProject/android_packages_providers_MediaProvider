@@ -100,7 +100,17 @@ class UserMonitor(
                                 properties.getShowInSharingSurfaces() ==
                                     UserProperties.SHOW_IN_SHARING_SURFACES_SEPARATE
                             } else {
-                                true
+                                when {
+                                    processOwnerUserHandle.identifier == it.identifier -> true
+                                    // For SDK < V, accept all managed profiles, and the parent
+                                    // of the current process owner. Ignore all others.
+                                    userManager.isManagedProfile(it.identifier) -> true
+                                    it.identifier ==
+                                        userManager
+                                            .getProfileParent(processOwnerUserHandle)
+                                            ?.identifier -> true
+                                    else -> false
+                                }
                             }
                         }
                         .map { getUserProfileFromHandle(it, context) },
@@ -255,8 +265,7 @@ class UserMonitor(
             ) {
                 Log.i(
                     TAG,
-                    "The active profile is no longer enabled, transitioning back to the process" +
-                        " owner's profile.",
+                    "The active profile is no longer enabled, transitioning back to the process owner's profile.",
                 )
 
                 // The current profile is disabled, we need to transition back to the process
@@ -281,8 +290,7 @@ class UserMonitor(
                     ?: run {
                         Log.w(
                             TAG,
-                            "Could not find the process owner's profile to switch to when the" +
-                                " active profile was disabled.",
+                            "Could not find the process owner's profile to switch to when the active profile was disabled.",
                         )
 
                         // Still attempt to update the list of profiles.
@@ -307,42 +315,103 @@ class UserMonitor(
     /**
      * Determines if the current handle supports CrossProfile content sharing.
      *
+     * This method accepts a pair of user handles (from/to) and determines if CrossProfile access is
+     * permitted between those two profiles.
+     *
+     * There are differences is on how the access is determined based on the platform SDK:
+     * - For Platform SDK < V:
+     *
+     *   A check for CrossProfileIntentForwarders in the origin (from) profile that target the
+     *   destination (to) profile. If such a forwarder exists, then access is allowed, and denied
+     *   otherwise.
+     * - For Platform SDK >= V:
+     *
+     *   The method now takes into account access delegation, which was first added in Android V.
+     *
+     *   For profiles that set the [CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT] property in
+     *   its [UserProperties], its parent profile will be substituted in for its side of the check.
+     *
+     *   ex. For access checks between a Managed (from) and Private (to) profile, where:
+     *     - Managed does not delegate to its parent
+     *     - Private delegates to its parent
+     *
+     *   The following logic is performed: Managed -> parent(Private)
+     *
+     *   The same check in the other direction would yield: parent(Private) -> Managed
+     *
+     *   Note how the private profile is never actually used for either side of the check, since it
+     *   is delegating its access check to the parent. And thus, if Managed can access the parent,
+     *   it can also access the private.
+     *
+     * @param context Current context object, for switching user contexts.
+     * @param fromUser The Origin profile, where the user is coming from
+     * @param toUser The destination profile, where the user is attempting to go to.
      * @return Whether CrossProfile content sharing is supported in this handle.
      */
-    private fun getIsCrossProfileAllowedForHandle(handle: UserHandle): Boolean {
+    private fun getIsCrossProfileAllowedForHandle(
+        context: Context,
+        fromUser: UserHandle,
+        toUser: UserHandle,
+    ): Boolean {
 
-        // Early exit conditions
-        if (handle == processOwnerUserHandle) {
+        /**
+         * Determine if the provided [UserHandle] delegates its cross profile content sharing (both
+         * to / from this profile) to its parent's access.
+         *
+         * @return True if the profile delegates to its parent, false otherwise.
+         */
+        fun profileDelegatesToParent(handle: UserHandle): Boolean {
+
+            // Early exit, this check only exists on V+
+            if (!SdkLevel.isAtLeastV()) {
+                return false
+            }
+
+            val props = userManager.getUserProperties(handle)
+            return props.getCrossProfileContentSharingStrategy() ==
+                UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
+        }
+
+        // Early exit conditions, accessing self.
+        // NOTE: It is also possible to reach this state if this method is recursively checking
+        // from: parent(A) to:parent(B) where A and B are both children of the same parent.
+        if (fromUser.identifier == toUser.identifier) {
             return true
         }
 
-        // First, check if cross profile is delegated to parent profile
-        if (SdkLevel.isAtLeastV()) {
-            val properties: UserProperties = userManager.getUserProperties(handle)
-            if (
-                /*
-                 * All user profiles with user property
-                 * [UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT]
-                 * can access each other including its parent.
-                 */
-                properties.getCrossProfileContentSharingStrategy() ==
-                    UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT
-            ) {
-                val parent = userManager.getProfileParent(handle)
-
-                parent?.let {
-                    return getIsCrossProfileAllowedForHandle(it)
-                }
-
-                // Couldn't resolve parent, fail closed.
-                return false
+        // Decide if we should use actual from or parent(from)
+        val currentFromUser: UserHandle =
+            if (profileDelegatesToParent(fromUser)) {
+                userManager.getProfileParent(fromUser) ?: fromUser
+            } else {
+                fromUser
             }
+
+        // Decide if we should use actual to or parent(to)
+        val currentToUser: UserHandle =
+            if (profileDelegatesToParent(toUser)) {
+                userManager.getProfileParent(toUser) ?: toUser
+            } else {
+                toUser
+            }
+
+        // When the from/to has changed from the original parameters, recursively restart the checks
+        // with the new from/to handles.
+        if (
+            fromUser.identifier != currentFromUser.identifier ||
+                toUser.identifier != currentToUser.identifier
+        ) {
+            return getIsCrossProfileAllowedForHandle(context, currentFromUser, currentToUser)
         }
 
         // As a last resort, no applicable cross profile information found, so inspect the current
         // configuration and if there is an intent set, try to see
         // if there is a matching CrossProfileIntentForwarder
-        return configuration.value.doesCrossProfileIntentForwarderExists(packageManager, handle)
+        return configuration.value.doesCrossProfileIntentForwarderExists(
+            packageManager,
+            fromUser,
+            toUser,
+        )
     }
 
     /**
@@ -355,7 +424,8 @@ class UserMonitor(
         val isParentProfile = userManager.getProfileParent(handle) == null
         val isManaged = userManager.isManagedProfile(handle.getIdentifier())
         val isQuietModeEnabled = userManager.isQuietModeEnabled(handle)
-        var isCrossProfileSupported = getIsCrossProfileAllowedForHandle(handle)
+        var isCrossProfileSupported =
+            getIsCrossProfileAllowedForHandle(context, processOwnerUserHandle, handle)
 
         val (icon, label) =
             try {
@@ -410,8 +480,6 @@ class UserMonitor(
                     processOwnerUserHandle -> emptySet()
                     else ->
                         buildSet {
-                            if (isParentProfile)
-                                return@buildSet // Parent profile can always be accessed by children
                             if (isQuietModeEnabled) {
                                 add(UserProfile.DisabledReason.QUIET_MODE)
 

@@ -149,6 +149,41 @@ public class PermissionUtils {
     }
 
     /**
+     * Check for read permission when legacy storage is granted.
+     * There is a bug in AppOpsManager that keeps legacy storage granted even
+     * when an app updates its targetSdkVersion from value <30 to >=30.
+     * If an app upgrades from targetSdk 29 to targetSdk 33, legacy storage
+     * remains granted and in targetSdk 33, app are required to replace R_E_S
+     * with R_M_*. If an app updates its manifest with R_M_*, permission check
+     * in MediaProvider will look for R_E_S and will not grant read access as
+     * the app would be still treated as legacy. Ensure that legacy app either has
+     * R_E_S or all of R_M_* to get read permission. Since this is a fix for legacy
+     * app op bug, we are avoiding granular permission checks based on media type.
+     */
+    public static boolean checkPermissionReadForLegacyStorage(@NonNull Context context,
+            int pid, int uid, @NonNull String packageName, @Nullable String attributionTag,
+            boolean isTargetSdkAtleastT) {
+        if (isTargetSdkAtleastT) {
+            return checkPermissionForDataDelivery(context, READ_EXTERNAL_STORAGE, pid, uid,
+                    packageName, attributionTag,
+                    generateAppOpMessage(packageName, sOpDescription.get())) || (
+                    checkPermissionForDataDelivery(context, READ_MEDIA_IMAGES, pid, uid,
+                            packageName, attributionTag,
+                            generateAppOpMessage(packageName, sOpDescription.get()))
+                            && checkPermissionForDataDelivery(context, READ_MEDIA_VIDEO, pid, uid,
+                            packageName, attributionTag,
+                            generateAppOpMessage(packageName, sOpDescription.get()))
+                            && checkPermissionForDataDelivery(context, READ_MEDIA_AUDIO, pid, uid,
+                            packageName, attributionTag,
+                            generateAppOpMessage(packageName, sOpDescription.get())));
+        } else {
+            return checkPermissionForDataDelivery(context, READ_EXTERNAL_STORAGE, pid, uid,
+                    packageName, attributionTag,
+                    generateAppOpMessage(packageName, sOpDescription.get()));
+        }
+    }
+
+    /**
      * Check if the given package has been granted the
      * android.Manifest.permission#ACCESS_MEDIA_LOCATION permission.
      */
@@ -360,12 +395,22 @@ public class PermissionUtils {
 
     /**
      * Check if the given package has been granted the
-     * android.provider.MediaStore#ACCESS_OEM_METADATA_PERMISSION permission.
+     * {@link android.provider.MediaStore#ACCESS_OEM_METADATA_PERMISSION} permission.
      */
     public static boolean checkPermissionAccessOemMetadata(@NonNull Context context,
             int pid, int uid, @NonNull String packageName, @Nullable String attributionTag) {
         return checkPermissionForDataDelivery(context, MediaStore.ACCESS_OEM_METADATA_PERMISSION,
                 pid, uid, packageName, attributionTag, null);
+    }
+
+    /**
+     * Check if the given package has been granted the
+     * {@link android.provider.MediaStore#UPDATE_OEM_METADATA_PERMISSION} permission.
+     */
+    public static boolean checkPermissionUpdateOemMetadata(@NonNull Context context,
+            int pid, int uid, @NonNull String packageName, @Nullable String attributionTag) {
+        return checkPermissionForPreflight(context, MediaStore.UPDATE_OEM_METADATA_PERMISSION,
+                pid, uid, packageName);
     }
 
     public static boolean checkPermissionInstallPackages(@NonNull Context context, int pid, int uid,

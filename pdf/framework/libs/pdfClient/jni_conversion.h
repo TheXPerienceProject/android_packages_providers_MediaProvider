@@ -117,8 +117,6 @@ jobject ToJavaGotoLink(JNIEnv* env, const GotoLink link);
 
 jobject ToJavaGotoLinks(JNIEnv* env, const vector<GotoLink>& links);
 
-jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height);
-
 jobject ToJavaColor(JNIEnv* env, Color color);
 
 jfloatArray ToJavaFloatArray(JNIEnv* env, const float arr[], size_t length);

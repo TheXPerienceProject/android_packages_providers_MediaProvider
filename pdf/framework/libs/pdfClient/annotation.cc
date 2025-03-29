@@ -35,6 +35,20 @@ std::vector<PageObject*> StampAnnotation::GetObjects() const {
     return page_objects;
 }
 
+bool updateExistingBounds(FPDF_ANNOTATION fpdf_annot, size_t num_bounds,
+                          std::vector<Rectangle_f> bounds) {
+    for (auto bound_index = 0; bound_index < num_bounds; bound_index++) {
+        Rectangle_f rect = bounds[bound_index];
+        FS_QUADPOINTSF quad_points = {rect.left, rect.top,    rect.right, rect.top,
+                                      rect.left, rect.bottom, rect.right, rect.bottom};
+        if (!FPDFAnnot_SetAttachmentPoints(fpdf_annot, bound_index, &quad_points)) {
+            LOGD("Failed to update the bounds of highlight annotation");
+            return false;
+        }
+    }
+    return true;
+}
+
 bool StampAnnotation::PopulateFromPdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_PAGE page) {
     int num_of_objects = FPDFAnnot_GetObjectCount(fpdf_annot);
 
@@ -207,16 +221,32 @@ bool HighlightAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_
         return false;
     }
 
-    Rectangle_f annotation_bounds = this->GetBounds();
-    FS_RECTF rect;
-    rect.left = annotation_bounds.left;
-    rect.bottom = annotation_bounds.bottom;
-    rect.right = annotation_bounds.right;
-    rect.top = annotation_bounds.top;
+    auto old_num_bounds = FPDFAnnot_CountAttachmentPoints(fpdf_annot);
+    std::vector<Rectangle_f> bounds = GetBounds();
+    auto new_num_bounds = bounds.size();
 
-    if (!FPDFAnnot_SetRect(fpdf_annot, &rect)) {
-        LOGE("Highlight Annotation bounds couldn't be updated");
-        return false;
+    if (old_num_bounds == new_num_bounds) {
+        if (!updateExistingBounds(fpdf_annot, old_num_bounds, bounds)) return false;
+    } else if (old_num_bounds < new_num_bounds) {
+        if (!updateExistingBounds(fpdf_annot, old_num_bounds, bounds)) return false;
+        for (auto bound_index = old_num_bounds; bound_index < new_num_bounds; bound_index++) {
+            Rectangle_f rect = bounds[bound_index];
+            FS_QUADPOINTSF quad_points = {rect.left, rect.top,    rect.right, rect.top,
+                                          rect.left, rect.bottom, rect.right, rect.bottom};
+            if (!FPDFAnnot_AppendAttachmentPoints(fpdf_annot, &quad_points)) {
+                LOGD("Failed to update bounds of the highlight annotation");
+                return false;
+            }
+        }
+    } else {
+        if (!updateExistingBounds(fpdf_annot, new_num_bounds, bounds)) return false;
+        for (auto bound_index = new_num_bounds; bound_index < old_num_bounds; bound_index++) {
+            FS_QUADPOINTSF quad_points = {0, 0, 0, 0, 0, 0, 0, 0};
+            if (!FPDFAnnot_SetAttachmentPoints(fpdf_annot, bound_index, &quad_points)) {
+                LOGD("Failed to update bounds of the highlight annotation");
+                return false;
+            }
+        }
     }
 
     Color new_color = this->GetColor();
@@ -318,4 +348,5 @@ bool FreeTextAnnotation::UpdatePdfiumInstance(FPDF_ANNOTATION fpdf_annot, FPDF_D
 
     return true;
 }
+
 }  // namespace pdfClient
