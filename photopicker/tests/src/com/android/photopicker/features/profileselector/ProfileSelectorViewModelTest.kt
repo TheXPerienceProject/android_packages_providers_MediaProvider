@@ -62,6 +62,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.any
 import org.mockito.Mockito.anyInt
+import org.mockito.Mockito.eq
 import org.mockito.MockitoAnnotations
 
 @SmallTest
@@ -170,7 +171,13 @@ class ProfileSelectorViewModelTest {
             whenever(mockUserManager.getProfileLabel()) { "label" }
         }
         val mockResolveInfo = ReflectedResolveInfo(USER_ID_MANAGED)
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                eq(USER_HANDLE_PRIMARY),
+            )
+        ) {
             listOf(mockResolveInfo)
         }
     }

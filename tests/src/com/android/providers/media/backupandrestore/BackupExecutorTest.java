@@ -18,11 +18,14 @@ package com.android.providers.media.backupandrestore;
 
 import static com.android.providers.media.backupandrestore.BackupAndRestoreTestUtils.deSerialiseValueString;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.BACKUP_COLUMNS;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.isBackupAndRestoreSupported;
 import static com.android.providers.media.scan.MediaScanner.REASON_UNKNOWN;
 import static com.android.providers.media.scan.MediaScannerTest.stage;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+
+import static org.junit.Assume.assumeTrue;
 
 import android.Manifest;
 import android.content.ContentResolver;
@@ -32,9 +35,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.SystemClock;
-import android.platform.test.annotations.RequiresFlagsEnabled;
-import android.platform.test.flag.junit.CheckFlagsRule;
-import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.MediaStore;
 
 import androidx.test.InstrumentationRegistry;
@@ -68,12 +70,12 @@ import java.util.Optional;
 import java.util.Set;
 
 @RunWith(AndroidJUnit4.class)
-@RequiresFlagsEnabled(com.android.providers.media.flags.Flags.FLAG_ENABLE_BACKUP_AND_RESTORE)
+@EnableFlags(com.android.providers.media.flags.Flags.FLAG_ENABLE_BACKUP_AND_RESTORE)
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
 public final class BackupExecutorTest {
 
     @Rule
-    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private Set<File> mStagedFiles = new HashSet<>();
 
@@ -103,7 +105,7 @@ public final class BackupExecutorTest {
         mDownloadsDir = new File(Environment.getExternalStorageDirectory(),
                 Environment.DIRECTORY_DOWNLOADS);
         mLevelDbPath =
-                mIsolatedContext.getFilesDir().getAbsolutePath() + "/backup/external_primary/";
+                mIsolatedContext.getFilesDir().getAbsolutePath() + "/backup/external_primary";
         FileUtils.deleteContents(mDownloadsDir);
     }
 
@@ -121,6 +123,7 @@ public final class BackupExecutorTest {
 
     @Test
     public void testBackup() throws Exception {
+        assumeTrue(isBackupAndRestoreSupported(mIsolatedContext));
         try {
             // Add all files in Downloads directory
             File file = new File(mDownloadsDir, "a_" + SystemClock.elapsedRealtimeNanos() + ".jpg");

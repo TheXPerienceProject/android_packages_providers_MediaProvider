@@ -2622,6 +2622,7 @@ std::unique_ptr<FdAccessResult> FuseDaemon::CheckFdAccess(int fd, uid_t uid) con
         return std::make_unique<FdAccessResult>(string(), false);
     }
 
+    std::lock_guard<std::recursive_mutex> guard(fuse->lock);
     const node* node = node::LookupInode(fuse->root, ino);
     if (!node) {
         PLOG(DEBUG) << "CheckFdAccess no node found with given ino";

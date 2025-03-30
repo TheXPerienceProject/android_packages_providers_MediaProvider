@@ -16,11 +16,9 @@
 
 package android.graphics.pdf.component;
 
+import android.annotation.ColorInt;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
-import android.annotation.Nullable;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.pdf.flags.Flags;
 
 /**
@@ -30,24 +28,29 @@ import android.graphics.pdf.flags.Flags;
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_TEXT_OBJECTS)
 public final class PdfPageTextObject extends PdfPageObject {
     private String mText;
-    private Typeface mTypeface;
-    private float mFontSize;
-    private Color mStrokeColor = new Color(); // Default is opaque black in the sRGB color space.
+    private final PdfPageTextObjectFont mFont;
+    private final float mFontSize;
+    private @ColorInt int mStrokeColor;
     private float mStrokeWidth = 1.0f;
-    private Color mFillColor;
+    private @ColorInt int mFillColor;
+    private @PdfPageObjectRenderMode.Type int mRenderMode;
 
     /**
      * Constructor for the PdfPageTextObject.
      * Sets the object type to TEXT and initializes the text color to black.
      *
-     * @param typeface The font of the text.
+     * @param font The font of the text.
      * @param fontSize The font size of the text.
      */
-    public PdfPageTextObject(@NonNull String text, @NonNull Typeface typeface, float fontSize) {
+    public PdfPageTextObject(@NonNull String text, @NonNull PdfPageTextObjectFont font,
+            float fontSize) {
         super(PdfPageObjectType.TEXT);
         this.mText = text;
-        this.mTypeface = typeface;
+        this.mFont = font;
         this.mFontSize = fontSize;
+        if (Flags.enableEditPdfPageObjects()) {
+            this.mRenderMode = PdfPageObjectRenderMode.FILL;
+        }
     }
 
     /**
@@ -79,31 +82,31 @@ public final class PdfPageTextObject extends PdfPageObject {
     }
 
     /**
-     * Sets the font size of the object.
+     * Returns the font of the text.
      *
-     * @param fontSize The font size to set.
-     */
-    public void setFontSize(float fontSize) {
-        mFontSize = fontSize;
-    }
-
-    /**
-     * Returns the stroke color of the object.
-     *
-     * @return The stroke color of the object.
+     * @return A copy of the font object.
      */
     @NonNull
-    public Color getStrokeColor() {
-        return mStrokeColor;
+    public PdfPageTextObjectFont getFont() {
+        return new PdfPageTextObjectFont(mFont);
     }
 
     /**
-     * Sets the stroke color of the object.
+     * Returns the fill color of the object.
      *
-     * @param strokeColor The stroke color of the object.
+     * @return The fill color of the object.
      */
-    public void setStrokeColor(@NonNull Color strokeColor) {
-        this.mStrokeColor = strokeColor;
+    public @ColorInt int getFillColor() {
+        return mFillColor;
+    }
+
+    /**
+     * Sets the fill color of the object.
+     *
+     * @param  fillColor The fill color of the object.
+     */
+    public void setFillColor(@ColorInt int fillColor) {
+        this.mFillColor = fillColor;
     }
 
     /**
@@ -121,44 +124,42 @@ public final class PdfPageTextObject extends PdfPageObject {
      * @param strokeWidth The stroke width of the object.
      */
     public void setStrokeWidth(float strokeWidth) {
-        this.mStrokeWidth = strokeWidth;
+        mStrokeWidth = strokeWidth;
     }
 
     /**
-     * Returns the font of the text.
+     * Returns the stroke color of the object.
      *
-     * @return The font.
+     * @return The stroke color of the object.
      */
-    @NonNull
-    public Typeface getTypeface() {
-        return mTypeface;
+    public @ColorInt int getStrokeColor() {
+        return mStrokeColor;
     }
 
     /**
-     * Sets the font of the text.
+     * Sets the stroke color of the object.
      *
-     * @param typeface The font to set.
+     * @param strokeColor The stroke color of the object.
      */
-    public void setTypeface(@NonNull Typeface typeface) {
-        this.mTypeface = typeface;
+    public void setStrokeColor(@ColorInt int strokeColor) {
+        this.mStrokeColor = strokeColor;
     }
 
     /**
-     * Returns the fill color of the object.
+     * Returns the render mode of the object.
      *
-     * @return The fill color of the object.
+     * @return The render mode of the object.
      */
-    @Nullable
-    public Color getFillColor() {
-        return mFillColor;
+    public @PdfPageObjectRenderMode.Type int getRenderMode() {
+        return mRenderMode;
     }
 
     /**
-     * Sets the fill color of the object.
+     * Sets the render mode of the object.
      *
-     * @param fillColor The fill color of the object.
+     * @param renderMode The render mode to be set.
      */
-    public void setFillColor(@Nullable Color fillColor) {
-        this.mFillColor = fillColor;
+    public void setRenderMode(@PdfPageObjectRenderMode.Type int renderMode) {
+        mRenderMode = renderMode;
     }
 }

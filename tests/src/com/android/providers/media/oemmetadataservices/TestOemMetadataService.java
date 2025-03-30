@@ -27,6 +27,15 @@ import java.util.Set;
 
 public class TestOemMetadataService extends OemMetadataService {
 
+    static Map<String, String> sOemMetadata = new HashMap<>();
+
+    static {
+        sOemMetadata.put("a", "1");
+        sOemMetadata.put("b", "2");
+        sOemMetadata.put("c", "3");
+        sOemMetadata.put("d", "4");
+        sOemMetadata.put("e", "5");
+    }
 
     @Override
     public Set<String> onGetSupportedMimeTypes() {
@@ -35,12 +44,14 @@ public class TestOemMetadataService extends OemMetadataService {
 
     @Override
     public Map<String, String> onGetOemCustomData(@NonNull ParcelFileDescriptor pfd) {
-        Map<String, String> oemMetadata = new HashMap<>();
-        oemMetadata.put("a", "1");
-        oemMetadata.put("b", "2");
-        oemMetadata.put("c", "3");
-        oemMetadata.put("d", "4");
-        oemMetadata.put("e", "5");
-        return oemMetadata;
+        return sOemMetadata;
+    }
+
+    public static void updateOemMetadataServiceData() {
+        sOemMetadata.put("f", "6");
+    }
+
+    public static void resetOemMetadataServiceData() {
+        sOemMetadata.remove("f");
     }
 }

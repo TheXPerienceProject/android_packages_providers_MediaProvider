@@ -21,6 +21,7 @@
 
 #include "fpdf_edit.h"
 #include "logging.h"
+#include "rect.h"
 
 #define LOG_TAG "path_object"
 
@@ -90,7 +91,7 @@ bool PathObject::UpdateFPDFInstance(FPDF_PAGEOBJECT path_object, FPDF_PAGE page)
     }
 
     // Set the updated matrix.
-    if (!FPDFPageObj_SetMatrix(path_object, reinterpret_cast<FS_MATRIX*>(&matrix_))) {
+    if (!SetDeviceToPageMatrix(path_object, page)) {
         return false;
     }
 
@@ -150,7 +151,7 @@ bool PathObject::PopulateFromFPDFInstance(FPDF_PAGEOBJECT path_object, FPDF_PAGE
     is_stroke_ = stroke;
 
     // Get Matrix
-    if (!FPDFPageObj_GetMatrix(path_object, reinterpret_cast<FS_MATRIX*>(&matrix_))) {
+    if (!GetPageToDeviceMatrix(path_object, page)) {
         return false;
     }
 
@@ -162,6 +163,44 @@ bool PathObject::PopulateFromFPDFInstance(FPDF_PAGEOBJECT path_object, FPDF_PAGE
                                &stroke_color_.a);
     // Get Stroke Width
     FPDFPageObj_GetStrokeWidth(path_object, &stroke_width_);
+
+    return true;
+}
+
+bool PathObject::GetPageToDeviceMatrix(FPDF_PAGEOBJECT path_object, FPDF_PAGE page) {
+    Matrix page_matrix;
+    if (!FPDFPageObj_GetMatrix(path_object, reinterpret_cast<FS_MATRIX*>(&page_matrix))) {
+        LOGE("GetPageMatrix failed!");
+        return false;
+    }
+
+    float page_height = FPDF_GetPageHeightF(page);
+
+    // Page to device matrix.
+    device_matrix_.a = page_matrix.a;
+    device_matrix_.b = (page_matrix.b != 0) ? -page_matrix.b : 0;
+    device_matrix_.c = (page_matrix.c != 0) ? -page_matrix.c : 0;
+    device_matrix_.d = page_matrix.d;
+    device_matrix_.e = page_matrix.e + (page_height * page_matrix.c);
+    device_matrix_.f = page_height - page_matrix.f - (page_height * page_matrix.d);
+
+    return true;
+}
+
+bool PathObject::SetDeviceToPageMatrix(FPDF_PAGEOBJECT path_object, FPDF_PAGE page) {
+    // Reset Previous Transformation.
+    Matrix identity = {1, 0, 0, 1, 0, 0};
+    if (!FPDFPageObj_SetMatrix(path_object, reinterpret_cast<FS_MATRIX*>(&identity))) {
+        LOGE("SetMatrix failed!");
+        return false;
+    }
+
+    float page_height = FPDF_GetPageHeightF(page);
+
+    FPDFPageObj_Transform(path_object, 1, 0, 0, 1, 0, -page_height);
+    FPDFPageObj_Transform(path_object, device_matrix_.a, -device_matrix_.b, -device_matrix_.c,
+                          device_matrix_.d, device_matrix_.e, -device_matrix_.f);
+    FPDFPageObj_Transform(path_object, 1, 0, 0, 1, 0, page_height);
 
     return true;
 }

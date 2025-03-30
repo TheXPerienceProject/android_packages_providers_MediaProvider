@@ -136,6 +136,7 @@ java_library {
     libs: [
         // To add StatsLog as a dependency of the generated file.
         "framework-statsd.stubs.module_lib",
+        "androidx.annotation_annotation",
     ],
     apex_available: [
         "com.android.mediaprovider",

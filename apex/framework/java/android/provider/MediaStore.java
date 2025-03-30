@@ -32,6 +32,7 @@ import android.annotation.WorkerThread;
 import android.app.Activity;
 import android.app.AppOpsManager;
 import android.app.PendingIntent;
+import android.app.compat.CompatChanges;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ClipData;
 import android.content.ContentProvider;
@@ -302,6 +303,9 @@ public final class MediaStore {
     /** @hide */
     public static final String REVOKED_ALL_READ_GRANTS_FOR_PACKAGE_CALL =
             "revoke_all_media_grants_for_package";
+
+    /** @hide */
+    public static final String BULK_UPDATE_OEM_METADATA_CALL = "bulk_update_oem_metadata";
 
     /** @hide */
     public static final String OPEN_FILE_CALL =
@@ -661,6 +665,11 @@ public final class MediaStore {
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String INTENT_ACTION_VIDEO_CAMERA = "android.media.action.VIDEO_CAMERA";
+
+    /**
+     * This is a copy of the flag that exists in MediaProvider.
+     */
+    private static final long EXCLUDE_UNRELIABLE_STORAGE_VOLUMES = 391360514L;
 
     /**
      * Standard Intent action that can be sent to have the camera application
@@ -1341,6 +1350,16 @@ public final class MediaStore {
     @FlaggedApi(Flags.FLAG_ENABLE_OEM_METADATA)
     public static final String ACCESS_OEM_METADATA_PERMISSION =
             "com.android.providers.media.permission.ACCESS_OEM_METADATA";
+
+    /**
+     * Permission that grants ability to trigger update of {@link MediaColumns#OEM_METADATA}.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_OEM_METADATA_UPDATE)
+    @SystemApi
+    public static final String UPDATE_OEM_METADATA_PERMISSION =
+            "com.android.providers.media.permission.UPDATE_OEM_METADATA";
 
     /** @hide */
     @IntDef(flag = true, prefix = { "MATCH_" }, value = {
@@ -4734,13 +4753,29 @@ public final class MediaStore {
                 case Environment.MEDIA_MOUNTED_READ_ONLY: {
                     final String volumeName = sv.getMediaStoreVolumeName();
                     if (volumeName != null) {
-                        res.add(volumeName);
+                        File directory = sv.getDirectory();
+                        if (shouldExcludeUnReliableStorageVolumes()
+                                && directory != null
+                                && directory.getAbsolutePath() != null
+                                && directory.getAbsolutePath().startsWith("/mnt/")) {
+                            Log.d(TAG, "skipping unreliable volume : " + volumeName);
+                        } else {
+                            res.add(volumeName);
+                        }
                     }
                     break;
                 }
             }
         }
         return res;
+    }
+
+    /**
+     * Checks if the EXCLUDE_UNRELIABLE_STORAGE_VOLUMES appcompat flag is enabled.
+     */
+    private static boolean shouldExcludeUnReliableStorageVolumes() {
+        return CompatChanges.isChangeEnabled(EXCLUDE_UNRELIABLE_STORAGE_VOLUMES)
+                && Flags.excludeUnreliableVolumes();
     }
 
     /**
@@ -5730,6 +5765,28 @@ public final class MediaStore {
             client.call(REVOKE_READ_GRANT_FOR_PACKAGE_CALL,
                     /* arg= */ null,
                     /* extras= */ extras);
+        } catch (RemoteException e) {
+            throw e.rethrowAsRuntimeException();
+        }
+    }
+
+    /**
+     * Allows bulk update of {@link MediaColumns#OEM_METADATA} column in next scan.
+     * Requires calling package to hold {@link UPDATE_OEM_METADATA_PERMISSION} permission. Updates
+     * {@link MediaColumns#OEM_METADATA} to NULL for OEM supported media files and re-fetch
+     * the latest values in the next scan.
+     * Caller can enforce file/volume scan after this to update MediaStore with the latest OEM
+     * metadata. If not done, next scan by MediaStore will fetch and update the latest data.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_OEM_METADATA_UPDATE)
+    @SystemApi
+    public static void bulkUpdateOemMetadataInNextScan(@NonNull Context context) {
+        final ContentResolver resolver = context.getContentResolver();
+        try (ContentProviderClient client = resolver.acquireContentProviderClient(AUTHORITY)) {
+            final Bundle extras = new Bundle();
+            client.call(BULK_UPDATE_OEM_METADATA_CALL, /* arg= */ null, /* extras= */ extras);
         } catch (RemoteException e) {
             throw e.rethrowAsRuntimeException();
         }

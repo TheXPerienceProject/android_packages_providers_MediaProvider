@@ -31,10 +31,13 @@ import androidx.annotation.VisibleForTesting
 import androidx.media3.common.util.MediaFormatUtil.createFormatFromMediaFormat
 import androidx.media3.common.util.MediaFormatUtil.isVideoFormat
 import androidx.media3.exoplayer.MediaExtractorCompat
+import com.android.photopicker.core.events.Telemetry
 import com.android.photopicker.data.model.Media
 
 /** A class that help video transcode. */
 class TranscoderImpl : Transcoder {
+
+    private var needsTranscodingVideoInfo: Transcoder.VideoInfo? = null
 
     override fun isTranscodeRequired(
         context: Context,
@@ -53,7 +56,7 @@ class TranscoderImpl : Transcoder {
         // Check if any video tracks need to be transcoded.
         val videoTrackMediaFormats = getVideoTrackMediaFormats(context, video)
         for (mediaFormat in videoTrackMediaFormats) {
-            if (isTranscodeRequired(mediaFormat, mediaCapabilities)) {
+            if (isTranscodeRequired(mediaFormat, mediaCapabilities, video.duration)) {
                 return true
             }
         }
@@ -98,6 +101,7 @@ class TranscoderImpl : Transcoder {
     fun isTranscodeRequired(
         mediaFormat: MediaFormat,
         mediaCapabilities: ApplicationMediaCapabilities,
+        duration: Int = 0,
     ): Boolean {
         val format = createFormatFromMediaFormat(mediaFormat)
         val mimeType = format.sampleMimeType
@@ -111,6 +115,13 @@ class TranscoderImpl : Transcoder {
                 // what the caller intended.
 
                 if (isHlg10(colorStandard, colorTransfer) && !isHdrTypeSupported(HdrType.HLG)) {
+                    needsTranscodingVideoInfo =
+                        Transcoder.VideoInfo(
+                            duration,
+                            colorStandard ?: 0,
+                            colorTransfer ?: 0,
+                            Telemetry.VideoMimeType.HEVC.type,
+                        )
                     return true
                 }
 
@@ -119,6 +130,13 @@ class TranscoderImpl : Transcoder {
                         (!isHdrTypeSupported(HdrType.HDR10) ||
                             !isHdrTypeSupported(HdrType.HDR10_PLUS))
                 ) {
+                    needsTranscodingVideoInfo =
+                        Transcoder.VideoInfo(
+                            duration,
+                            colorStandard ?: 0,
+                            colorTransfer ?: 0,
+                            Telemetry.VideoMimeType.HEVC.type,
+                        )
                     return true
                 }
             }
@@ -127,11 +145,22 @@ class TranscoderImpl : Transcoder {
                 isHdrDolbyVision(mimeType, colorStandard, colorTransfer) &&
                     !isHdrTypeSupported(HdrType.DOLBY_VISION)
             ) {
+                needsTranscodingVideoInfo =
+                    Transcoder.VideoInfo(
+                        duration,
+                        colorStandard ?: 0,
+                        colorTransfer ?: 0,
+                        Telemetry.VideoMimeType.DOLBY.type,
+                    )
                 return true
             }
         }
-
         return false
+    }
+
+    /** Returns details of the video that needs transcoding */
+    override fun getTranscodingVideoInfo(): Transcoder.VideoInfo? {
+        return needsTranscodingVideoInfo
     }
 
     companion object {

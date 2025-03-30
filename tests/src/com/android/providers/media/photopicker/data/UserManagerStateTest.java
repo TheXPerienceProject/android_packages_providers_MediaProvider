@@ -23,6 +23,7 @@ import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -111,6 +112,7 @@ public class UserManagerStateTest {
 
         // set Managed Profile identification
         when(mMockUserManager.isManagedProfile(mManagedUser.getIdentifier())).thenReturn(true);
+        when(mMockUserManager.isManagedProfile(mManagedUser2.getIdentifier())).thenReturn(true);
         when(mMockUserManager.isManagedProfile(mPersonalUser.getIdentifier())).thenReturn(false);
         when(mMockUserManager.isManagedProfile(mOtherUser1.getIdentifier())).thenReturn(false);
         when(mMockUserManager.isManagedProfile(mOtherUser2.getIdentifier())).thenReturn(false);
@@ -171,6 +173,62 @@ public class UserManagerStateTest {
     }
 
     @Test
+    public void testCrossProfileAccessWithDelegationVPlus() {
+        assumeTrue(SdkLevel.isAtLeastV());
+
+        // Return a ResolveInfo for the correct managed profile.
+        when(mMockPackageManager.queryIntentActivitiesAsUser(
+                        any(Intent.class), anyInt(), any(UserHandle.class)))
+                .thenReturn(List.of());
+
+        initializeUserManagerState(
+                UserId.of(mPersonalUser),
+                Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1));
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            mUserManagerState.setIntentAndCheckRestrictions(new Intent());
+                            assertThat(
+                                            mUserManagerState.isCrossProfileAllowedToUser(
+                                                    UserId.of(mManagedUser)))
+                                    .isFalse();
+                            assertThat(
+                                            mUserManagerState.isCrossProfileAllowedToUser(
+                                                    UserId.of(mOtherUser1)))
+                                    .isTrue();
+                        });
+    }
+
+    @Test
+    public void testCrossProfileAccessWithDelegationManagedToPrivateVPlus() {
+        assumeTrue(SdkLevel.isAtLeastV());
+
+        // Return a ResolveInfo for the personal profile only.
+        when(mMockPackageManager.queryIntentActivitiesAsUser(
+                        any(Intent.class), anyInt(), eq(mManagedUser)))
+                .thenReturn(List.of(new ReflectedResolveInfo(mPersonalUser.getIdentifier())));
+
+        initializeUserManagerState(
+                UserId.of(mManagedUser),
+                Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1));
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            mUserManagerState.setIntentAndCheckRestrictions(new Intent());
+                            assertThat(
+                                            mUserManagerState.isCrossProfileAllowedToUser(
+                                                    UserId.of(mPersonalUser)))
+                                    .isTrue();
+                            assertThat(
+                                            mUserManagerState.isCrossProfileAllowedToUser(
+                                                    UserId.of(mOtherUser1)))
+                                    .isTrue();
+                        });
+    }
+
+    @Test
     public void testCrossProfileAccessWithMultipleManagedProfilesIsAllowedVPlus() {
         assumeTrue(SdkLevel.isAtLeastV());
 
@@ -186,7 +244,8 @@ public class UserManagerStateTest {
         when(mMockUserManager.getUserProperties(mManagedUser2)).thenReturn(mManagedUser2Properties);
 
         // Return a ResolveInfo for the correct managed profile.
-        when(mMockPackageManager.queryIntentActivities(any(Intent.class), anyInt()))
+        when(mMockPackageManager.queryIntentActivitiesAsUser(
+                        any(Intent.class), anyInt(), eq(mPersonalUser)))
                 .thenReturn(List.of(new ReflectedResolveInfo(mManagedUser2.getIdentifier())));
 
         initializeUserManagerState(
@@ -224,7 +283,8 @@ public class UserManagerStateTest {
         when(mMockUserManager.getUserProperties(mManagedUser2)).thenReturn(mManagedUser2Properties);
 
         // Return a ResolveInfo for the OTHER managed profile.
-        when(mMockPackageManager.queryIntentActivities(any(Intent.class), anyInt()))
+        when(mMockPackageManager.queryIntentActivitiesAsUser(
+                        any(Intent.class), anyInt(), eq(mPersonalUser)))
                 .thenReturn(List.of(new ReflectedResolveInfo(mManagedUser.getIdentifier())));
 
         initializeUserManagerState(
@@ -254,7 +314,8 @@ public class UserManagerStateTest {
         when(mMockUserManager.isManagedProfile(mManagedUser2.getIdentifier())).thenReturn(true);
 
         // Return a ResolveInfo for the correct managed profile.
-        when(mMockPackageManager.queryIntentActivities(any(Intent.class), anyInt()))
+        when(mMockPackageManager.queryIntentActivitiesAsUser(
+                        any(Intent.class), anyInt(), eq(mPersonalUser)))
                 .thenReturn(List.of(new ReflectedResolveInfo(mManagedUser2.getIdentifier())));
 
         initializeUserManagerState(
@@ -280,7 +341,8 @@ public class UserManagerStateTest {
         when(mMockUserManager.isManagedProfile(mManagedUser2.getIdentifier())).thenReturn(true);
 
         // Return a ResolveInfo for the OTHER managed profile.
-        when(mMockPackageManager.queryIntentActivities(any(Intent.class), anyInt()))
+        when(mMockPackageManager.queryIntentActivitiesAsUser(
+                        any(Intent.class), anyInt(), eq(mPersonalUser)))
                 .thenReturn(List.of(new ReflectedResolveInfo(mManagedUser.getIdentifier())));
 
         initializeUserManagerState(
@@ -349,19 +411,14 @@ public class UserManagerStateTest {
     public void testGetAllUserProfileIdsThatNeedToShowInPhotoPicker_currentUserIsPersonalUser() {
         initializeUserManagerState(
                 UserId.of(mPersonalUser),
-                Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1, mOtherUser2));
+                Arrays.asList(mPersonalUser, mManagedUser));
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
                             List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser));
+                                    Arrays.asList(
+                                            UserId.of(mPersonalUser),
+                                            UserId.of(mManagedUser));
 
                             assertThat(mUserManagerState.getAllUserProfileIds())
                                     .containsExactlyElementsIn(userIdList);
@@ -372,19 +429,14 @@ public class UserManagerStateTest {
     public void testGetAllUserProfileIdsThatNeedToShowInPhotoPicker_currentUserIsManagedUser() {
         initializeUserManagerState(
                 UserId.of(mManagedUser),
-                Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1, mOtherUser2));
+                Arrays.asList(mPersonalUser, mManagedUser));
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
                             List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser));
+                                    Arrays.asList(
+                                            UserId.of(mPersonalUser),
+                                            UserId.of(mManagedUser));
 
                             assertThat(mUserManagerState.getAllUserProfileIds())
                                     .containsExactlyElementsIn(userIdList);
@@ -392,22 +444,21 @@ public class UserManagerStateTest {
     }
 
     @Test
-    public void testGetAllUserProfileIdsThatNeedToShowInPhotoPicker_currentUserIsOtherUser1() {
+    public void
+            testGetAllUserProfileIdsThatNeedToShowInPhotoPicker_currentUserIsOtherUser1VPlus() {
+        assumeTrue(SdkLevel.isAtLeastV());
         initializeUserManagerState(
                 UserId.of(mOtherUser1),
-                Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1, mOtherUser2));
+                Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1));
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
                             List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser));
+                                    Arrays.asList(
+                                            UserId.of(mPersonalUser),
+                                            UserId.of(mManagedUser),
+                                            UserId.of(mOtherUser1));
+
                             assertThat(mUserManagerState.getAllUserProfileIds())
                                     .containsExactlyElementsIn(userIdList);
                         });
@@ -433,6 +484,36 @@ public class UserManagerStateTest {
 
     @Test
     public void testUserIds_multiUserProfilesAvailable_currentUserIsPersonalUser() {
+        assumeFalse(SdkLevel.isAtLeastV());
+        UserId currentUser = UserId.of(mPersonalUser);
+
+        // if available user profiles are {personal , managed, otherUser1 }
+        initializeUserManagerState(
+                currentUser, Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1));
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            assertThat(mUserManagerState.isMultiUserProfiles()).isTrue();
+
+                            assertThat(mUserManagerState.getCurrentUserProfileId())
+                                    .isEqualTo(UserId.of(mPersonalUser));
+
+                            List<UserId> userIdList = Arrays.asList(
+                                                    UserId.of(mPersonalUser),
+                                                    UserId.of(mManagedUser));
+                            assertThat(mUserManagerState.getAllUserProfileIds())
+                                    .containsExactlyElementsIn(userIdList);
+
+                            assertThat(
+                                            mUserManagerState.isManagedUserProfile(
+                                                    mUserManagerState.getCurrentUserProfileId()))
+                                    .isFalse();
+                        });
+    }
+
+    @Test
+    public void testUserIds_multiUserProfilesAvailable_currentUserIsPersonalUserVPlus() {
+        assumeTrue(SdkLevel.isAtLeastV());
         UserId currentUser = UserId.of(mPersonalUser);
 
         // if available user profiles are {personal , managed, otherUser1 }
@@ -447,14 +528,10 @@ public class UserManagerStateTest {
                                     .isEqualTo(UserId.of(mPersonalUser));
 
                             List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser));
+                                    Arrays.asList(
+                                            UserId.of(mPersonalUser),
+                                            UserId.of(mManagedUser),
+                                            UserId.of(mOtherUser1));
                             assertThat(mUserManagerState.getAllUserProfileIds())
                                     .containsExactlyElementsIn(userIdList);
 
@@ -462,78 +539,6 @@ public class UserManagerStateTest {
                                             mUserManagerState.isManagedUserProfile(
                                                     mUserManagerState.getCurrentUserProfileId()))
                                     .isFalse();
-                        });
-
-        // if available user profiles are {personal , otherUser1 }
-        initializeUserManagerState(currentUser, Arrays.asList(mPersonalUser, mOtherUser1));
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            if (SdkLevel.isAtLeastV()) {
-                                assertThat(mUserManagerState.isMultiUserProfiles()).isTrue();
-                            } else {
-                                assertThat(mUserManagerState.isMultiUserProfiles()).isFalse();
-                            }
-
-                            List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(UserId.of(mPersonalUser));
-                            assertThat(mUserManagerState.getAllUserProfileIds())
-                                    .containsExactlyElementsIn(userIdList);
-                        });
-
-        // if available user profiles are {personal , otherUser2 }
-        initializeUserManagerState(currentUser, Arrays.asList(mPersonalUser, mOtherUser2));
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            assertThat(mUserManagerState.isMultiUserProfiles()).isFalse();
-
-                            assertThat(mUserManagerState.getCurrentUserProfileId())
-                                    .isEqualTo(UserId.of(mPersonalUser));
-                            assertThat(mUserManagerState.getAllUserProfileIds())
-                                    .containsExactlyElementsIn(
-                                            Arrays.asList(UserId.of(mPersonalUser)));
-                        });
-    }
-
-    @Test
-    public void testUserIds_multiUserProfilesAvailable_currentUserIsOtherUser2() {
-        UserId currentUser = UserId.of(mOtherUser2);
-
-        initializeUserManagerState(
-                currentUser, Arrays.asList(mPersonalUser, mManagedUser, mOtherUser1, mOtherUser2));
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            assertThat(mUserManagerState.isMultiUserProfiles()).isTrue();
-                            assertThat(mUserManagerState.getCurrentUserProfileId())
-                                    .isEqualTo(UserId.of(mOtherUser2));
-
-                            List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser));
-                            assertThat(mUserManagerState.getAllUserProfileIds())
-                                    .containsExactlyElementsIn(userIdList);
-                        });
-
-        initializeUserManagerState(currentUser, Arrays.asList(mPersonalUser, mOtherUser2));
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            assertThat(mUserManagerState.isMultiUserProfiles()).isFalse();
-                            assertThat(mUserManagerState.getAllUserProfileIds())
-                                    .containsExactlyElementsIn(
-                                            Arrays.asList(UserId.of(mPersonalUser)));
                         });
     }
 
@@ -555,56 +560,6 @@ public class UserManagerStateTest {
                                             mUserManagerState.isManagedUserProfile(
                                                     mUserManagerState.getCurrentUserProfileId()))
                                     .isTrue();
-                        });
-
-        // set current user as otherUser2
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            mUserManagerState.setUserAsCurrentUserProfile(UserId.of(mOtherUser2));
-                            assertThat(mUserManagerState.getCurrentUserProfileId())
-                                    .isEqualTo(UserId.of(mManagedUser));
-                        });
-
-        // set current user as otherUser1
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            mUserManagerState.setUserAsCurrentUserProfile(UserId.of(mOtherUser1));
-                            UserHandle currentUserProfile =
-                                    SdkLevel.isAtLeastV() ? mOtherUser1 : mManagedUser;
-                            assertThat(mUserManagerState.getCurrentUserProfileId())
-                                    .isEqualTo(UserId.of(currentUserProfile));
-                        });
-
-        // set current user as personalUser
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            mUserManagerState.setUserAsCurrentUserProfile(UserId.of(mPersonalUser));
-                            assertThat(mUserManagerState.getCurrentUserProfileId())
-                                    .isEqualTo(UserId.of(mPersonalUser));
-                        });
-
-        // set current user otherUser3
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(
-                        () -> {
-                            mUserManagerState.setUserAsCurrentUserProfile(UserId.of(mOtherUser3));
-                            assertThat(mUserManagerState.getCurrentUserProfileId())
-                                    .isEqualTo(UserId.of(mPersonalUser));
-
-                            List<UserId> userIdList =
-                                    SdkLevel.isAtLeastV()
-                                            ? Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser),
-                                                    UserId.of(mOtherUser1))
-                                            : Arrays.asList(
-                                                    UserId.of(mPersonalUser),
-                                                    UserId.of(mManagedUser));
-                            assertThat(mUserManagerState.getAllUserProfileIds())
-                                    .containsExactlyElementsIn(userIdList);
                         });
     }
 

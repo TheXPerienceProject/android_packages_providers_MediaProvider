@@ -18,10 +18,13 @@ package com.android.providers.media.backupandrestore;
 
 import static com.android.providers.media.backupandrestore.BackupAndRestoreTestUtils.createSerialisedValue;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.RESTORE_COMPLETED;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.isBackupAndRestoreSupported;
 import static com.android.providers.media.scan.MediaScanner.REASON_UNKNOWN;
 import static com.android.providers.media.scan.MediaScannerTest.stage;
 
 import static com.google.common.truth.Truth.assertThat;
+
+import static org.junit.Assume.assumeTrue;
 
 import android.Manifest;
 import android.content.ContentResolver;
@@ -32,9 +35,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.SystemClock;
-import android.platform.test.annotations.RequiresFlagsEnabled;
-import android.platform.test.flag.junit.CheckFlagsRule;
-import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.MediaStore;
 
 import androidx.test.InstrumentationRegistry;
@@ -58,18 +60,16 @@ import org.junit.runner.RunWith;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 @RunWith(AndroidJUnit4.class)
-@RequiresFlagsEnabled(com.android.providers.media.flags.Flags.FLAG_ENABLE_BACKUP_AND_RESTORE)
+@EnableFlags(com.android.providers.media.flags.Flags.FLAG_ENABLE_BACKUP_AND_RESTORE)
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
 public final class RestoreExecutorTest {
 
     @Rule
-    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private Context mIsolatedContext;
 
@@ -105,8 +105,9 @@ public final class RestoreExecutorTest {
 
     @Test
     public void testMetadataRestoreForImageFile() throws Exception {
+        assumeTrue(isBackupAndRestoreSupported(mIsolatedContext));
         String levelDbPath =
-                mIsolatedContext.getFilesDir().getAbsolutePath() + "/restore/external_primary/";
+                mIsolatedContext.getFilesDir().getAbsolutePath() + "/restore/external_primary";
         if (!new File(levelDbPath).exists()) {
             new File(levelDbPath).mkdirs();
         }
@@ -277,12 +278,10 @@ public final class RestoreExecutorTest {
         }
     }
 
-    private void seedAudioDataIntoLevelDb(File testAudioFile, LevelDBInstance levelDBInstance)
-            throws IOException {
+    private void seedAudioDataIntoLevelDb(File testAudioFile, LevelDBInstance levelDBInstance) {
         Map<String, String> values = new HashMap<>();
         values.put(MediaStore.Files.FileColumns.OWNER_PACKAGE_NAME, "com.hello.audio");
-        values.put(MediaStore.Files.FileColumns.SIZE,
-                String.valueOf(Files.size(Path.of(testAudioFile.getAbsolutePath()))));
+        values.put(MediaStore.Files.FileColumns.SIZE, String.valueOf(testAudioFile.length()));
         values.put(MediaStore.Files.FileColumns.TITLE, "MyAudio");
         values.put(MediaStore.Audio.AudioColumns.TRACK, "Forever");
         values.put(MediaStore.Files.FileColumns.DURATION, "120");
@@ -294,12 +293,10 @@ public final class RestoreExecutorTest {
                         createSerialisedValue(values))).isSuccess()).isTrue();
     }
 
-    private void seedVideoDataIntoLevelDb(File testVideoFile, LevelDBInstance levelDBInstance)
-            throws IOException {
+    private void seedVideoDataIntoLevelDb(File testVideoFile, LevelDBInstance levelDBInstance) {
         Map<String, String> values = new HashMap<>();
         values.put(MediaStore.Files.FileColumns.OWNER_PACKAGE_NAME, "com.hello.video");
-        values.put(MediaStore.Files.FileColumns.SIZE,
-                String.valueOf(Files.size(Path.of(testVideoFile.getAbsolutePath()))));
+        values.put(MediaStore.Files.FileColumns.SIZE, String.valueOf(testVideoFile.length()));
         values.put(MediaStore.Files.FileColumns.TITLE, "MyVideo");
         values.put(MediaStore.Video.VideoColumns.COLOR_STANDARD, "1");
         values.put(MediaStore.Video.VideoColumns.COLOR_RANGE, "5");
@@ -311,12 +308,10 @@ public final class RestoreExecutorTest {
                         createSerialisedValue(values))).isSuccess()).isTrue();
     }
 
-    private void seedImageDataIntoLevelDb(File testFile, LevelDBInstance levelDBInstance)
-            throws IOException {
+    private void seedImageDataIntoLevelDb(File testFile, LevelDBInstance levelDBInstance) {
         Map<String, String> values = new HashMap<>();
         values.put(MediaStore.Files.FileColumns.OWNER_PACKAGE_NAME, "com.hello.image");
-        values.put(MediaStore.Files.FileColumns.SIZE,
-                String.valueOf(Files.size(Path.of(testFile.getAbsolutePath()))));
+        values.put(MediaStore.Files.FileColumns.SIZE, String.valueOf(testFile.length()));
         values.put(MediaStore.Files.FileColumns.TITLE, "MyImage");
         values.put(MediaStore.Files.FileColumns.HEIGHT, "1600");
         values.put(MediaStore.Files.FileColumns.WIDTH, "3200");

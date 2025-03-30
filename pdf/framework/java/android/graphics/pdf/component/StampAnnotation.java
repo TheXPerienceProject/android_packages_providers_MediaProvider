@@ -35,16 +35,40 @@ import java.util.List;
  */
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_STAMP_ANNOTATIONS)
 public final class StampAnnotation extends PdfAnnotation {
+    @NonNull private RectF mBounds;
     @NonNull private List<PdfPageObject> mObjects;
 
     /**
-     * Creates a new stamp annotation with the specified bounds
+     * Creates a new stamp annotation with the specified bounds.
+     * <p>
+     *     The list of page objects inside the stamp annotation will be empty by default
      *
      * @param bounds The bounding rectangle of the annotation.
      */
     public StampAnnotation(@NonNull RectF bounds) {
-        super(PdfAnnotationType.STAMP, bounds);
+        super(PdfAnnotationType.STAMP);
+        mBounds = bounds;
         mObjects = new ArrayList<>();
+    }
+
+    /**
+     * Sets the bounding rectangle of the stamp annotation.
+     *
+     * @param bounds The new bounding rectangle.
+     * @throws NullPointerException if given bounds is null
+     */
+    public void setBounds(@NonNull RectF bounds) {
+        Preconditions.checkNotNull(bounds, "Bounds should not be null");
+        this.mBounds = bounds;
+    }
+
+    /**
+     * Returns the bounding rectangle of the stamp annotation.
+     *
+     * @return The bounding rectangle.
+     */
+    @NonNull public RectF getBounds() {
+        return mBounds;
     }
 
     /**

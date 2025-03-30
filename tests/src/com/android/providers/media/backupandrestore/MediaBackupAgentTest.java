@@ -18,6 +18,7 @@ package com.android.providers.media.backupandrestore;
 
 import static com.android.providers.media.backupandrestore.BackupAndRestoreTestUtils.deSerialiseValueString;
 import static com.android.providers.media.backupandrestore.BackupAndRestoreTestUtils.getSharedPreferenceValue;
+import static com.android.providers.media.backupandrestore.BackupAndRestoreUtils.isBackupAndRestoreSupported;
 import static com.android.providers.media.scan.MediaScanner.REASON_UNKNOWN;
 import static com.android.providers.media.scan.MediaScannerTest.stage;
 
@@ -25,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import android.Manifest;
 import android.content.ContentResolver;
@@ -99,7 +101,7 @@ public class MediaBackupAgentTest {
         mDownloadsDir = new File(Environment.getExternalStorageDirectory(),
                 Environment.DIRECTORY_DOWNLOADS);
         mLevelDbPath =
-                mIsolatedContext.getFilesDir().getAbsolutePath() + "/backup/external_primary/";
+                mIsolatedContext.getFilesDir().getAbsolutePath() + "/backup/external_primary";
         FileUtils.deleteContents(mDownloadsDir);
 
         mMediaBackupAgent = new MediaBackupAgent();
@@ -108,6 +110,7 @@ public class MediaBackupAgentTest {
 
     @Test
     public void testCompleteFlow() throws Exception {
+        assumeTrue(isBackupAndRestoreSupported(mIsolatedContext));
         //create new test file & stage it
         File file = new File(mDownloadsDir, "testImage_"
                 + SystemClock.elapsedRealtimeNanos() + ".jpg");

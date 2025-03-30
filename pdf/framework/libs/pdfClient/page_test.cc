@@ -250,7 +250,7 @@ TEST(Test, AddImagePageObjectTest) {
     FPDFBitmap_FillRect(imageObject->bitmap_.get(), 0, 0, 100, 100, 0xFF000000);
 
     // Set Matrix.
-    imageObject->matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
+    imageObject->device_matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
 
     // Add the page object.
     ASSERT_EQ(page->AddPageObject(std::move(imageObject)), initialPageObjects.size());
@@ -289,7 +289,7 @@ TEST(Test, AddPathPageObject) {
     pathObject->is_stroke_ = true;
 
     // Set PathObject Matrix.
-    pathObject->matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
+    pathObject->device_matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
 
     // Add the page object.
     ASSERT_EQ(page->AddPageObject(std::move(pathObject)), initialPageObjects.size());
@@ -343,7 +343,7 @@ TEST(Test, AddTextPageObject) {
         textObject->fill_color_ = Color(0, 0, 255, 255);
 
         // Set TextObject Matrix.
-        textObject->matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
+        textObject->device_matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
 
         // Add the page object.
         if (index != 2) {
@@ -401,8 +401,8 @@ TEST(Test, UpdateImagePageObjectTest) {
     FPDFBitmap_FillRect(imageObject->bitmap_.get(), 0, 0, 100, 110, 0xFF0000FF);
 
     // Set Matrix.
-    Matrix update_matrix = {2.0f, 0, 0, 2.0f, 0, 0};
-    imageObject->matrix_ = update_matrix;
+    Matrix update_matrix = {2.0f, 3.0f, 4.0f, 2.0f, 1.0f, -2.0f};
+    imageObject->device_matrix_ = update_matrix;
 
     // Update the page object.
     EXPECT_TRUE(page->UpdatePageObject(0, std::move(imageObject)));
@@ -420,7 +420,7 @@ TEST(Test, UpdateImagePageObjectTest) {
               110);
 
     // Check for updated matrix.
-    ASSERT_EQ(updatedPageObjects[0]->matrix_, update_matrix);
+    ASSERT_EQ(updatedPageObjects[0]->device_matrix_, update_matrix);
 }
 
 TEST(Test, UpdatePathPageObjectTest) {
@@ -442,8 +442,8 @@ TEST(Test, UpdatePathPageObjectTest) {
     pathObject->is_stroke_ = false;
 
     // Set Matrix.
-    Matrix update_matrix = {2.0f, 0, 0, 2.0f, 0, 0};
-    pathObject->matrix_ = update_matrix;
+    Matrix update_matrix = {2.0f, -3.0f, 2.0f, 2.0f, -1.0f, 2.0f};
+    pathObject->device_matrix_ = update_matrix;
 
     // Update the page object.
     EXPECT_TRUE(page->UpdatePageObject(1, std::move(pathObject)));
@@ -459,7 +459,7 @@ TEST(Test, UpdatePathPageObjectTest) {
     ASSERT_EQ(static_cast<PathObject*>(updatedPageObjects[1])->is_stroke_, false);
 
     // Check for updated matrix.
-    ASSERT_EQ(updatedPageObjects[1]->matrix_, update_matrix);
+    ASSERT_EQ(updatedPageObjects[1]->device_matrix_, update_matrix);
 }
 
 TEST(Test, UpdateTextPageObjectTest) {
@@ -482,7 +482,8 @@ TEST(Test, UpdateTextPageObjectTest) {
     ASSERT_EQ(initialTextObject->render_mode_, TextObject::RenderMode::Fill);
 
     // Check for initial matrix.
-    ASSERT_EQ(initialTextObject->matrix_, Matrix(1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 30.0f));
+    Matrix initial_matrix(1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 759.424f);
+    ASSERT_LT(initialTextObject->device_matrix_ - initial_matrix, 0.01f);
 
     // Check for initial fill color.
     ASSERT_EQ(initialTextObject->fill_color_, Color(0, 255, 0, 255));
@@ -502,8 +503,8 @@ TEST(Test, UpdateTextPageObjectTest) {
     textObject->fill_color_ = update_fill_color;
 
     // Set Matrix.
-    Matrix update_matrix = {2.0f, 5.0f, 0, 3.0f, 4.0f, 10.0f};
-    textObject->matrix_ = update_matrix;
+    Matrix update_matrix = {2.0f, 5.0f, -2.0f, 3.0f, -4.0f, 10.0f};
+    textObject->device_matrix_ = update_matrix;
 
     // Update the page object.
     EXPECT_TRUE(page->UpdatePageObject(2, std::move(textObject)));
@@ -521,8 +522,13 @@ TEST(Test, UpdateTextPageObjectTest) {
     // Check for updated fill Color.
     ASSERT_EQ(updatedPageObjects[2]->fill_color_, update_fill_color);
 
-    // Check for updated matrix.
-    ASSERT_EQ(updatedPageObjects[2]->matrix_, update_matrix);
+    /*
+     *  TextObject Transformation is dependent upon its bounds values.
+     *  Pdfium calculation for bounds shows a little fluctuation which results
+     *  in return matrix values to be not exactly the same. We should tolerate
+     *  the difference which does not make any visible difference.
+     */
+    ASSERT_LT(updatedPageObjects[2]->device_matrix_ - update_matrix, 0.01f);
 }
 
 TEST(Test, GetPageAnnotationsTest) {
@@ -568,7 +574,7 @@ TEST(Test, AddStampAnnotationTest) {
     FPDFBitmap_FillRect(imageObject->bitmap_.get(), 0, 0, 100, 100, 0xFF000000);
 
     // Set Matrix.
-    imageObject->matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
+    imageObject->device_matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
 
     // Add the page object.
     stampAnnotation->AddObject(std::move(imageObject));
@@ -586,7 +592,7 @@ TEST(Test, AddStampAnnotationTest) {
     pathObject->is_stroke_ = true;
 
     // Set PathObject Matrix.
-    pathObject->matrix_ = {1.0f, 0, 0, 1.0f, 0, 0};
+    pathObject->device_matrix_ = {1.0f, 2.0f, 3.0f, 1.0f, 3.0f, 2.0f};
 
     // Add the page object.
     stampAnnotation->AddObject(std::move(pathObject));

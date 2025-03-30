@@ -22,6 +22,7 @@ import android.net.Uri;
 import com.android.providers.media.MediaVolume;
 
 import java.io.File;
+import java.util.Set;
 
 @Deprecated
 public class LegacyMediaScanner implements MediaScanner {
@@ -58,6 +59,11 @@ public class LegacyMediaScanner implements MediaScanner {
 
     @Override
     public void onDirectoryDirty(File file) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Set<String> getOemSupportedMimeTypes() {
         throw new UnsupportedOperationException();
     }
 }

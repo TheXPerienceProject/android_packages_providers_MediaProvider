@@ -26,6 +26,14 @@ import com.android.photopicker.data.model.Media
 /** Provides methods to help video transcode. */
 interface Transcoder {
 
+    /** Data class to hold details of the transcoding video. */
+    data class VideoInfo(
+        val duration: Int,
+        val colorStandard: Int,
+        val colorTransfer: Int,
+        val mimeType: Int,
+    )
+
     /**
      * Checks if a transcode is required for the given video.
      *
@@ -38,6 +46,9 @@ interface Transcoder {
         mediaCapabilities: ApplicationMediaCapabilities?,
         video: Media.Video,
     ): Boolean
+
+    /** Returns details of the video that needs transcoding */
+    fun getTranscodingVideoInfo(): VideoInfo?
 
     companion object {
 

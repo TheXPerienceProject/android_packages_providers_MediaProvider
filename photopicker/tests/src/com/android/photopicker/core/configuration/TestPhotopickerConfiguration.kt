@@ -17,6 +17,7 @@
 package com.android.photopicker.core.configuration
 
 import android.content.Intent
+import android.media.ApplicationMediaCapabilities
 import com.android.photopicker.core.events.generatePickerSessionId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -69,6 +70,7 @@ class TestPhotopickerConfiguration {
         private var sessionId: Int = generatePickerSessionId()
         private var flags: PhotopickerFlags = PhotopickerFlags()
         private var mimeTypes: ArrayList<String> = arrayListOf("image/*", "video/*")
+        private var appMediaCapabilities: ApplicationMediaCapabilities? = null
 
         fun action(value: String) = apply { this.action = value }
 
@@ -92,6 +94,10 @@ class TestPhotopickerConfiguration {
 
         fun mimeTypes(value: ArrayList<String>) = apply { this.mimeTypes = value }
 
+        fun appMediaCapabilities(value: ApplicationMediaCapabilities) = apply {
+            this.appMediaCapabilities = value
+        }
+
         fun build(): PhotopickerConfiguration {
             return PhotopickerConfiguration(
                 action = action,
@@ -105,6 +111,7 @@ class TestPhotopickerConfiguration {
                 sessionId = sessionId,
                 flags = flags,
                 mimeTypes = mimeTypes,
+                callingPackageMediaCapabilities = appMediaCapabilities,
             )
         }
     }

@@ -21,8 +21,6 @@ import static androidx.core.util.Preconditions.checkNotNull;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresApi;
-import android.annotation.SuppressLint;
-import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -242,48 +240,40 @@ public interface UserManagerState {
             setUserIds();
         }
 
-        private UserId getSystemUser() {
-            return UserId.of(UserHandle.of(ActivityManager.getCurrentUser()));
-        }
-
         private void setUserIds() {
-            setUserIdsInternal();
-            mIsMultiUserProfiles.postValue(isMultiUserProfiles());
-        }
-
-        private void setUserIdsInternal() {
             mUserProfileIds.clear();
-            mUserProfileIds.add(getSystemUser());
-            if (mUserManager == null) {
-                Log.e(TAG, "Cannot obtain user manager");
-                return;
-            }
 
-            // Here there could be other profiles too , that we do not want to show anywhere
-            // in photo picker at all.
-            final List<UserHandle> userProfiles = mUserManager.getUserProfiles();
-            if (SdkLevel.isAtLeastV()) {
-                for (UserHandle userHandle : userProfiles) {
-                    UserProperties userProperties = mUserManager.getUserProperties(userHandle);
-                    UserId userId = UserId.of(userHandle);
+            mUserProfileIds.add(mCurrentUser);
+             boolean currentUserIsManaged =
+                    mUserManager.isManagedProfile(mCurrentUser.getIdentifier());
 
-                    // Check if we want to show this profile data in PhotoPicker or if it is
-                    // an owner profile itself.
-                    if (getSystemUser().getIdentifier() != userHandle.getIdentifier()
-                            && userProperties.getShowInSharingSurfaces()
-                                    == userProperties.SHOW_IN_SHARING_SURFACES_SEPARATE) {
-                        mUserProfileIds.add(userId);
+            for (UserHandle handle : mUserManager.getUserProfiles()) {
+
+                // For >= Android V, check if the profile wants to be shown
+                if (SdkLevel.isAtLeastV()) {
+
+                    UserProperties properties = mUserManager.getUserProperties(handle);
+                    if (properties.getShowInSharingSurfaces()
+                            != UserProperties.SHOW_IN_SHARING_SURFACES_SEPARATE) {
+                        continue;
+                    }
+                } else {
+                     // Only allow managed profiles + the parent user on lower than V.
+                    if (currentUserIsManaged
+                            && mUserManager.getProfileParent(mCurrentUser.getUserHandle())
+                                    == handle) {
+                        // Intentionally empty so that this profile gets added.
+                    } else if (!mUserManager.isManagedProfile(handle.getIdentifier())) {
+                        continue;
                     }
                 }
-            } else {
-                // if sdk version is less than V, then maximum two profiles with separate tab
-                // could only be available
-                for (UserHandle userHandle : userProfiles) {
-                    if (mUserManager.isManagedProfile(userHandle.getIdentifier())) {
-                        mUserProfileIds.add(UserId.of(userHandle));
-                    }
-                }
+
+                // Ensure the system user doesn't get added twice.
+                if (mUserProfileIds.contains(UserId.of(handle))) continue;
+                mUserProfileIds.add(UserId.of(handle));
             }
+
+            mIsMultiUserProfiles.postValue(isMultiUserProfiles());
         }
 
         @Override
@@ -312,11 +302,161 @@ public interface UserManagerState {
             return crossProfileAllowedStatusForAll;
         }
 
+
+        /**
+         * External method that allows quick checking from the current user to a target user.
+         *
+         * Takes into account the On/Off state of the profile, as well as cross profile content
+         * sharing policies.
+         *
+         * @param targetUser the target of the access. Current User is the "from" user.
+         * @return If the target user currently is eligible for cross profile content sharing.
+         */
         @Override
-        public boolean isCrossProfileAllowedToUser(UserId otherUser) {
+        public boolean isCrossProfileAllowedToUser(UserId targetUser) {
             assertMainThread();
-            return !isProfileOff(otherUser) && !isBlockedByAdmin(otherUser);
+            return !isProfileOff(targetUser) && !isBlockedByAdmin(targetUser);
         }
+
+        /**
+         * Determines if the provided UserIds support CrossProfile content sharing.
+         *
+         * <p>This method accepts a pair of user handles (from/to) and determines if CrossProfile
+         * access is permitted between those two profiles.
+         *
+         * <p>There are differences is on how the access is determined based on the platform SDK:
+         *
+         * <p>For Platform SDK < V:
+         *
+         * <p>A check for CrossProfileIntentForwarders in the origin (from) profile that target the
+         * destination (to) profile. If such a forwarder exists, then access is allowed, and denied
+         * otherwise.
+         *
+         * <p>For Platform SDK >= V:
+         *
+         * <p>The method now takes into account access delegation, which was first added in Android
+         * V.
+         *
+         * <p>For profiles that set the [CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT]
+         * property in its [UserProperties], its parent profile will be substituted in for its side
+         * of the check.
+         *
+         * <p>ex. For access checks between a Managed (from) and Private (to) profile, where: -
+         * Managed does not delegate to its parent - Private delegates to its parent
+         *
+         * <p>The following logic is performed: Managed -> parent(Private)
+         *
+         * <p>The same check in the other direction would yield: parent(Private) -> Managed
+         *
+         * <p>Note how the private profile is never actually used for either side of the check,
+         * since it is delegating its access check to the parent. And thus, if Managed can access
+         * the parent, it can also access the private.
+         *
+         * @param context Current context object, for switching user contexts.
+         * @param intent The current intent the Photopicker is running under.
+         * @param fromUser The Origin profile, where the user is coming from
+         * @param toUser The destination profile, where the user is attempting to go to.
+         * @return Whether CrossProfile content sharing is supported in this handle.
+         */
+        private boolean isCrossProfileAllowedToUser(
+                Context context, Intent intent, UserId fromUser, UserId toUser) {
+
+            // Early exit conditions, accessing self.
+            // NOTE: It is also possible to reach this state if this method is recursively checking
+            // from: parent(A) to:parent(B) where A and B are both children of the same parent.
+            if (fromUser.getIdentifier() == toUser.getIdentifier()) {
+                return true;
+            }
+
+            // Decide if we should use actual from or parent(from)
+            UserHandle currentFromUser =
+                    getProfileToCheckCrossProfileAccess(fromUser.getUserHandle());
+
+            // Decide if we should use actual to or parent(to)
+            UserHandle currentToUser = getProfileToCheckCrossProfileAccess(toUser.getUserHandle());
+
+            // When the from/to has changed from the original parameters, recursively restart the
+            // checks with the new from/to handles.
+            if (fromUser.getIdentifier() != currentFromUser.getIdentifier()
+                    || toUser.getIdentifier() != currentToUser.getIdentifier()) {
+                return isCrossProfileAllowedToUser(
+                        context, intent, UserId.of(currentFromUser), UserId.of(currentToUser));
+            }
+
+            return doesCrossProfileIntentForwarderExist(
+                    intent,
+                    mContext.getPackageManager(),
+                    fromUser.getUserHandle(),
+                    toUser.getUserHandle());
+        }
+
+        /**
+         * Checks the Intent to see if it can be resolved as a CrossProfileIntentForwarderActivity
+         * for the target user.
+         *
+         * @param intent The current intent the photopicker is running under.
+         * @param pm the PM which will be used for querying.
+         * @param fromUser the [UserHandle] of the origin user
+         * @param targetUserHandle the [UserHandle] of the target user
+         * @return Whether the current Intent Photopicker may be running under has a matching
+         *     CrossProfileIntentForwarderActivity
+         */
+        private boolean doesCrossProfileIntentForwarderExist(
+                Intent intent,
+                PackageManager pm,
+                UserHandle fromUser,
+                UserHandle targetUserHandle) {
+
+            // Clear out the component & package before attempting to match
+            Intent intentToCheck = (Intent) intent.clone();
+            intentToCheck.setComponent(null);
+            intentToCheck.setPackage(null);
+
+            for (ResolveInfo resolveInfo :
+                    pm.queryIntentActivitiesAsUser(
+                            intentToCheck, PackageManager.MATCH_DEFAULT_ONLY, fromUser)) {
+
+                // If the activity is a CrossProfileIntentForwardingActivity, inspect its
+                // targetUserId to see if it targets the user we are currently checking for.
+                if (resolveInfo.isCrossProfileIntentForwarderActivity()) {
+
+                    /*
+                     * IMPORTANT: This is a reflection based hack to ensure the profile is
+                     * actually the installer of the CrossProfileIntentForwardingActivity.
+                     *
+                     * ResolveInfo.targetUserId exists, but is a hidden API not available to
+                     * mainline modules, and no such API exists, so it is accessed via
+                     * reflection below. All exceptions are caught to protect against
+                     * reflection related issues such as:
+                     * NoSuchFieldException / IllegalAccessException / SecurityException.
+                     *
+                     * In the event of an exception, the code fails "closed" for the current
+                     * profile to avoid showing content that should not be visible.
+                     */
+                    try {
+                        Field targetUserIdField =
+                                resolveInfo.getClass().getDeclaredField("targetUserId");
+                        targetUserIdField.setAccessible(true);
+                        int targetUserId = (int) targetUserIdField.get(resolveInfo);
+
+                        if (targetUserId == targetUserHandle.getIdentifier()) {
+                            // Don't need to look further, exit the loop.
+                            return true;
+                        }
+
+                    } catch (NoSuchFieldException | IllegalAccessException | SecurityException ex) {
+                        // Couldn't check the targetUserId via reflection, so fail without
+                        // further iterations.
+                        Log.e(TAG, "Could not access targetUserId via reflection.", ex);
+                        return false;
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Exception occurred during cross profile checks", ex);
+                    }
+                }
+            }
+            return false;
+        }
+
 
         @Override
         public MutableLiveData<Boolean> getIsMultiUserProfiles() {
@@ -331,8 +471,7 @@ public interface UserManagerState {
 
         @Override
         public void resetUserIdsAndSetCrossProfileValues(Intent intent) {
-            assertMainThread();
-            setUserIdsInternal();
+            resetUserIds();
             setCrossProfileValues(intent);
             mIsMultiUserProfiles.postValue(isMultiUserProfiles());
         }
@@ -510,6 +649,12 @@ public interface UserManagerState {
                     || !CrossProfileUtils.isMediaProviderAvailable(userId, mContext);
         }
 
+        /**
+         * Determines if the target UserHandle delegates its content sharing to its parent.
+         *
+         * @param userHandle The target handle to check delegation for.
+         * @return TRUE if V+ and the handle delegates to parent. False otherwise.
+         */
         private boolean isCrossProfileStrategyDelegatedToParent(UserHandle userHandle) {
             if (SdkLevel.isAtLeastV()) {
                 if (mUserManager == null) {
@@ -525,6 +670,15 @@ public interface UserManagerState {
             return false;
         }
 
+        /**
+         * Acquires the correct {@link UserHandle} which should be used for CrossProfile access
+         * checks.
+         *
+         * @param userHandle the origin handle.
+         * @return The UserHandle that should be used for cross profile access checks. In the event
+         *     the origin handle delegates its access, this may not be the same handle as the origin
+         *     handle.
+         */
         private UserHandle getProfileToCheckCrossProfileAccess(UserHandle userHandle) {
             if (mUserManager == null) {
                 Log.e(TAG, "Cannot obtain user manager");
@@ -551,7 +705,6 @@ public interface UserManagerState {
          * @param intent The intent Photopicker is currently running under, for
          *     CrossProfileForwardActivity checking.
          */
-        @SuppressLint("DiscouragedPrivateApi")
         private void setBlockedByAdminValue(Intent intent) {
             if (intent == null) {
                 Log.e(
@@ -561,95 +714,6 @@ public interface UserManagerState {
                 return;
             }
 
-            Map<UserId, Boolean> profileIsAccessibleToProcessOwner = new HashMap<>();
-            List<UserId> delegatedFromParent = new ArrayList<>();
-
-            final PackageManager pm = mContext.getPackageManager();
-
-            // Resolve CrossProfile activities for all user profiles that Photopicker is
-            // aware of.
-            for (UserId userId : mUserProfileIds) {
-
-                // If the UserId is the system user, exit early.
-                if (userId.getIdentifier() == mCurrentUser.getIdentifier()) {
-                    profileIsAccessibleToProcessOwner.put(userId, true);
-                    continue;
-                }
-
-                // This UserId delegates its strategy to the parent profile
-                if (isCrossProfileStrategyDelegatedToParent(userId.getUserHandle())) {
-                    delegatedFromParent.add(userId);
-                    continue;
-                }
-
-                // Clear out the component & package before attempting to match
-                Intent intentToCheck = (Intent) intent.clone();
-                intentToCheck.setComponent(null);
-                intentToCheck.setPackage(null);
-
-                for (ResolveInfo resolveInfo :
-                        pm.queryIntentActivities(
-                                intentToCheck, PackageManager.MATCH_DEFAULT_ONLY)) {
-
-                    // If the activity is a CrossProfileIntentForwardingActivity, inspect its
-                    // targetUserId to
-                    // see if it targets the user we are currently checking for.
-                    if (resolveInfo.isCrossProfileIntentForwarderActivity()) {
-
-                        /*
-                         * IMPORTANT: This is a reflection based hack to ensure the profile is
-                         * actually the installer of the CrossProfileIntentForwardingActivity.
-                         *
-                         * ResolveInfo.targetUserId exists, but is a hidden API not available to
-                         * mainline modules, and no such API exists, so it is accessed via
-                         * reflection below. All exceptions are caught to protect against
-                         * reflection related issues such as:
-                         * NoSuchFieldException / IllegalAccessException / SecurityException.
-                         *
-                         * In the event of an exception, the code fails "closed" for the current
-                         * profile to avoid showing content that should not be visible.
-                         */
-                        try {
-                            Field targetUserIdField =
-                                    resolveInfo.getClass().getDeclaredField("targetUserId");
-                            targetUserIdField.setAccessible(true);
-                            int targetUserId = (int) targetUserIdField.get(resolveInfo);
-
-                            if (targetUserId == userId.getIdentifier()) {
-                                profileIsAccessibleToProcessOwner.put(userId, true);
-
-                                // Don't need to look further, exit the loop.
-                                break;
-                            }
-
-                        } catch (NoSuchFieldException
-                                | IllegalAccessException
-                                | SecurityException ex) {
-                            // Couldn't check the targetUserId via reflection, so fail without
-                            // further
-                            // iterations.
-                            Log.e(TAG, "Could not access targetUserId via reflection.", ex);
-                            break;
-                        } catch (Exception ex) {
-                            Log.e(TAG, "Exception occurred during cross profile checks", ex);
-                        }
-                    }
-                }
-                // Fail case, was unable to find a suitable Activity for this user.
-                profileIsAccessibleToProcessOwner.putIfAbsent(userId, false);
-            }
-
-            // For profiles that delegate their access to the parent, set the access for
-            // those profiles equal to the same as their parent.
-            for (UserId userId : delegatedFromParent) {
-                UserHandle parent =
-                        mUserManager.getProfileParent(UserHandle.of(userId.getIdentifier()));
-                profileIsAccessibleToProcessOwner.put(
-                        userId,
-                        profileIsAccessibleToProcessOwner.getOrDefault(
-                                UserId.of(parent), /* default= */ false));
-            }
-
             mIsProfileBlockedByAdminMap.clear();
             for (UserId userId : mUserProfileIds) {
                 mIsProfileBlockedByAdminMap.put(
@@ -657,8 +721,8 @@ public interface UserManagerState {
                         // calculated, (which are blocked, rather than which are accessible) so the
                         // boolean needs to be inverted.
                         userId,
-                        !profileIsAccessibleToProcessOwner.getOrDefault(
-                                userId, /* default= */ false));
+                        !isCrossProfileAllowedToUser(mContext, intent, UserId.CURRENT_USER, userId)
+                );
             }
         }
 
