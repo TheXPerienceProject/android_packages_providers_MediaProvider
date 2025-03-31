@@ -27,6 +27,13 @@ typedef unsigned int uint;
 
 namespace pdfClient {
 
+enum class BitmapFormat {
+    Unknown = -1,
+    BGR,
+    BGRA,
+    BGRx,
+};
+
 class ImageObject : public PageObject {
   public:
     ImageObject();
@@ -35,12 +42,13 @@ class ImageObject : public PageObject {
     bool UpdateFPDFInstance(FPDF_PAGEOBJECT image_object, FPDF_PAGE page) override;
     bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT image_object, FPDF_PAGE page) override;
 
-    void* GetBitmapReadableBuffer() const;
+    void* GetBitmapBuffer() const;
 
     ~ImageObject();
 
-    int width_ = 0;
-    int height_ = 0;
+    size_t width_ = 0;
+    size_t height_ = 0;
+    BitmapFormat bitmap_format_ = BitmapFormat::Unknown;
     ScopedFPDFBitmap bitmap_;
 };
 

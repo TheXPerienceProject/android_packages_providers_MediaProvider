@@ -330,6 +330,7 @@ class ConfigurationManager(
                     /* defaultValue= */ FEATURE_PICKER_CHOICE_MANAGED_SELECTION.second,
                 ),
             PICKER_SEARCH_ENABLED = Flags.enablePhotopickerSearch(),
+            PICKER_DATESCRUBBER_ENABLED = Flags.enablePhotopickerDatescrubber(),
             PICKER_TRANSCODING_ENABLED = Flags.enablePhotopickerTranscoding(),
         )
     }

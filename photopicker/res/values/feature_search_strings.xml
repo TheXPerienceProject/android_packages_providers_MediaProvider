@@ -24,6 +24,9 @@
     <!-- Search view placeholder text when videos MIME type filter is applied-->
     <string name="photopicker_search_videos_placeholder_text" translation_description="Place holder text shown in Search Bar for videos MIME type filter">Search your videos</string>
 
+    <!-- Search Bar trailing icon description text-->
+    <string name="photopicker_search_clear_text" translation_description="Description for trailing icon to clear search text in Search Bar">Clear search text</string>
+
     <!-- Empty state title when the search has no results -->
     <string name="photopicker_search_result_empty_state_title" translation_description="Title of the message shown to the user when there are no search results to show">No results found</string>
 

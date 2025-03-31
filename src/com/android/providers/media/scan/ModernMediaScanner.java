@@ -287,7 +287,8 @@ public class ModernMediaScanner implements MediaScanner {
         }
     }
 
-    private Set<String> getOemSupportedMimeTypes() {
+    @Override
+    public Set<String> getOemSupportedMimeTypes() {
         try {
             // Return if no package implements OemMetadataService
             if (!mDefaultOemMetadataServicePackage.isPresent()) {

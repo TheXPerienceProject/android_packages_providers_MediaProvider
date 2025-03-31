@@ -163,6 +163,10 @@ public final class MimeTypeFixHandler {
      * @return Optional file extension, or empty.
      */
     static Optional<String> getExtFromMimeType(String mimeType) {
+        if (mimeType == null) {
+            return Optional.empty();
+        }
+
         mimeType = mimeType.toLowerCase(Locale.ROOT);
         return Optional.ofNullable(sMimeTypeToExt.get(mimeType));
     }

@@ -65,6 +65,7 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyString
+import org.mockito.Mockito.eq
 import org.mockito.Mockito.isNull
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -161,7 +162,13 @@ class BannerManagerImplTest {
         whenever(mockUserManager.getProfileParent(USER_HANDLE_MANAGED)) { USER_HANDLE_PRIMARY }
 
         val mockResolveInfo = ReflectedResolveInfo(USER_ID_MANAGED)
-        whenever(mockPackageManager.queryIntentActivities(any(Intent::class.java), anyInt())) {
+        whenever(
+            mockPackageManager.queryIntentActivitiesAsUser(
+                any(Intent::class.java),
+                anyInt(),
+                eq(USER_HANDLE_PRIMARY),
+            )
+        ) {
             listOf(mockResolveInfo)
         }
 

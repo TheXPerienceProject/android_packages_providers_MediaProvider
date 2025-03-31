@@ -22,6 +22,9 @@ import android.annotation.NonNull;
 import android.graphics.Color;
 import android.graphics.RectF;
 import android.graphics.pdf.flags.Flags;
+import android.graphics.pdf.utils.Preconditions;
+
+import java.util.List;
 
 /**
  * Represents a highlight annotation in a PDF document.
@@ -31,6 +34,7 @@ import android.graphics.pdf.flags.Flags;
  */
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_ANNOTATIONS)
 public final class HighlightAnnotation extends PdfAnnotation {
+    @NonNull private List<RectF> mBounds;
     private @ColorInt int mColor;
 
     /**
@@ -40,9 +44,33 @@ public final class HighlightAnnotation extends PdfAnnotation {
      *
      * @param bounds The bounding rectangle of the annotation.
      */
-    public HighlightAnnotation(@NonNull RectF bounds) {
-        super(PdfAnnotationType.HIGHLIGHT, bounds);
+    public HighlightAnnotation(@NonNull List<RectF> bounds) {
+        super(PdfAnnotationType.HIGHLIGHT);
+        this.mBounds = bounds;
         this.mColor = Color.YELLOW;
+    }
+
+    /**
+     * Sets the bounding rectangles of the highlight annotation. Each rect in the list mBounds
+     * represent an absolute position of highlight inside the page of the document
+     *
+     * @param bounds The new bounding rectangles.
+     * @throws NullPointerException if given bounds is null
+     * @throws IllegalArgumentException if the given bounds list is empty
+     */
+    public void setBounds(@NonNull List<RectF> bounds) {
+        Preconditions.checkNotNull(bounds, "Bounds should not be null");
+        Preconditions.checkArgument(!bounds.isEmpty(), "Bounds should not be empty");
+        this.mBounds = bounds;
+    }
+
+    /**
+     * Returns the bounding rectangles of the highlight annotation.
+     *
+     * @return The bounding rectangles.
+     */
+    @NonNull public List<RectF> getBounds() {
+        return mBounds;
     }
 
     /**

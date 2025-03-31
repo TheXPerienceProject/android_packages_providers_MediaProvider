@@ -19,6 +19,8 @@
 
 #include <stdint.h>
 
+#include <algorithm>
+
 #include "cpp/fpdf_scopers.h"
 #include "fpdfview.h"
 
@@ -56,6 +58,11 @@ struct Matrix {
         return a == other.a && b == other.b && c == other.c && d == other.d && e == other.e &&
                f == other.f;
     }
+
+    float operator-(const Matrix& other) const {
+        return std::max({abs(a - other.a), abs(b - other.b), abs(c - other.c), abs(d - other.d),
+                         abs(e - other.e), abs(f - other.f)});
+    }
 };
 
 class PageObject {
@@ -77,13 +84,16 @@ class PageObject {
 
     virtual ~PageObject();
 
-    Matrix matrix_;  // Matrix used to scale, rotate, shear and translate the page object.
+    Matrix device_matrix_;  // Matrix used to scale, rotate, shear and translate the page object.
     Color fill_color_;
     Color stroke_color_;
     float stroke_width_ = 1.0f;
 
   protected:
     PageObject(Type type = Type::Unknown);
+
+    virtual bool GetPageToDeviceMatrix(FPDF_PAGEOBJECT page_object, FPDF_PAGE page);
+    virtual bool SetDeviceToPageMatrix(FPDF_PAGEOBJECT page_object, FPDF_PAGE page);
 
   private:
     Type type_;

@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.outlined.HideImage
 import androidx.compose.material.icons.outlined.History
@@ -118,6 +119,7 @@ import com.android.photopicker.core.theme.LocalWindowSizeClass
 import com.android.photopicker.extensions.navigateToPreviewMedia
 import com.android.photopicker.extensions.transferScrollableTouchesToHostInEmbedded
 import com.android.photopicker.features.preview.PreviewFeature
+import com.android.photopicker.features.search.SearchViewModel.Companion.ZERO_STATE_SEARCH_QUERY
 import com.android.photopicker.features.search.model.SearchSuggestion
 import com.android.photopicker.features.search.model.SearchSuggestionType
 import com.android.photopicker.features.search.model.UserSearchState
@@ -428,16 +430,12 @@ fun SearchInputContent(
  * @param searchQuery The current text entered in search bar input field.
  * @param focused A boolean value indicating whether the search input field is currently focused.
  * @param onSearchQueryChanged A callback function that is invoked when the search query text
- *   changes.
- *     * This function receives the updated search query as a parameter.
- *
+ *   changes. This function receives the updated search query as a parameter.
  * @param onFocused A callback function that is invoked when the focus state of the search field
- *   changes.
- *     * This function receives a boolean value indicating the new focus state.
- *
+ *   changes. This function receives a boolean value indicating the new focus state.
  * @param onSearch A callback function to be invoked when a text is searched.
  * @param modifier A Modifier that can be applied to the SearchInput composable to customize its
- *     * appearance and behavior.
+ *   appearance and behavior.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -473,16 +471,53 @@ private fun SearchInput(
         expanded = focused,
         onExpandedChange = onFocused,
         leadingIcon = { SearchBarIcon(focused, onFocused, onSearchQueryChanged) },
+        trailingIcon = {
+            SearchBarTrailingIcon(
+                focused && !searchQuery.equals(ZERO_STATE_SEARCH_QUERY),
+                onSearchQueryChanged,
+            )
+        },
         modifier = modifier.focusRequester(focusRequester),
     )
     RequestFocusOnResume(focusRequester = focusRequester, focused)
 }
 
+/**
+ * A composable function that displays the trailing icon in a SearchBar. The icon is shown when
+ * query is typed clicking on which clears the typed text.
+ *
+ * @param showClearIcon A boolean value indicating whether clear icon is to be shown
+ * @param onSearchQueryChanged A callback function that is invoked when the search query text
+ *   changes. This function receives the updated search query as a parameter.
+ * @param viewModel The `SearchViewModel` providing the search logic and state.
+ */
 @Composable
-private fun RequestFocusOnResume(focusRequester: FocusRequester, focused: Boolean) {
+private fun SearchBarTrailingIcon(
+    showClearIcon: Boolean,
+    onSearchQueryChanged: (String) -> Unit,
+    viewModel: SearchViewModel = obtainViewModel(),
+) {
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
+    if (showClearIcon && searchState is SearchState.Inactive) {
+        IconButton(onClick = { onSearchQueryChanged("") }) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = stringResource(R.string.photopicker_search_clear_text),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RequestFocusOnResume(
+    focusRequester: FocusRequester,
+    focused: Boolean,
+    viewModel: SearchViewModel = obtainViewModel(),
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
-        when (focused) {
+        when (focused && searchState is SearchState.Inactive) {
             true ->
                 lifecycleOwner.repeatOnLifecycle(state = Lifecycle.State.RESUMED) {
                     focusRequester.requestFocus()
@@ -789,7 +824,11 @@ fun SuggestionItem(suggestion: SearchSuggestion) {
         }
         val text = suggestion.displayText ?: ""
         Text(text = text, modifier = Modifier.padding(start = MEASUREMENT_LARGE_PADDING).weight(1f))
-        if (suggestion.type != SearchSuggestionType.FACE && suggestion.icon != null) {
+        if (
+            suggestion.type != SearchSuggestionType.FACE &&
+                suggestion.type != SearchSuggestionType.HISTORY &&
+                suggestion.icon != null
+        ) {
             ShowSuggestionIcon(suggestion, Modifier.size(MEASUREMENT_OTHER_ICON).clip(CircleShape))
         }
     }
