@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 
-#include <vector>
+#include <algorithm>
 
 #include "cpp/fpdf_scopers.h"
 #include "fpdfview.h"
@@ -34,11 +34,12 @@ struct Color {
     uint b;
     uint a;
 
+    Color() : Color(0, 0, 0, 255) {}
     Color(uint r, uint g, uint b, uint a) : r(r), g(g), b(b), a(a) {}
-    Color() : Color(INVALID_COLOR, INVALID_COLOR, INVALID_COLOR, INVALID_COLOR) {}
 
-  private:
-    static constexpr uint INVALID_COLOR = 256;
+    bool operator==(const Color& other) const {
+        return r == other.r && g == other.g && b == other.b && a == other.a;
+    }
 };
 
 struct Matrix {
@@ -48,86 +49,54 @@ struct Matrix {
     float d;
     float e;
     float f;
+
+    Matrix() {}
+    Matrix(float a, float b, float c, float d, float e, float f)
+        : a(a), b(b), c(c), d(d), e(e), f(f) {}
+
+    bool operator==(const Matrix& other) const {
+        return a == other.a && b == other.b && c == other.c && d == other.d && e == other.e &&
+               f == other.f;
+    }
+
+    float operator-(const Matrix& other) const {
+        return std::max({abs(a - other.a), abs(b - other.b), abs(c - other.c), abs(d - other.d),
+                         abs(e - other.e), abs(f - other.f)});
+    }
 };
 
 class PageObject {
   public:
     enum class Type {
         Unknown = 0,
+        Text = 1,
         Path = 2,
         Image = 3,
     };
 
     Type GetType() const;
     // Returns a FPDF Instance for a PageObject.
-    virtual ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) = 0;
+    virtual ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document, FPDF_PAGE page) = 0;
     // Updates the FPDF Instance of PageObject present on Page.
-    virtual bool UpdateFPDFInstance(FPDF_PAGEOBJECT page_object) = 0;
+    virtual bool UpdateFPDFInstance(FPDF_PAGEOBJECT page_object, FPDF_PAGE page) = 0;
     // Populates data from FPDFInstance of PageObject present on Page.
-    virtual bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT page_object) = 0;
+    virtual bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT page_object, FPDF_PAGE page) = 0;
 
     virtual ~PageObject();
 
-    Matrix matrix;  // Matrix used to scale, rotate, shear and translate the page object.
-    Color fill_color;
-    Color stroke_color;
-    float stroke_width = 1.0f;
+    Matrix device_matrix_;  // Matrix used to scale, rotate, shear and translate the page object.
+    Color fill_color_;
+    Color stroke_color_;
+    float stroke_width_ = 1.0f;
 
   protected:
     PageObject(Type type = Type::Unknown);
 
+    virtual bool GetPageToDeviceMatrix(FPDF_PAGEOBJECT page_object, FPDF_PAGE page);
+    virtual bool SetDeviceToPageMatrix(FPDF_PAGEOBJECT page_object, FPDF_PAGE page);
+
   private:
-    Type type;
-};
-
-class PathObject : public PageObject {
-  public:
-    PathObject();
-
-    ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) override;
-    bool UpdateFPDFInstance(FPDF_PAGEOBJECT path_object) override;
-    bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT path_object) override;
-
-    ~PathObject();
-
-    class Segment {
-      public:
-        enum class Command {
-            Unknown = 0,
-            Move,
-            Line,
-        };
-
-        Command command;
-        float x;
-        float y;
-        bool is_closed;  // Checks if the path_segment is closed
-
-        Segment(Command command, float x, float y, bool is_closed = false)
-            : command(command), x(x), y(y), is_closed(is_closed) {}
-    };
-
-    bool is_fill_mode = false;
-    bool is_stroke = false;
-
-    std::vector<Segment> segments;
-};
-
-class ImageObject : public PageObject {
-  public:
-    ImageObject();
-
-    ScopedFPDFPageObject CreateFPDFInstance(FPDF_DOCUMENT document) override;
-    bool UpdateFPDFInstance(FPDF_PAGEOBJECT image_object) override;
-    bool PopulateFromFPDFInstance(FPDF_PAGEOBJECT image_object) override;
-
-    void* GetBitmapReadableBuffer() const;
-
-    ~ImageObject();
-
-    int width = 0;
-    int height = 0;
-    ScopedFPDFBitmap bitmap;
+    Type type_;
 };
 
 }  // namespace pdfClient

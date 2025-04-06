@@ -21,8 +21,8 @@ import static com.google.common.truth.Truth.assertThat;
 
 import android.content.Context;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,7 +39,7 @@ public class LevelDBManagerTest {
 
     @Test
     public void testLevelDbOperations() {
-        final Context context = InstrumentationRegistry.getInstrumentation().getContext();
+        final Context context = InstrumentationRegistry.getTargetContext();
         String levelDBFile = "test-leveldb";
         final String levelDBPath = context.getFilesDir().getPath() + "/" + levelDBFile;
         LevelDBInstance levelDBInstance = LevelDBManager.getInstance(levelDBPath);

@@ -152,6 +152,11 @@ public class IsolatedContext extends ContextWrapper {
             protected boolean shouldCheckForMaliciousActivity() {
                 return Flags.enableMaliciousAppDetector();
             }
+
+            @Override
+            protected void enforcePermissionCheckForOemMetadataUpdate(){
+
+            }
         };
     }
 

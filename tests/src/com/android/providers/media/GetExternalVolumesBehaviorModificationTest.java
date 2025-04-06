@@ -55,7 +55,7 @@ import java.util.Set;
 @RunWith(AndroidJUnit4.class)
 @RequiresFlagsEnabled({Flags.FLAG_EXCLUDE_UNRELIABLE_VOLUMES})
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
-public class MediaProviderChangeIdTest {
+public class GetExternalVolumesBehaviorModificationTest {
     @Rule
     public TestRule compatChangeRule = new PlatformCompatChangeRule();
 

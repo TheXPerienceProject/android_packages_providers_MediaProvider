@@ -22,6 +22,7 @@ import android.annotation.NonNull;
 import android.graphics.Color;
 import android.graphics.RectF;
 import android.graphics.pdf.flags.Flags;
+import android.graphics.pdf.utils.Preconditions;
 
 /**
  * Represents a free text annotation in a PDF document.
@@ -38,6 +39,7 @@ import android.graphics.pdf.flags.Flags;
  */
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_TEXT_ANNOTATIONS)
 public final class FreeTextAnnotation extends PdfAnnotation {
+    @NonNull private RectF mBounds;
     @NonNull private String mTextContent;
     private @ColorInt int mTextColor;
     private @ColorInt int mBackgroundColor;
@@ -51,10 +53,31 @@ public final class FreeTextAnnotation extends PdfAnnotation {
      * @param textContent The text content of the annotation
      */
     public FreeTextAnnotation(@NonNull RectF bounds, @NonNull String textContent) {
-        super(PdfAnnotationType.FREETEXT, bounds);
+        super(PdfAnnotationType.FREETEXT);
+        this.mBounds = bounds;
         this.mTextContent = textContent;
         this.mTextColor = Color.BLACK;
         this.mBackgroundColor = Color.WHITE;
+    }
+
+    /**
+     * Sets the bounding rectangle of the freetext annotation.
+     *
+     * @param bounds The new bounding rectangle.
+     * @throws NullPointerException if given bounds is null
+     */
+    public void setBounds(@NonNull RectF bounds) {
+        Preconditions.checkNotNull(bounds, "Bounds should not be null");
+        this.mBounds = bounds;
+    }
+
+    /**
+     * Returns the bounding rectangle of the freetext annotation.
+     *
+     * @return The bounding rectangle.
+     */
+    @NonNull public RectF getBounds() {
+        return mBounds;
     }
 
     /**

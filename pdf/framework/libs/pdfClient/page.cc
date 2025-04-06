@@ -32,9 +32,12 @@
 #include "fpdf_doc.h"
 #include "fpdf_text.h"
 #include "fpdfview.h"
+#include "image_object.h"
 #include "logging.h"
 #include "normalize.h"
+#include "path_object.h"
 #include "rect.h"
+#include "text_object.h"
 #include "utf.h"
 #include "utils/annot_hider.h"
 #include "utils/text.h"
@@ -462,7 +465,7 @@ std::vector<PageObject*> Page::GetPageObjects(bool refetch) {
 
 int Page::AddPageObject(std::unique_ptr<PageObject> pageObject) {
     // Create a scoped PDFium page object.
-    ScopedFPDFPageObject scoped_page_object = pageObject->CreateFPDFInstance(document_);
+    ScopedFPDFPageObject scoped_page_object(pageObject->CreateFPDFInstance(document_, page_.get()));
 
     // Check if a FPDF page object was created.
     if (!scoped_page_object) {
@@ -509,7 +512,7 @@ bool Page::UpdatePageObject(int index, std::unique_ptr<PageObject> pageObject) {
     FPDF_PAGEOBJECT page_object = FPDFPage_GetObject(page_.get(), index);
 
     // Update PDFium PageObject
-    if (!pageObject->UpdateFPDFInstance(page_object)) {
+    if (!pageObject->UpdateFPDFInstance(page_object, page_.get())) {
         return false;
     }
 
@@ -805,6 +808,10 @@ void Page::PopulatePageObjects(bool refetch) {
         std::unique_ptr<PageObject> page_object_ = nullptr;
 
         switch (type) {
+            case FPDF_PAGEOBJ_TEXT: {
+                page_object_ = std::make_unique<TextObject>();
+                break;
+            }
             case FPDF_PAGEOBJ_PATH: {
                 page_object_ = std::make_unique<PathObject>();
                 break;
@@ -818,7 +825,7 @@ void Page::PopulatePageObjects(bool refetch) {
         }
 
         // Populate PageObject From Page
-        if (page_object_ && page_object_->PopulateFromFPDFInstance(page_object)) {
+        if (page_object_ && page_object_->PopulateFromFPDFInstance(page_object, page_.get())) {
             page_objects_[index] = std::move(page_object_);
         }
     }
@@ -851,25 +858,48 @@ void Page::PopulateAnnotations() {
         ScopedFPDFAnnotation scoped_annot(FPDFPage_GetAnnot(page_.get(), annotation_index));
         int annotationType = FPDFAnnot_GetSubtype(scoped_annot.get());
 
-        FS_RECTF rect;
-        if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
-            LOGE("Failed to get the bounds of the annotation");
-            break;
-        }
-        Rectangle_f bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
-
         std::unique_ptr<Annotation> annotation = nullptr;
 
         switch (annotationType) {
             case FPDF_ANNOT_STAMP: {
+                FS_RECTF rect;
+                if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
+                    LOGE("Failed to get the bounds of the annotation");
+                    break;
+                }
+                auto bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
                 annotation = std::make_unique<StampAnnotation>(bounds);
                 break;
             }
             case FPDF_ANNOT_HIGHLIGHT: {
+                vector<Rectangle_f> bounds;
+                auto num_bounds = FPDFAnnot_CountAttachmentPoints(scoped_annot.get());
+                if (num_bounds > 0) {
+                    bounds.resize(num_bounds);
+                    for (auto bound_index = 0; bound_index < num_bounds; bound_index++) {
+                        FS_QUADPOINTSF quad_points;
+                        if (!FPDFAnnot_GetAttachmentPoints(scoped_annot.get(), bound_index,
+                                                           &quad_points)) {
+                            LOGD("Failed to get quad points from pdfium");
+                            break;
+                        }
+
+                        bounds[bound_index] = Rectangle_f(quad_points.x1, quad_points.y1,
+                                                          quad_points.x2, quad_points.y4);
+                    }
+                } else {
+                    LOGD("Failed to find bounds for highlight annotation");
+                }
                 annotation = std::make_unique<HighlightAnnotation>(bounds);
                 break;
             }
             case FPDF_ANNOT_FREETEXT: {
+                FS_RECTF rect;
+                if (!FPDFAnnot_GetRect(scoped_annot.get(), &rect)) {
+                    LOGE("Failed to get the bounds of the annotation");
+                    break;
+                }
+                auto bounds = Rectangle_f{rect.left, rect.top, rect.right, rect.bottom};
                 annotation = std::make_unique<FreeTextAnnotation>(bounds);
                 break;
             }
@@ -878,7 +908,8 @@ void Page::PopulateAnnotations() {
             }
         }
 
-        if (!annotation || !annotation->PopulateFromPdfiumInstance(scoped_annot.get())) {
+        if (!annotation ||
+            !annotation->PopulateFromPdfiumInstance(scoped_annot.get(), page_.get())) {
             LOGE("Failed to create a pdfClient's instance of annotation using pdfium "
                  "instance");
         }
@@ -944,7 +975,7 @@ bool Page::UpdatePageAnnotation(int index, std::unique_ptr<Annotation> annotatio
         return false;
     }
 
-    if (!annotation->UpdatePdfiumInstance(scoped_annot.get(), document_)) {
+    if (!annotation->UpdatePdfiumInstance(scoped_annot.get(), document_, page_.get())) {
         LOGE("Failed to update pdfium annotation's instance");
         return false;
     }

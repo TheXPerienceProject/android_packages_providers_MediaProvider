@@ -474,6 +474,31 @@ constructor(
                 // Trigger transcoding.
                 val transcodeStatus =
                     if (transcoder.isTranscodeRequired(context, mediaCapabilities, item)) {
+                        val transcodingVideoInfo: Transcoder.VideoInfo? =
+                            transcoder.getTranscodingVideoInfo()
+                        scope.launch {
+                            val configuration = configurationManager.configuration.value
+                            if (transcodingVideoInfo != null) {
+                                events.dispatch(
+                                    Event.ReportTranscodingVideoDetails(
+                                        dispatcherToken = FeatureToken.CORE.token,
+                                        sessionId = configuration.sessionId,
+                                        duration = transcodingVideoInfo.duration,
+                                        colorTransfer = transcodingVideoInfo.colorTransfer,
+                                        colorStandard = transcodingVideoInfo.colorStandard,
+                                        mimeType = transcodingVideoInfo.mimeType,
+                                    )
+                                )
+                            }
+                            events.dispatch(
+                                Event.LogPhotopickerUIEvent(
+                                    FeatureToken.CORE.token,
+                                    configuration.sessionId,
+                                    configuration.callingPackageUid ?: -1,
+                                    Telemetry.UiEvent.PICKER_TRANSCODING_START,
+                                )
+                            )
+                        }
                         val uri = item.mediaUri
                         val resultBundle =
                             contentResolver.call(
@@ -485,9 +510,31 @@ constructor(
 
                         if (resultBundle?.getBoolean(PICKER_TRANSCODE_RESULT, false) == true) {
                             Log.v(PrepareMediaFeature.TAG, "Transcode successful: $item")
+                            scope.launch {
+                                val configuration = configurationManager.configuration.value
+                                events.dispatch(
+                                    Event.LogPhotopickerUIEvent(
+                                        FeatureToken.CORE.token,
+                                        configuration.sessionId,
+                                        configuration.callingPackageUid ?: -1,
+                                        Telemetry.UiEvent.PICKER_TRANSCODING_SUCCESS,
+                                    )
+                                )
+                            }
                             TranscodeStatus.SUCCEED
                         } else {
                             Log.w(PrepareMediaFeature.TAG, "Not able to transcode: $item")
+                            scope.launch {
+                                val configuration = configurationManager.configuration.value
+                                events.dispatch(
+                                    Event.LogPhotopickerUIEvent(
+                                        FeatureToken.CORE.token,
+                                        configuration.sessionId,
+                                        configuration.callingPackageUid ?: -1,
+                                        Telemetry.UiEvent.PICKER_TRANSCODING_FAILED,
+                                    )
+                                )
+                            }
                             TranscodeStatus.NOT_APPLIED
                         }
                     } else {

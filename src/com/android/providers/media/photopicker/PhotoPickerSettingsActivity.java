@@ -36,9 +36,6 @@ import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -54,6 +51,7 @@ import com.android.providers.media.photopicker.data.model.UserId;
 import com.android.providers.media.photopicker.ui.settings.SettingsProfileSelectFragment;
 import com.android.providers.media.photopicker.ui.settings.SettingsViewModel;
 import com.android.providers.media.photopicker.util.RecentsPreviewUtil;
+import com.android.settingslib.collapsingtoolbar.CollapsingToolbarAppCompatActivity;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,7 +60,7 @@ import java.util.List;
 /**
  * Photo Picker settings page where user can view/edit current cloud media provider.
  */
-public class PhotoPickerSettingsActivity extends AppCompatActivity {
+public class PhotoPickerSettingsActivity extends CollapsingToolbarAppCompatActivity {
     private static final String TAG = "PickerSettings";
     static final String EXTRA_CURRENT_USER_ID = "user_id";
     private static final int DEFAULT_EXTRA_USER_ID = -1;
@@ -107,8 +105,8 @@ public class PhotoPickerSettingsActivity extends AppCompatActivity {
             mCallingUserId = DEFAULT_EXTRA_USER_ID;
         }
 
+        setTitle(R.string.picker_settings_title);
         setContentView(R.layout.activity_photo_picker_settings);
-        displayActionBar();
         createAndShowFragment(mCallingUserId, /* allowReplace= */ false);
 
         View settingsView = findViewById(R.id.settings_activity_root);
@@ -152,14 +150,6 @@ public class PhotoPickerSettingsActivity extends AppCompatActivity {
     private void updateRecentsVisibilitySetting() {
         RecentsPreviewUtil.updateRecentsVisibilitySetting(mSettingsViewModel.getConfigStore(),
                 mSettingsViewModel.getUserManagerState(), this);
-    }
-
-    private void displayActionBar() {
-        final Toolbar toolbar = findViewById(R.id.picker_settings_toolbar);
-        setSupportActionBar(toolbar);
-        final ActionBar actionBar = getSupportActionBar();
-        actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setDisplayShowTitleEnabled(false);
     }
 
     @Override

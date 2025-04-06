@@ -248,7 +248,7 @@ open class MediaProviderClient {
     }
 
     /** Fetch a list of [Media] from MediaProvider for the given page key. */
-    suspend fun fetchMedia(
+    open suspend fun fetchMedia(
         pageKey: MediaPageKey,
         pageSize: Int,
         contentResolver: ContentResolver,
@@ -401,7 +401,7 @@ open class MediaProviderClient {
     }
 
     /** Fetch a list of [Group.Album] from MediaProvider for the given page key. */
-    suspend fun fetchAlbums(
+    open suspend fun fetchAlbums(
         pageKey: MediaPageKey,
         pageSize: Int,
         contentResolver: ContentResolver,
@@ -447,7 +447,7 @@ open class MediaProviderClient {
     }
 
     /** Fetch a list of [Media] from MediaProvider for the given page key. */
-    suspend fun fetchAlbumMedia(
+    open suspend fun fetchAlbumMedia(
         albumId: String,
         albumAuthority: String,
         pageKey: MediaPageKey,

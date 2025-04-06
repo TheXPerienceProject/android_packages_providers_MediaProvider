@@ -160,7 +160,8 @@ class PhotoGridViewModelTest {
                 resources.getDrawable(R.drawable.android, /* theme= */ null)
             }
             whenever(mockUserManager.getProfileLabel()) { PLATFORM_PROVIDED_PROFILE_LABEL }
-            whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIMARY)) {
+            whenever(mockUserManager.getUserProperties(USER_HANDLE_PRIMARY))
+            @JvmSerializableLambda {
                 UserProperties.Builder().build()
             }
         }

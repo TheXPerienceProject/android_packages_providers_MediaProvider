@@ -16,10 +16,9 @@
 
 package android.graphics.pdf.component;
 
+import android.annotation.ColorInt;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
-import android.annotation.Nullable;
-import android.graphics.Color;
 import android.graphics.Path;
 import android.graphics.pdf.flags.Flags;
 
@@ -31,9 +30,10 @@ import android.graphics.pdf.flags.Flags;
 @FlaggedApi(Flags.FLAG_ENABLE_EDIT_PDF_PAGE_OBJECTS)
 public final class PdfPagePathObject extends PdfPageObject {
     private final Path mPath;
-    private Color mStrokeColor;
+    private @ColorInt int mStrokeColor;
     private float mStrokeWidth;
-    private Color mFillColor;
+    private @ColorInt int mFillColor;
+    private @PdfPageObjectRenderMode.Type int mRenderMode;
 
     /**
      * Constructor for the PdfPagePathObject. Sets the object type
@@ -42,6 +42,7 @@ public final class PdfPagePathObject extends PdfPageObject {
     public PdfPagePathObject(@NonNull Path path) {
         super(PdfPageObjectType.PATH);
         this.mPath = path;
+        this.mRenderMode = PdfPageObjectRenderMode.FILL;
     }
 
     /**
@@ -64,8 +65,7 @@ public final class PdfPagePathObject extends PdfPageObject {
      *
      * @return The stroke color of the object.
      */
-    @Nullable
-    public Color getStrokeColor() {
+    public @ColorInt int getStrokeColor() {
         return mStrokeColor;
     }
 
@@ -74,7 +74,7 @@ public final class PdfPagePathObject extends PdfPageObject {
      *
      * @param strokeColor The stroke color of the object.
      */
-    public void setStrokeColor(@Nullable Color strokeColor) {
+    public void setStrokeColor(@ColorInt int strokeColor) {
         this.mStrokeColor = strokeColor;
     }
 
@@ -101,8 +101,7 @@ public final class PdfPagePathObject extends PdfPageObject {
      *
      * @return The fill color of the object.
      */
-    @Nullable
-    public Color getFillColor() {
+    public @ColorInt int getFillColor() {
         return mFillColor;
     }
 
@@ -111,8 +110,27 @@ public final class PdfPagePathObject extends PdfPageObject {
      *
      * @param fillColor The fill color of the object.
      */
-    public void setFillColor(@Nullable Color fillColor) {
+    public void setFillColor(@ColorInt int fillColor) {
         this.mFillColor = fillColor;
     }
 
+    /**
+     * Returns the {@link PdfPageObjectRenderMode} of the object.
+     * Returns {@link PdfPageObjectRenderMode#FILL} by default
+     * if {@link PdfPagePathObject#mRenderMode} is not set.
+     *
+     * @return The {@link PdfPageObjectRenderMode} of the object.
+     */
+    public @PdfPageObjectRenderMode.Type int getRenderMode() {
+        return mRenderMode;
+    }
+
+    /**
+     * Sets the {@link PdfPageObjectRenderMode} of the object.
+     *
+     * @param renderMode The {@link PdfPageObjectRenderMode} to be set.
+     */
+    public void setRenderMode(@PdfPageObjectRenderMode.Type int renderMode) {
+        mRenderMode = renderMode;
+    }
 }

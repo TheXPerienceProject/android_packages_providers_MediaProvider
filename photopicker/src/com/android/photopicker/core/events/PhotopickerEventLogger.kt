@@ -100,6 +100,7 @@ class PhotopickerEventLogger(val dataService: Lazy<DataService>) {
                             /* is_search_enabled */ false,
                             event.isCloudSearchEnabled,
                             event.isLocalSearchEnabled,
+                            event.isTranscodingRequested,
                         )
                     }
                     is Event.LogPhotopickerUIEvent -> {
@@ -254,6 +255,24 @@ class PhotopickerEventLogger(val dataService: Lazy<DataService>) {
                             event.isSurfacePackageCreationSuccessful,
                             event.surfacePackageDeliveryStartTime,
                             event.surfacePackageDeliveryEndTime,
+                        )
+                    }
+                    is Event.ReportPickerAppMediaCapabilities -> {
+                        MediaProviderStatsLog.write(
+                            MediaProviderStatsLog.PHOTOPICKER_APP_MEDIA_CAPABILITIES_REPORTED,
+                            event.sessionId,
+                            event.supportedHdrTypes,
+                            event.unsupportedHdrTypes,
+                        )
+                    }
+                    is Event.ReportTranscodingVideoDetails -> {
+                        MediaProviderStatsLog.write(
+                            MediaProviderStatsLog.PHOTOPICKER_VIDEO_TRANSCODING_DETAILS_LOGGED,
+                            event.sessionId,
+                            event.duration,
+                            event.colorStandard,
+                            event.colorTransfer,
+                            event.mimeType,
                         )
                     }
                 }

@@ -34,6 +34,7 @@ import static android.provider.CloudMediaProviderContract.METHOD_GET_ASYNC_CONTE
 import static android.provider.MediaStore.EXTRA_IS_STABLE_URIS_ENABLED;
 import static android.provider.MediaStore.EXTRA_OPEN_ASSET_FILE_REQUEST;
 import static android.provider.MediaStore.EXTRA_OPEN_FILE_REQUEST;
+import static android.provider.MediaStore.EXTRA_URI_LIST;
 import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE;
 import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
 import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
@@ -521,6 +522,7 @@ public class MediaProvider extends ContentProvider {
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.CUR_DEVELOPMENT)
     @VisibleForTesting
+    // TODO: b/402623169 Set CUR_DEVELOPMENT as the latest version once available
     static final long EXCLUDE_UNRELIABLE_STORAGE_VOLUMES = 391360514L;
 
     /**
@@ -574,7 +576,7 @@ public class MediaProvider extends ContentProvider {
      * Attempting to send more than 2000 uris will result in an IllegalArgumentException.
      */
     @ChangeId
-    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.BAKLAVA)
+    @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     static final long LIMIT_CREATE_REQUEST_URIS = 203408344L;
 
     @GuardedBy("mPendingOpenInfo")
@@ -5859,6 +5861,12 @@ public class MediaProvider extends ContentProvider {
             }
         }
 
+
+        // Enforce oem_metadata permission if caller is not MediaProvider
+        if (Flags.enableOemMetadataUpdate() && initialValues.containsKey(OEM_METADATA)) {
+            enforcePermissionCheckForOemMetadataUpdate();
+        }
+
         long rowId = -1;
         Uri newUri = null;
 
@@ -7316,8 +7324,77 @@ public class MediaProvider extends ContentProvider {
                 removeRecoveryData();
                 return new Bundle();
             }
+            case MediaStore.BULK_UPDATE_OEM_METADATA_CALL: {
+                callForBulkUpdateOemMetadataColumn();
+                return new Bundle();
+            }
             default:
                 throw new UnsupportedOperationException("Unsupported call: " + method);
+        }
+    }
+
+    private void callForBulkUpdateOemMetadataColumn() {
+        if (!Flags.enableOemMetadataUpdate()) {
+            return;
+        }
+
+        enforcePermissionCheckForOemMetadataUpdate();
+        Set<String> oemSupportedMimeTypes = mMediaScanner.getOemSupportedMimeTypes();
+        if (oemSupportedMimeTypes == null || oemSupportedMimeTypes.isEmpty()) {
+            // Nothing to update
+            return;
+        }
+
+        // Get media types to update rows based on media type
+        Set<Integer> mediaTypesToBeUpdated = new HashSet<>();
+        for (String mimeType : oemSupportedMimeTypes) {
+            // Convert to media type to avoid using like clause on mime types to protect against
+            // SQL injection
+            mediaTypesToBeUpdated.add(MimeUtils.resolveMediaType(mimeType));
+        }
+
+        if (mediaTypesToBeUpdated.isEmpty()) {
+            // For invalid mime types, do not bother
+            return;
+        }
+
+        final LocalCallingIdentity token = clearLocalCallingIdentity();
+        try {
+            ContentValues values = new ContentValues();
+            values.putNull(OEM_METADATA);
+            // Mark _modifier as _MODIFIER_CR to allow metadata update on next scan. This
+            // is explicitly required when calling update with MediaProvider identity
+            values.put(FileColumns._MODIFIER, FileColumns._MODIFIER_CR);
+            Bundle extras = new Bundle();
+            extras.putString(ContentResolver.QUERY_ARG_SQL_SELECTION,
+                    appendMediaTypeClause(mediaTypesToBeUpdated));
+            Log.v(TAG, "Trigger bulk update of OEM metadata");
+            update(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL), values, extras);
+        } finally {
+            restoreLocalCallingIdentity(token);
+        }
+    }
+
+    private String appendMediaTypeClause(Set<Integer> mediaTypesToBeUpdated) {
+        List<String> whereMediaTypesCondition = new ArrayList<String>();
+        for (Integer mediaType : mediaTypesToBeUpdated) {
+            whereMediaTypesCondition.add(
+                    String.format(Locale.ROOT, "%s=%d", MEDIA_TYPE, mediaType));
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("(");
+        sb.append(TextUtils.join(" OR ", whereMediaTypesCondition));
+        sb.append(")");
+        return sb.toString();
+    }
+
+    @VisibleForTesting
+    protected void enforcePermissionCheckForOemMetadataUpdate() {
+        if (!isCallingPackageSelf()
+                && !mCallingIdentity.get().checkCallingPermissionToUpdateOemMetadata()) {
+            throw new SecurityException(
+                    "Calling package does not have permission to update OEM metadata");
         }
     }
 
@@ -7363,7 +7440,7 @@ public class MediaProvider extends ContentProvider {
             userId = uidToUserId(packageUid);
             // Uris are not a requirement for revoke all call
             if (!isCallForRevokeAll) {
-                uris = extras.getParcelableArrayList(MediaStore.EXTRA_URI_LIST);
+                uris = extras.getParcelableArrayList(EXTRA_URI_LIST);
             }
         } else {
             // All other callers are unauthorized.
@@ -7640,14 +7717,14 @@ public class MediaProvider extends ContentProvider {
 
     @NotNull
     private Bundle getResultForGetRedactedMediaUriList(Bundle extras) {
-        final List<Uri> uris = extras.getParcelableArrayList(MediaStore.EXTRA_URI_LIST);
+        final List<Uri> uris = extras.getParcelableArrayList(EXTRA_URI_LIST);
         // NOTE: It is ok to update the DB and return a redacted URI for the cases when
         // the user code only has read access, hence we don't check for write permission.
         enforceCallingPermission(uris, false);
         final LocalCallingIdentity token = clearLocalCallingIdentity();
         try {
             final Bundle res = new Bundle();
-            res.putParcelableArrayList(MediaStore.EXTRA_URI_LIST,
+            res.putParcelableArrayList(EXTRA_URI_LIST,
                     (ArrayList<? extends Parcelable>) getRedactedUri(uris));
             return res;
         } finally {
@@ -7678,12 +7755,12 @@ public class MediaProvider extends ContentProvider {
         } else if (checkPermissionSelf(caller) || isCallerPhotoPicker()) {
             // If the caller is MediaProvider the accepted parameters are EXTRA_URI_LIST
             // and EXTRA_UID.
-            if (!extras.containsKey(MediaStore.EXTRA_URI_LIST)
+            if (!extras.containsKey(EXTRA_URI_LIST)
                     && !extras.containsKey(Intent.EXTRA_UID)) {
                 throw new IllegalArgumentException(
                         "Missing required extras arguments: EXTRA_URI_LIST or" + " EXTRA_UID");
             }
-            uris = extras.getParcelableArrayList(MediaStore.EXTRA_URI_LIST);
+            uris = extras.getParcelableArrayList(EXTRA_URI_LIST);
             final PackageManager pm = getContext().getPackageManager();
             final int packageUid = extras.getInt(Intent.EXTRA_UID);
             final String[] packages = pm.getPackagesForUid(packageUid);
@@ -7783,7 +7860,8 @@ public class MediaProvider extends ContentProvider {
             String packageName = arg;
             int uid = extras.getInt(MediaStore.EXTRA_IS_SYSTEM_GALLERY_UID);
             boolean isSystemGallery = PermissionUtils.checkWriteImagesOrVideoAppOps(
-                    getContext(), uid, packageName, getContext().getAttributionTag());
+                    getContext(), uid, packageName, getContext().getAttributionTag(),
+                    /*forDataDelivery*/ false);
             Bundle res = new Bundle();
             res.putBoolean(MediaStore.EXTRA_IS_SYSTEM_GALLERY_RESPONSE, isSystemGallery);
             return res;
@@ -8760,6 +8838,11 @@ public class MediaProvider extends ContentProvider {
                     && !isCallingPackageSelf()) {
                 // We only allow MediaScanner to send updates for generation modified
                 initialValues.remove(FileColumns.GENERATION_MODIFIED);
+            }
+
+            // Enforce oem_metadata permission if caller is not MediaProvider
+            if (Flags.enableOemMetadataUpdate() && initialValues.containsKey(OEM_METADATA)) {
+                enforcePermissionCheckForOemMetadataUpdate();
             }
 
             if (!isCallingPackageSelf()) {
@@ -11898,14 +11981,15 @@ public class MediaProvider extends ContentProvider {
         final ContentResolver resolver = getContext().getContentResolver();
         final Uri uri = getBaseContentUri(volumeName);
         // TODO(b/182396009) we probably also want to notify clone profile (and vice versa)
-        resolver.notifyChange(getBaseContentUri(volumeName), null);
+        ForegroundThread.getExecutor().execute(() -> {
+            resolver.notifyChange(getBaseContentUri(volumeName), null);
+        });
 
         if (LOGV) Log.v(TAG, "Attached volume: " + volume);
         if (!MediaStore.VOLUME_INTERNAL.equals(volumeName)) {
-            // Also notify on synthetic view of all devices
-            resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
-
             ForegroundThread.getExecutor().execute(() -> {
+                // Also notify on synthetic view of all devices
+                resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
                 mExternalDatabase.runWithTransaction((db) -> {
                     ensureNecessaryFolders(volume, db);
                     return null;
@@ -11966,11 +12050,15 @@ public class MediaProvider extends ContentProvider {
         }
 
         final ContentResolver resolver = getContext().getContentResolver();
-        resolver.notifyChange(getBaseContentUri(volumeName), null);
+        ForegroundThread.getExecutor().execute(() -> {
+            resolver.notifyChange(getBaseContentUri(volumeName), null);
+        });
 
         if (!MediaStore.VOLUME_INTERNAL.equals(volumeName)) {
-            // Also notify on synthetic view of all devices
-            resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
+            ForegroundThread.getExecutor().execute(() -> {
+                // Also notify on synthetic view of all devices
+                resolver.notifyChange(getBaseContentUri(MediaStore.VOLUME_EXTERNAL), null);
+            });
         }
 
         if (LOGV) Log.v(TAG, "Detached volume: " + volumeName);
@@ -12062,6 +12150,8 @@ public class MediaProvider extends ContentProvider {
 
         sMutableColumns.add(MediaStore.Files.FileColumns.MIME_TYPE);
         sMutableColumns.add(MediaStore.Files.FileColumns.MEDIA_TYPE);
+
+        sMutableColumns.add(MediaStore.Files.FileColumns.OEM_METADATA);
     }
 
     /**

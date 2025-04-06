@@ -38,8 +38,6 @@ import com.android.photopicker.R
 import com.android.photopicker.core.components.MediaGridItem
 import com.android.photopicker.core.components.mediaGrid
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
-import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
-import com.android.photopicker.core.embedded.LocalEmbeddedState
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.LocalEvents
 import com.android.photopicker.core.events.Telemetry
@@ -80,10 +78,6 @@ fun AlbumGrid(viewModel: AlbumGridViewModel = obtainViewModel()) {
     val configuration = LocalPhotopickerConfiguration.current
     val events = LocalEvents.current
     val scope = rememberCoroutineScope()
-
-    val isEmbedded =
-        LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
-    val isExpanded = LocalEmbeddedState.current?.isExpanded ?: false
 
     // Use the expanded layout any time the Width is Medium or larger.
     val isExpandedScreen: Boolean =

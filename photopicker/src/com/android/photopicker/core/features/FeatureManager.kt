@@ -121,6 +121,8 @@ class FeatureManager(
                 Event.ReportPhotopickerSearchInfo::class.java,
                 Event.ReportSearchDataExtractionDetails::class.java,
                 Event.ReportEmbeddedPhotopickerInfo::class.java,
+                Event.ReportPickerAppMediaCapabilities::class.java,
+                Event.ReportTranscodingVideoDetails::class.java,
             )
     }
 
@@ -236,7 +238,7 @@ class FeatureManager(
                 mapOfDeferredWithTimeout<PrefetchResultKey, PrefetchDataService>(
                     inputMap = prefetchRequestMap,
                     input = prefetchDataService,
-                    timeoutMillis = 200L,
+                    timeoutMillis = 250L,
                     backgroundScope = scope,
                     dispatcher = dispatcher,
                 )

@@ -33,6 +33,7 @@ import com.android.providers.media.MediaVolume;
 import java.io.File;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Set;
 
 public interface MediaScanner {
     int REASON_UNKNOWN = MEDIA_PROVIDER_SCAN_OCCURRED__REASON__UNKNOWN;
@@ -62,4 +63,9 @@ public interface MediaScanner {
     void onIdleScanStopped();
 
     void onDirectoryDirty(@NonNull File file);
+
+    /**
+     * Returns OEM supported mime types for OEM metadata.
+     */
+    Set<String> getOemSupportedMimeTypes();
 }

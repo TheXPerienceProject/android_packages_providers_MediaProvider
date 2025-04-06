@@ -1132,6 +1132,18 @@ public class PickerDataLayerV2 {
                 Log.d(TAG, "Cannot fetch cloud categories when cloud authority is null.");
                 return null;
             }
+
+            try {
+                if (syncController.isFullSyncPending(cloudAuthority, /* isLocal */ false)) {
+                    Log.d(TAG, "Don't return cloud categories when full sync is pending.");
+                    return null;
+                }
+            } catch (RequestObsoleteException | RuntimeException e) {
+                Log.e(TAG, "Could not check if full sync is pending. "
+                        + "Not returning cloud categories", e);
+                return null;
+            }
+
             final PickerSearchProviderClient searchClient = PickerSearchProviderClient.create(
                     appContext, cloudAuthority);
             if (syncController.getCategoriesState().areCategoriesEnabled(

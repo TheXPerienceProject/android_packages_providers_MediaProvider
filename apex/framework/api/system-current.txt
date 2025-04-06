@@ -64,6 +64,7 @@ package android.provider {
   }
 
   public final class MediaStore {
+    method @FlaggedApi("com.android.providers.media.flags.enable_oem_metadata_update") public static void bulkUpdateOemMetadataInNextScan(@NonNull android.content.Context);
     method @NonNull public static android.net.Uri rewriteToLegacy(@NonNull android.net.Uri);
     method @NonNull @WorkerThread public static android.net.Uri scanFile(@NonNull android.content.ContentResolver, @NonNull java.io.File);
     method @WorkerThread public static void scanVolume(@NonNull android.content.ContentResolver, @NonNull String);
@@ -72,6 +73,7 @@ package android.provider {
     field public static final String AUTHORITY_LEGACY = "media_legacy";
     field @NonNull public static final android.net.Uri AUTHORITY_LEGACY_URI;
     field public static final String QUERY_ARG_DEFER_SCAN = "android:query-arg-defer-scan";
+    field @FlaggedApi("com.android.providers.media.flags.enable_oem_metadata_update") public static final String UPDATE_OEM_METADATA_PERMISSION = "com.android.providers.media.permission.UPDATE_OEM_METADATA";
   }
 
   @FlaggedApi("com.android.providers.media.flags.enable_oem_metadata") public abstract class OemMetadataService extends android.app.Service {

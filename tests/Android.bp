@@ -155,6 +155,25 @@ android_test_helper_app {
     ],
 }
 
+android_test_helper_app {
+    name: "LegacyMediaProviderTestAppFor33",
+    manifest: "test_app/LegacyTestAppWithTargetSdk33.xml",
+    srcs: [
+        "test_app/src/**/*.java",
+        "src/com/android/providers/media/util/TestUtils.java",
+    ],
+    static_libs: [
+        "cts-install-lib",
+    ],
+    sdk_version: "test_current",
+    target_sdk_version: "33",
+    min_sdk_version: "30",
+    test_suites: [
+        "general-tests",
+        "mts-mediaprovider",
+    ],
+}
+
 // This looks a bit awkward, but we need our tests to run against either
 // MediaProvider or MediaProviderGoogle, and we don't know which one is
 // on the device being tested, so we can't sign our tests with a key that
@@ -173,6 +192,7 @@ android_test {
     resource_dirs: [
         "main_res",
         "res",
+        "photopicker_res",
     ],
 
     srcs: [
@@ -224,6 +244,8 @@ android_test {
         "exoplayer-mediaprovider-ui",
         "SettingsLibProfileSelector",
         "SettingsLibSelectorWithWidgetPreference",
+        "SettingsLibTopIntroPreference",
+        "SettingsLibCollapsingToolbarBaseActivity",
         "mediaprovider_flags_java_lib",
         "flag-junit",
         "androidx.media3.media3-common",
@@ -247,6 +269,7 @@ android_test {
 
     data: [
         ":LegacyMediaProviderTestApp",
+        ":LegacyMediaProviderTestAppFor33",
         ":LegacyMediaProviderTestAppFor35",
         ":MediaProviderTestAppForPermissionActivity",
         ":MediaProviderTestAppForPermissionActivity33",

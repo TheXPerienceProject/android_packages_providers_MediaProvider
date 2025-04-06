@@ -26,6 +26,7 @@
 #include "form_widget_info.h"
 #include "page.h"
 #include "page_object.h"
+#include "path_object.h"
 #include "rect.h"
 
 using pdfClient::Annotation;
@@ -115,8 +116,6 @@ jobject ToJavaDestination(JNIEnv* env, const GotoLinkDest dest);
 jobject ToJavaGotoLink(JNIEnv* env, const GotoLink link);
 
 jobject ToJavaGotoLinks(JNIEnv* env, const vector<GotoLink>& links);
-
-jobject ToJavaBitmap(JNIEnv* env, void* buffer, int width, int height);
 
 jobject ToJavaColor(JNIEnv* env, Color color);
 
