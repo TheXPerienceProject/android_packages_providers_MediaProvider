@@ -38,13 +38,13 @@
     <string name="allow" msgid="8885707816848569619">"Permet"</string>
     <string name="deny" msgid="6040983710442068936">"Denega"</string>
     <string name="picker_browse" msgid="5554477454636075934">"Navega…"</string>
-    <string name="picker_settings" msgid="6443463167344790260">"Aplicació multimèdia al núvol"</string>
-    <string name="picker_settings_system_settings_menu_title" msgid="3055084757610063581">"App multimèdia al núvol"</string>
-    <string name="picker_settings_title" msgid="5647700706470673258">"Aplicació multimèdia al núvol"</string>
+    <string name="picker_settings" msgid="6443463167344790260">"App de multimèdia al núvol"</string>
+    <string name="picker_settings_system_settings_menu_title" msgid="3055084757610063581">"App de contingut multimèdia al núvol"</string>
+    <string name="picker_settings_title" msgid="5647700706470673258">"App de contingut multimèdia al núvol"</string>
     <string name="picker_settings_description" msgid="2916686824777214585">"Accedeix al contingut multimèdia al núvol quan una aplicació o un lloc web et demani que seleccionis fotos o vídeos"</string>
     <string name="picker_settings_selection_message" msgid="245453573086488596">"Accedeix al contingut multimèdia al núvol des de"</string>
     <string name="picker_settings_no_provider" msgid="2582311853680058223">"Cap"</string>
-    <string name="picker_settings_toast_error" msgid="697274445512467469">"No s\'ha pogut canviar l\'app multimèdia al núvol."</string>
+    <string name="picker_settings_toast_error" msgid="697274445512467469">"No s\'ha pogut canviar l\'app de multimèdia al núvol."</string>
     <string name="picker_sync_notification_channel" msgid="1867105708912627993">"Selector de mitjans"</string>
     <string name="picker_sync_notification_title" msgid="1122713382122055246">"Selector de mitjans"</string>
     <string name="picker_sync_notification_text" msgid="8204423917712309382">"S\'està sincronitzant el contingut multimèdia…"</string>
@@ -110,8 +110,8 @@
     <string name="picker_banner_cloud_first_time_available_desc" msgid="5570916598348187607">"Pots seleccionar fotos del compte de <xliff:g id="APP_NAME">%1$s</xliff:g> de <xliff:g id="USER_ACCOUNT">%2$s</xliff:g>"</string>
     <string name="picker_banner_cloud_account_changed_title" msgid="4825058474378077327">"S\'ha actualitzat el compte de <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="picker_banner_cloud_account_changed_desc" msgid="3433218869899792497">"Les fotos de <xliff:g id="USER_ACCOUNT">%1$s</xliff:g> ara s\'inclouen aquí"</string>
-    <string name="picker_banner_cloud_choose_app_title" msgid="3165966147547974251">"Tria una aplicació multimèdia amb servei al núvol"</string>
-    <string name="picker_banner_cloud_choose_app_desc" msgid="2359212653555524926">"Per incloure una còpia de seguretat de les fotos aquí, a Configuració, tria una aplicació multimèdia amb servei al núvol"</string>
+    <string name="picker_banner_cloud_choose_app_title" msgid="3165966147547974251">"Tria una aplicació de contingut multimèdia al núvol"</string>
+    <string name="picker_banner_cloud_choose_app_desc" msgid="2359212653555524926">"Per incloure una còpia de seguretat de les fotos aquí, a Configuració, tria una aplicació de contingut multimèdia al núvol"</string>
     <string name="picker_banner_cloud_choose_account_title" msgid="5010901185639577685">"Tria un compte de <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="picker_banner_cloud_choose_account_desc" msgid="8868134443673142712">"Per incloure les fotos de <xliff:g id="APP_NAME">%1$s</xliff:g> aquí, tria un compte a l\'aplicació"</string>
     <string name="picker_banner_cloud_dismiss_button" msgid="2935903078288463882">"Ignora"</string>
