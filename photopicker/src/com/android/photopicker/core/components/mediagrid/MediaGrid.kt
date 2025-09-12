@@ -851,16 +851,9 @@ fun defaultBuildMediaItem(
             // Padding is animated based on the selected state of the item. When the item is
             // selected, it should shrink in the cell and provide a surface background.
 
-            val isEmbedded =
-                LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
-
-            val shouldIndicateSelected =
-                if (isEmbedded) isSelected
-                else isSelected && LocalPhotopickerConfiguration.current.selectionLimit > 1
-
             val padding by
                 animateDpAsState(
-                    if (shouldIndicateSelected) {
+                    if (isSelected) {
                         MEASUREMENT_SELECTED_INTERNAL_PADDING
                     } else {
                         MEASUREMENT_NOT_SELECTED_INTERNAL_PADDING
@@ -958,7 +951,7 @@ fun defaultBuildMediaItem(
                         // selected or not.
                         modifier =
                             boxModifier.applyChoice(
-                                condition = shouldIndicateSelected,
+                                condition = isSelected,
                                 trueBlock = { selectedModifier },
                                 falseBlock = {
                                     applyChoice(
@@ -1090,72 +1083,66 @@ private fun SelectedIconOverlay(
             exit = scaleOut(animationSpec = emphasizedAccelerateFloat),
         ) {
             val configuration = LocalPhotopickerConfiguration.current
-            val isEmbedded =
-                LocalPhotopickerConfiguration.current.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED
-            val shouldIndicateSelected = isEmbedded || configuration.selectionLimit > 1
-            if (shouldIndicateSelected) {
-                when (configuration.pickImagesInOrder) {
-                    true -> {
-                        val numberFormatter = remember { NumberFormat.getInstance() }
-                        var rememberedIndex by remember { mutableStateOf(selectedIndex) }
+            when (configuration.pickImagesInOrder) {
+                true -> {
+                    val numberFormatter = remember { NumberFormat.getInstance() }
+                    var rememberedIndex by remember { mutableStateOf(selectedIndex) }
 
-                        LaunchedEffect(isSelected, selectedIndex) {
-                            if (isSelected) {
-                                rememberedIndex = selectedIndex
-                            }
+                    LaunchedEffect(isSelected, selectedIndex) {
+                        if (isSelected) {
+                            rememberedIndex = selectedIndex
                         }
-                        Text(
-                            // Since this is a 0-based index, increment it by 1 for displaying
-                            // to the user.
-                            text = numberFormatter.format(rememberedIndex + 1),
-                            textAlign = TextAlign.Center,
-                            modifier =
-                                Modifier.circleBackground(
-                                    color =
-                                        CustomAccentColorScheme.current
-                                            .getAccentColorIfDefinedOrElse(
-                                                /* fallback */ MaterialTheme.colorScheme.primary
-                                            ),
-                                    padding = 1.dp,
-                                    borderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    borderWidth = MEASUREMENT_SELECTED_ICON_BORDER,
-                                ),
-                            style =
-                                LocalTextStyle.current.copy(
-                                    fontSize = MEASUREMENT_SELECTED_POSITION_FONT_SIZE
-                                ),
-                            color =
-                                CustomAccentColorScheme.current
-                                    .getTextColorForAccentComponentsIfDefinedOrElse(
-                                        MaterialTheme.colorScheme.onPrimary
-                                    ),
-                            maxLines = 1,
-                            softWrap = false,
-                        )
                     }
-
-                    false ->
-                        Icon(
-                            ImageVector.vectorResource(R.drawable.photopicker_selected_media),
-                            modifier =
-                                Modifier
-                                    // Background is necessary because the icon has negative
-                                    // space.
-                                    .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
-                                    // Border color should match the surface that is behind
-                                    // the image.
-                                    .border(
-                                        MEASUREMENT_SELECTED_ICON_BORDER,
-                                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                                        CircleShape,
+                    Text(
+                        // Since this is a 0-based index, increment it by 1 for displaying
+                        // to the user.
+                        text = numberFormatter.format(rememberedIndex + 1),
+                        textAlign = TextAlign.Center,
+                        modifier =
+                            Modifier.circleBackground(
+                                color =
+                                    CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
+                                        /* fallback */ MaterialTheme.colorScheme.primary
                                     ),
-                            contentDescription = stringResource(R.string.photopicker_item_selected),
-                            tint =
-                                CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
-                                    /* fallback */ MaterialTheme.colorScheme.primary
+                                padding = 1.dp,
+                                borderColor = MaterialTheme.colorScheme.surfaceVariant,
+                                borderWidth = MEASUREMENT_SELECTED_ICON_BORDER,
+                            ),
+                        style =
+                            LocalTextStyle.current.copy(
+                                fontSize = MEASUREMENT_SELECTED_POSITION_FONT_SIZE
+                            ),
+                        color =
+                            CustomAccentColorScheme.current
+                                .getTextColorForAccentComponentsIfDefinedOrElse(
+                                    MaterialTheme.colorScheme.onPrimary
                                 ),
-                        )
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
+
+                false ->
+                    Icon(
+                        ImageVector.vectorResource(R.drawable.photopicker_selected_media),
+                        modifier =
+                            Modifier
+                                // Background is necessary because the icon has negative
+                                // space.
+                                .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
+                                // Border color should match the surface that is behind
+                                // the image.
+                                .border(
+                                    MEASUREMENT_SELECTED_ICON_BORDER,
+                                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    CircleShape,
+                                ),
+                        contentDescription = stringResource(R.string.photopicker_item_selected),
+                        tint =
+                            CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
+                                /* fallback */ MaterialTheme.colorScheme.primary
+                            ),
+                    )
             }
         } // Image + Icon Container
     }

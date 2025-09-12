@@ -607,4 +607,56 @@ class SelectionImplTest {
 
         assertWithMessage("Expected empty size did not match").that(selection.size()).isEqualTo(0)
     }
+
+    /** Ensures toggling a new item when selection limit is 1 replaces the existing item. */
+    @Test
+    fun testToggleWithSelectionLimitOneReplacesExistingItem() = runTest {
+        val initialItem = SelectionData(id = 1)
+        val selection: Selection<SelectionData> =
+            SelectionImpl(
+                scope = backgroundScope,
+                configuration =
+                    provideTestConfigurationFlow(
+                        scope = backgroundScope,
+                        defaultConfiguration =
+                            TestPhotopickerConfiguration.build {
+                                action("")
+                                selectionLimit(1)
+                            },
+                    ),
+                initialSelection = setOf(initialItem),
+                preSelectedMedia = testPreSelectionMediaData,
+            )
+        val emissions = mutableListOf<Set<SelectionData>>()
+        backgroundScope.launch { selection.flow.toList(emissions) }
+
+        val newItem = SelectionData(id = 2)
+
+        assertWithMessage("Initial selection should contain the initial item")
+            .that(selection.snapshot())
+            .contains(initialItem)
+        assertWithMessage("Initial selection size should be 1").that(selection.size()).isEqualTo(1)
+
+        val result = selection.toggle(newItem)
+
+        assertWithMessage("Toggle operation should be successful")
+            .that(result)
+            .isEqualTo(SelectionModifiedResult.SUCCESS)
+
+        val snapshot = selection.snapshot()
+        assertWithMessage("Snapshot should contain the new item").that(snapshot).contains(newItem)
+        assertWithMessage("Snapshot should not contain the initial item")
+            .that(snapshot)
+            .doesNotContain(initialItem)
+        assertWithMessage("Snapshot size should still be 1").that(snapshot).hasSize(1)
+
+        advanceTimeBy(100)
+
+        val flow = emissions.last()
+        assertWithMessage("Emitted flow should contain the new item").that(flow).contains(newItem)
+        assertWithMessage("Emitted flow should not contain the initial item")
+            .that(flow)
+            .doesNotContain(initialItem)
+        assertWithMessage("Emitted flow size should still be 1").that(flow).hasSize(1)
+    }
 }

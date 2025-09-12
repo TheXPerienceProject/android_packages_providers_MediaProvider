@@ -54,7 +54,6 @@ import com.android.photopicker.core.animations.emphasizedAccelerate
 import com.android.photopicker.core.animations.emphasizedDecelerate
 import com.android.photopicker.core.components.ElevationTokens
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
-import com.android.photopicker.core.configuration.PhotopickerRuntimeEnv
 import com.android.photopicker.core.events.Event
 import com.android.photopicker.core.events.LocalEvents
 import com.android.photopicker.core.events.Telemetry
@@ -97,13 +96,6 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
             MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP.equals(
                 LocalPhotopickerConfiguration.current.action
             )
-    val visible =
-        if (configuration.runtimeEnv == PhotopickerRuntimeEnv.EMBEDDED) {
-            // For embedded picker do not show selection bar when limit is 1
-            configuration.selectionLimit > 1 && showSelectionBar
-        } else {
-            showSelectionBar
-        }
     val disableClearAllButton =
         MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP.equals(
             LocalPhotopickerConfiguration.current.action
@@ -117,7 +109,7 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
     AnimatedVisibility(
         // Pass through the modifier that is received for positioning offsets.
         modifier = modifier,
-        visible = visible,
+        visible = showSelectionBar,
         enter =
             slideInVertically(animationSpec = emphasizedDecelerate, initialOffsetY = { it * 2 }),
         exit = slideOutVertically(animationSpec = emphasizedAccelerate, targetOffsetY = { it * 2 }),
